@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_22"]
 
 [phases.install]
-cmds = ["npm install --legacy-peer-deps --include=optional"]
+cmds = ["npm install --legacy-peer-deps --include=optional", "npm install --os=linux --cpu=x64 sharp"]
 
 [start]
 cmd = "npm start"
