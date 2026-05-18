@@ -112,7 +112,7 @@ const s = {
   header:        { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:       { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   headerTitle:   { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a', textAlign: 'center' },
-  main:          { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 },
+  main:          { flex: 1, padding: '20px 16px', paddingBottom: 'max(32px, calc(32px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 14 },
   sourceRow:     { display: 'flex', gap: 8, flexWrap: 'wrap' },
   engineerBadge: { fontSize: 12, background: '#f0fdf4', color: '#15803d', padding: '4px 10px', borderRadius: 99, fontWeight: 600 },
   confBadge:     { fontSize: 12, padding: '4px 10px', borderRadius: 99 },

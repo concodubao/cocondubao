@@ -97,7 +97,7 @@ const styles = {
   header:      { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0' },
   iconBtn:     { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   headerTitle: { fontSize: 17, fontWeight: 700, color: '#0f172a' },
-  main:        { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 },
+  main:        { flex: 1, padding: '20px 16px', paddingBottom: 'max(32px, calc(32px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 14 },
   pickArea:    { border: '2px dashed #bbf7d0', borderRadius: 16, padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, cursor: 'pointer', background: '#f0fdf4' },
   pickIconWrap:{ width: 72, height: 72, borderRadius: 20, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bbf7d0' },
   pickText:    { fontSize: 15, color: '#64748b', textAlign: 'center', margin: 0, lineHeight: 1.5 },
@@ -105,7 +105,7 @@ const styles = {
   removeBtn:   { position: 'absolute', top: 10, right: 10, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', width: 34, height: 34, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   retakeBtn:   { position: 'absolute', bottom: 10, right: 10, background: 'rgba(0,0,0,0.5)', color: '#fff', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 13, cursor: 'pointer' },
   label:       { fontSize: 15, fontWeight: 600, color: '#0f172a' },
-  textarea:    { padding: '12px 14px', fontSize: 16, borderRadius: 10, border: '1.5px solid #e2e8f0', resize: 'none', outline: 'none', color: '#0f172a', background: '#fff', lineHeight: 1.6 },
+  textarea:    { width: '100%', padding: '12px 14px', fontSize: 16, borderRadius: 10, border: '1.5px solid #e2e8f0', resize: 'none', outline: 'none', color: '#0f172a', background: '#fff', lineHeight: 1.6, textAlign: 'left', boxSizing: 'border-box' },
   error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '8px 12px', borderRadius: 8, margin: 0 },
   btnSend:     { padding: '14px', fontSize: 18, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52 },
 }

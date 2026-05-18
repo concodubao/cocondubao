@@ -135,6 +135,6 @@ const styles = {
   badge:     { background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 11, fontWeight: 700, padding: '2px 7px', display: 'inline-block' },
   quickNav:  { padding: '4px 16px 0', display: 'flex', gap: 10, flexWrap: 'wrap' },
   quickBtn:  { padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#16a34a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, minHeight: 40 },
-  footer:    { padding: '20px 16px 0', display: 'flex', justifyContent: 'center' },
+  footer:    { padding: '20px 16px 0', paddingBottom: 'max(20px, env(safe-area-inset-bottom))', display: 'flex', justifyContent: 'center' },
   logoutBtn: { background: 'transparent', border: 'none', fontSize: 14, color: '#94a3b8', cursor: 'pointer', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 },
 }

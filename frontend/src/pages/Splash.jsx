@@ -88,8 +88,8 @@ export default function Splash() {
 
 const s = {
   loadPage: { minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif" },
-  page:     { minHeight: '100dvh', background: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', padding: '24px 20px 56px', fontFamily: "'Noto Sans', sans-serif" },
-  content:  { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, width: '100%', maxWidth: 380 },
+  page:     { minHeight: '100dvh', background: '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 20px', fontFamily: "'Noto Sans', sans-serif" },
+  content:  { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24, width: '100%', maxWidth: 380 },
   logoMark: { width: 64, height: 64, borderRadius: 18, background: '#16a34a', color: '#fff', fontSize: 28, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   appName:  { fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0, textAlign: 'center' },
   tagline:  { fontSize: 14, color: '#64748b', margin: '-8px 0 0', textAlign: 'center' },

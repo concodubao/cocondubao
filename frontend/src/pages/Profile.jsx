@@ -114,7 +114,7 @@ const s = {
   welcomeText: { fontSize: 15, color: '#15803d', margin: 0, lineHeight: 1.6 },
   section:     { display: 'flex', flexDirection: 'column', gap: 6 },
   label:       { fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 },
-  input:       { padding: '12px 14px', fontSize: 16, borderRadius: 10, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', boxSizing: 'border-box' },
+  input:       { width: '100%', padding: '12px 14px', fontSize: 16, borderRadius: 10, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', boxSizing: 'border-box', textAlign: 'left' },
   error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 10, margin: 0 },
   btnSave:     { padding: '14px', fontSize: 17, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52 },
   infoBox:     { background: '#fff', borderRadius: 12, padding: '14px 16px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 10 },

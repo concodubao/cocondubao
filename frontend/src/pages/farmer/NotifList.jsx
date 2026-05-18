@@ -143,7 +143,7 @@ const styles = {
   pushBannerBtn:   { padding: '7px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 700, whiteSpace: 'nowrap' },
   filterRow:       { display: 'flex', padding: '8px 12px', gap: 6, background: '#fff', borderBottom: '1px solid #e2e8f0', overflowX: 'auto' },
   filterBtn:       { padding: '5px 12px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 },
-  main:            { flex: 1, padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 8 },
+  main:            { flex: 1, padding: '10px 14px', paddingBottom: 'max(24px, calc(24px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 8 },
   empty:           { color: '#94a3b8', fontSize: 15, textAlign: 'center', margin: '16px 0 0' },
   card:            { border: '1px solid', borderRadius: 12, padding: '12px 14px', transition: 'border-color 0.2s' },
   cardHead:        { display: 'flex', gap: 10, alignItems: 'flex-start' },

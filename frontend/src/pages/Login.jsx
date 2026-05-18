@@ -208,7 +208,7 @@ const s = {
   sub:         { fontSize: 15, color: '#64748b', margin: 0, textAlign: 'center' },
   card:        { background: '#fff', borderRadius: 20, padding: '24px 20px', width: '100%', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 12 },
   label:       { fontSize: 15, fontWeight: 600, color: '#0f172a' },
-  input:       { width: '100%', padding: '13px 16px', fontSize: 18, borderRadius: 12, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#f8fafc', boxSizing: 'border-box', transition: 'border-color 0.2s' },
+  input:       { width: '100%', padding: '13px 16px', fontSize: 18, borderRadius: 12, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#f8fafc', boxSizing: 'border-box', transition: 'border-color 0.2s', textAlign: 'left' },
   btnPrimary:  { width: '100%', padding: '14px', fontSize: 17, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52 },
   error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '8px 12px', borderRadius: 8, margin: 0 },
   backBtn:     { alignSelf: 'flex-start', background: 'transparent', border: 'none', fontSize: 15, color: '#64748b', cursor: 'pointer', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4 },

@@ -51,7 +51,7 @@ export default function WaitEngineer() {
 }
 
 const styles = {
-  page:    { minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: '24px 20px', fontFamily: "'Noto Sans', sans-serif" },
+  page:    { minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: '48px 20px', paddingBottom: 'max(48px, calc(48px + env(safe-area-inset-bottom)))', fontFamily: "'Noto Sans', sans-serif" },
   content: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, maxWidth: 380, width: '100%' },
   iconWrap:{ width: 80, height: 80, borderRadius: 24, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #bbf7d0' },
   title:   { fontSize: 24, fontWeight: 800, color: '#0f172a', margin: 0, textAlign: 'center' },

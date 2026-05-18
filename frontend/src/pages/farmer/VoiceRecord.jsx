@@ -174,7 +174,7 @@ const styles = {
   iconBtn:        { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   headerTitle:    { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a' },
   modeTag:        { fontSize: 10, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 },
-  main:           { flex: 1, padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 },
+  main:           { flex: 1, padding: '24px 20px', paddingBottom: 'max(32px, calc(32px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 },
   textBox:        { width: '100%', minHeight: 120, border: '2px solid', borderRadius: 14, padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border-color 0.3s, background 0.3s' },
   placeholder:    { fontSize: 15, color: '#94a3b8', textAlign: 'center', margin: 0, lineHeight: 1.6 },
   transcriptText: { fontSize: 18, lineHeight: 1.7, margin: 0, wordBreak: 'break-word' },

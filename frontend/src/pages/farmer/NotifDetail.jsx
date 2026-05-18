@@ -88,7 +88,7 @@ const styles = {
   header:    { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, background: '#fff', zIndex: 10 },
   iconBtn:   { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   typeBadge: { fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 },
-  main:      { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14 },
+  main:      { flex: 1, padding: '20px 16px', paddingBottom: 'max(32px, calc(32px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 14 },
   image:     { width: '100%', borderRadius: 12, objectFit: 'cover', maxHeight: 200, border: '1px solid #e2e8f0' },
   title:     { fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 },
   date:      { fontSize: 13, color: '#94a3b8' },
