@@ -43,49 +43,54 @@ export default function AIResult() {
       </header>
 
       <main style={s.main}>
-        <div style={s.sourceRow}>
-          {source === 'engineer' && <span style={s.engineerBadge}>Kỹ sư xác nhận</span>}
-          {source === 'rag' && confidence && (
-            <span style={{
-              ...s.confBadge,
-              background: isHighConf ? '#f0fdf4' : isMidConf ? '#fffbeb' : '#eff6ff',
-              color:      isHighConf ? '#16a34a' : isMidConf ? '#d97706' : '#2563eb',
-            }}>
-              Độ tin cậy {confidencePct}%
-            </span>
+        {/* Vùng trên — badge + nội dung câu trả lời (cuộn được nếu dài) */}
+        <div style={s.topContent}>
+          <div style={s.sourceRow}>
+            {source === 'engineer' && <span style={s.engineerBadge}>Kỹ sư xác nhận</span>}
+            {source === 'rag' && confidence && (
+              <span style={{
+                ...s.confBadge,
+                background: isHighConf ? '#f0fdf4' : isMidConf ? '#fffbeb' : '#eff6ff',
+                color:      isHighConf ? '#16a34a' : isMidConf ? '#d97706' : '#2563eb',
+              }}>
+                Độ tin cậy {confidencePct}%
+              </span>
+            )}
+          </div>
+
+          <div style={s.answerBox}>
+            <p style={s.answerText}>{answer}</p>
+          </div>
+
+          {isSupported && (
+            <button onClick={() => isSpeaking ? stop() : speak(answer)} style={s.ttsBtn}
+              aria-label={isSpeaking ? 'Dừng đọc' : 'Nghe câu trả lời'}>
+              {isSpeaking
+                ? <><VolumeX size={18} strokeWidth={2} /> Dừng đọc</>
+                : <><Volume2 size={18} strokeWidth={2} /> Nghe câu trả lời</>
+              }
+            </button>
           )}
         </div>
 
-        <div style={s.answerBox}>
-          <p style={s.answerText}>{answer}</p>
+        {/* Vùng dưới — nút hành động (luôn hiện ở cuối trang) */}
+        <div style={s.bottomContent}>
+          <div style={s.actionRow}>
+            <button onClick={() => navigate('/chat', { state: { sessionId } })} style={s.btnAsk}>
+              <MessageCircle size={18} strokeWidth={2} /> Hỏi thêm
+            </button>
+            <button onClick={() => navigate('/home')} style={s.btnHome}>
+              <Home size={18} strokeWidth={2} /> Trang chủ
+            </button>
+          </div>
+          {!reported ? (
+            <button onClick={() => setShowReport(true)} style={s.reportLink}>
+              Câu trả lời này chưa đúng?
+            </button>
+          ) : (
+            <p style={s.reportedText}>Cảm ơn bạn đã báo lỗi!</p>
+          )}
         </div>
-
-        {isSupported && (
-          <button onClick={() => isSpeaking ? stop() : speak(answer)} style={s.ttsBtn}
-            aria-label={isSpeaking ? 'Dừng đọc' : 'Nghe câu trả lời'}>
-            {isSpeaking
-              ? <><VolumeX size={18} strokeWidth={2} /> Dừng đọc</>
-              : <><Volume2 size={18} strokeWidth={2} /> Nghe câu trả lời</>
-            }
-          </button>
-        )}
-
-        <div style={s.actionRow}>
-          <button onClick={() => navigate('/chat', { state: { sessionId } })} style={s.btnAsk}>
-            <MessageCircle size={18} strokeWidth={2} /> Hỏi thêm
-          </button>
-          <button onClick={() => navigate('/home')} style={s.btnHome}>
-            <Home size={18} strokeWidth={2} /> Trang chủ
-          </button>
-        </div>
-
-        {!reported ? (
-          <button onClick={() => setShowReport(true)} style={s.reportLink}>
-            Câu trả lời này chưa đúng?
-          </button>
-        ) : (
-          <p style={s.reportedText}>Cảm ơn bạn đã báo lỗi!</p>
-        )}
       </main>
 
       {showReport && (
@@ -108,21 +113,23 @@ export default function AIResult() {
 }
 
 const s = {
-  page:          { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto', position: 'relative' },
-  header:        { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
-  iconBtn:       { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  page:          { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto', position: 'relative' },
+  header:        { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
+  iconBtn:       { width: 44, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   headerTitle:   { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a', textAlign: 'center' },
-  main:          { flex: 1, padding: '20px 16px', paddingBottom: 'max(32px, calc(32px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 14 },
+  main:          { flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 16, paddingBottom: 'max(24px, env(safe-area-inset-bottom))' },
+  topContent:    { display: 'flex', flexDirection: 'column', gap: 14, flex: 1 },
+  bottomContent: { display: 'flex', flexDirection: 'column', gap: 10 },
   sourceRow:     { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  engineerBadge: { fontSize: 12, background: '#f0fdf4', color: '#15803d', padding: '4px 10px', borderRadius: 99, fontWeight: 600 },
-  confBadge:     { fontSize: 12, padding: '4px 10px', borderRadius: 99 },
-  answerBox:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '16px' },
-  answerText:    { fontSize: 17, color: '#0f172a', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' },
-  ttsBtn:        { padding: '12px', fontSize: 15, fontWeight: 600, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  engineerBadge: { fontSize: 12, background: '#f0fdf4', color: '#15803d', padding: '5px 12px', borderRadius: 99, fontWeight: 600 },
+  confBadge:     { fontSize: 12, padding: '5px 12px', borderRadius: 99 },
+  answerBox:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '18px', flex: 1 },
+  answerText:    { fontSize: 17, color: '#0f172a', lineHeight: 1.85, margin: 0, whiteSpace: 'pre-wrap', textAlign: 'left' },
+  ttsBtn:        { padding: '13px', fontSize: 15, fontWeight: 600, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
   actionRow:     { display: 'flex', gap: 10 },
-  btnAsk:        { flex: 1, padding: '13px', fontSize: 16, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  btnHome:       { flex: 1, padding: '13px', fontSize: 16, background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  reportLink:    { fontSize: 13, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', textAlign: 'center' },
+  btnAsk:        { flex: 1, padding: '14px', fontSize: 16, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  btnHome:       { flex: 1, padding: '14px', fontSize: 16, background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  reportLink:    { fontSize: 13, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', textAlign: 'center', padding: '4px 0' },
   reportedText:  { fontSize: 13, color: '#16a34a', textAlign: 'center' },
   overlay:       { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end' },
   modal:         { background: '#fff', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },

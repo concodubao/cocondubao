@@ -10,6 +10,8 @@ const ROLES = [
   { id: 'admin',    label: 'Quản Trị',  Icon: Shield,  desc: 'Quản lý hệ thống, gửi thông báo' },
 ]
 
+// ── Nội dung từng bước (không có logo/tiêu đề — nằm trong hero) ──────────────
+
 function StepPhone({ onNext }) {
   const [phone,   setPhone]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,51 +35,41 @@ function StepPhone({ onNext }) {
   }
 
   return (
-    <div style={s.step}>
-      <div style={s.logoMark}>C</div>
-      <h1 style={s.title}>Cò Con Dự Báo</h1>
-      <p style={s.sub}>Nhập số điện thoại để đăng nhập</p>
-      <div style={s.card}>
-        <label style={s.label} htmlFor="phone">Số điện thoại</label>
-        <input
-          id="phone" type="tel" inputMode="numeric" autoComplete="tel"
-          placeholder="0901 234 567" value={phone}
-          onChange={e => setPhone(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          style={s.input} autoFocus
-        />
-        {error && <p style={s.error}>{error}</p>}
-        <button onClick={handleSend} disabled={loading} style={{ ...s.btnPrimary, opacity: loading ? 0.7 : 1 }}>
-          {loading ? 'Đang gửi...' : 'Nhận mã OTP'}
-        </button>
-      </div>
-    </div>
+    <>
+      <label style={s.label} htmlFor="phone">Số điện thoại</label>
+      <input
+        id="phone" type="tel" inputMode="numeric" autoComplete="tel"
+        placeholder="0901 234 567" value={phone}
+        onChange={e => setPhone(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && handleSend()}
+        style={s.input} autoFocus
+      />
+      {error && <p style={s.error}>{error}</p>}
+      <button onClick={handleSend} disabled={loading}
+        style={{ ...s.btnPrimary, opacity: loading ? 0.7 : 1 }}>
+        {loading ? 'Đang gửi...' : 'Nhận mã OTP'}
+      </button>
+    </>
   )
 }
 
-function StepRole({ onNext, onBack }) {
+function StepRole({ onNext }) {
   return (
-    <div style={s.step}>
-      <button onClick={onBack} style={s.backBtn}><ChevronLeft size={20} /> Quay lại</button>
-      <div style={s.logoMark}>C</div>
-      <h1 style={s.title}>Bạn là ai?</h1>
-      <p style={s.sub}>Vai trò sẽ được gắn vĩnh viễn với số điện thoại này</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 360 }}>
-        {ROLES.map(r => (
-          <button key={r.id} onClick={() => onNext(r.id)} style={s.roleCard}>
-            <div style={s.roleIconWrap}><r.Icon size={22} color="#16a34a" strokeWidth={1.5} /></div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a' }}>{r.label}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>{r.desc}</div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </div>
+    <>
+      {ROLES.map(r => (
+        <button key={r.id} onClick={() => onNext(r.id)} style={s.roleCard}>
+          <div style={s.roleIconWrap}><r.Icon size={22} color="#16a34a" strokeWidth={1.5} /></div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a' }}>{r.label}</div>
+            <div style={{ fontSize: 13, color: '#64748b', marginTop: 3 }}>{r.desc}</div>
+          </div>
+        </button>
+      ))}
+    </>
   )
 }
 
-function StepOTP({ phone, role, devOtp, isExistingUser, onBack, onResend }) {
+function StepOTP({ phone, role, devOtp, onResend }) {
   const [otp,       setOtp]       = useState(devOtp || '')
   const [loading,   setLoading]   = useState(false)
   const [error,     setError]     = useState('')
@@ -122,46 +114,42 @@ function StepOTP({ phone, role, devOtp, isExistingUser, onBack, onResend }) {
   }
 
   return (
-    <div style={s.step}>
-      <button onClick={onBack} style={s.backBtn}><ChevronLeft size={20} /> Quay lại</button>
-      <div style={s.logoMark}>C</div>
-      <h1 style={s.title}>Nhập mã OTP</h1>
-      <p style={s.sub}>Mã đã gửi đến {phone}</p>
-      <div style={s.card}>
-        <label style={s.label} htmlFor="otp">Mã 6 số</label>
-        <input
-          id="otp" type="tel" inputMode="numeric" autoComplete="one-time-code"
-          maxLength={6} placeholder="• • • • • •" value={otp}
-          onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          onKeyDown={e => e.key === 'Enter' && handleVerify()}
-          style={{ ...s.input, textAlign: 'center', fontSize: 28, letterSpacing: 8 }}
-          autoFocus
-        />
-        {devOtp && (
-          <p style={{ fontSize: 13, color: '#16a34a', background: '#f0fdf4', padding: '6px 10px', borderRadius: 8, margin: 0 }}>
-            [DEV] OTP: <strong>{devOtp}</strong>
-          </p>
+    <>
+      <label style={s.label} htmlFor="otp">Mã 6 chữ số</label>
+      <input
+        id="otp" type="tel" inputMode="numeric" autoComplete="one-time-code"
+        maxLength={6} placeholder="• • • • • •" value={otp}
+        onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+        onKeyDown={e => e.key === 'Enter' && handleVerify()}
+        style={{ ...s.input, textAlign: 'center', fontSize: 28, letterSpacing: 8 }}
+        autoFocus
+      />
+      {devOtp && (
+        <p style={{ fontSize: 13, color: '#16a34a', background: '#f0fdf4', padding: '8px 12px', borderRadius: 8, margin: 0 }}>
+          [DEV] OTP: <strong>{devOtp}</strong>
+        </p>
+      )}
+      <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, textAlign: 'center' }}>Mã hết hạn sau 10 phút</p>
+      {error && <p style={s.error}>{error}</p>}
+      <button onClick={handleVerify} disabled={loading || otp.length !== 6}
+        style={{ ...s.btnPrimary, opacity: (loading || otp.length !== 6) ? 0.6 : 1 }}>
+        {loading ? 'Đang xác nhận...' : 'Xác nhận'}
+      </button>
+      <div style={{ textAlign: 'center' }}>
+        {countdown > 0 ? (
+          <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>Gửi lại sau <strong>{countdown}s</strong></p>
+        ) : (
+          <button onClick={handleResend} disabled={resending}
+            style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
+            {resending ? 'Đang gửi lại...' : 'Gửi lại OTP'}
+          </button>
         )}
-        <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, textAlign: 'center' }}>Mã hết hạn sau 10 phút</p>
-        {error && <p style={s.error}>{error}</p>}
-        <button onClick={handleVerify} disabled={loading || otp.length !== 6}
-          style={{ ...s.btnPrimary, opacity: (loading || otp.length !== 6) ? 0.6 : 1 }}>
-          {loading ? 'Đang xác nhận...' : 'Xác nhận'}
-        </button>
-        <div style={{ textAlign: 'center' }}>
-          {countdown > 0 ? (
-            <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>Gửi lại sau <strong>{countdown}s</strong></p>
-          ) : (
-            <button onClick={handleResend} disabled={resending}
-              style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>
-              {resending ? 'Đang gửi lại...' : 'Gửi lại OTP'}
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+    </>
   )
 }
+
+// ── Login — quản lý bố cục hero + sheet ──────────────────────────────────────
 
 export default function Login() {
   const [step,           setStep]           = useState('phone')
@@ -172,6 +160,17 @@ export default function Login() {
 
   const { token } = useAuthStore()
   if (token) return <Navigate to="/home" replace />
+
+  const HERO_INFO = {
+    phone: { title: 'Đăng Nhập',    sub: 'Nhập số điện thoại để tiếp tục' },
+    role:  { title: 'Bạn Là Ai?',   sub: 'Vai trò gắn vĩnh viễn với số điện thoại' },
+    otp:   { title: 'Nhập Mã OTP',  sub: `Đã gửi mã đến ${phone || '...'}` },
+  }[step]
+
+  function handleBack() {
+    if (step === 'role') setStep('phone')
+    else if (step === 'otp') setStep(isExistingUser ? 'phone' : 'role')
+  }
 
   function handlePhoneNext({ phone: p, devOtp: otp, isExistingUser: exists, existingRole }) {
     setPhone(p)
@@ -190,28 +189,43 @@ export default function Login() {
 
   return (
     <div style={s.page}>
-      {step === 'phone' && <StepPhone onNext={handlePhoneNext} />}
-      {step === 'role'  && <StepRole onNext={r => { setRole(r); setStep('otp') }} onBack={() => setStep('phone')} />}
-      {step === 'otp'   && (
-        <StepOTP phone={phone} role={role} devOtp={devOtp} isExistingUser={isExistingUser}
-          onBack={() => setStep(isExistingUser ? 'phone' : 'role')} onResend={handleResend} />
-      )}
+      {/* Hero — nền xanh, logo + tiêu đề động */}
+      <div style={s.hero}>
+        <div style={s.logoMark}>C</div>
+        <h1 style={s.heroTitle}>{HERO_INFO.title}</h1>
+        <p style={s.heroSub}>{HERO_INFO.sub}</p>
+      </div>
+
+      {/* Sheet — nền trắng, form nội dung */}
+      <div style={s.sheet}>
+        {step !== 'phone' && (
+          <button onClick={handleBack} style={s.backBtn}>
+            <ChevronLeft size={20} /> Quay lại
+          </button>
+        )}
+        {step === 'phone' && <StepPhone onNext={handlePhoneNext} />}
+        {step === 'role'  && <StepRole  onNext={r => { setRole(r); setStep('otp') }} />}
+        {step === 'otp'   && (
+          <StepOTP phone={phone} role={role} devOtp={devOtp}
+            isExistingUser={isExistingUser} onResend={handleResend} />
+        )}
+      </div>
     </div>
   )
 }
 
 const s = {
-  page:        { minHeight: '100dvh', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', fontFamily: "'Noto Sans', sans-serif" },
-  step:        { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, width: '100%', maxWidth: 400 },
-  logoMark:    { width: 56, height: 56, borderRadius: 16, background: '#16a34a', color: '#fff', fontSize: 24, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title:       { fontSize: 26, fontWeight: 800, color: '#0f172a', margin: 0, textAlign: 'center' },
-  sub:         { fontSize: 15, color: '#64748b', margin: 0, textAlign: 'center' },
-  card:        { background: '#fff', borderRadius: 20, padding: '24px 20px', width: '100%', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 12 },
+  page:        { height: '100dvh', display: 'flex', flexDirection: 'column', fontFamily: "'Noto Sans', sans-serif", background: '#16a34a', overflow: 'hidden' },
+  hero:        { flex: '0 0 38%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '0 28px', paddingTop: 'env(safe-area-inset-top)' },
+  logoMark:    { width: 76, height: 76, borderRadius: 22, background: 'rgba(255,255,255,0.2)', color: '#fff', fontSize: 34, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px rgba(255,255,255,0.25)' },
+  heroTitle:   { fontSize: 26, fontWeight: 800, color: '#fff', margin: 0, textAlign: 'center' },
+  heroSub:     { fontSize: 14, color: 'rgba(255,255,255,0.85)', margin: 0, textAlign: 'center', lineHeight: 1.5 },
+  sheet:       { flex: 1, background: '#fff', borderRadius: '28px 28px 0 0', padding: '28px 22px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', paddingBottom: 'max(36px, env(safe-area-inset-bottom))' },
+  backBtn:     { alignSelf: 'flex-start', background: 'none', border: 'none', color: '#16a34a', fontSize: 15, cursor: 'pointer', padding: '0 0 4px', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 },
   label:       { fontSize: 15, fontWeight: 600, color: '#0f172a' },
-  input:       { width: '100%', padding: '13px 16px', fontSize: 18, borderRadius: 12, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#f8fafc', boxSizing: 'border-box', transition: 'border-color 0.2s', textAlign: 'left' },
-  btnPrimary:  { width: '100%', padding: '14px', fontSize: 17, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52 },
-  error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '8px 12px', borderRadius: 8, margin: 0 },
-  backBtn:     { alignSelf: 'flex-start', background: 'transparent', border: 'none', fontSize: 15, color: '#64748b', cursor: 'pointer', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 4 },
-  roleCard:    { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', width: '100%', textAlign: 'left', transition: 'border-color 0.15s' },
-  roleIconWrap:{ width: 44, height: 44, borderRadius: 12, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  input:       { width: '100%', padding: '14px 16px', fontSize: 18, borderRadius: 12, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#f8fafc', boxSizing: 'border-box', textAlign: 'left' },
+  btnPrimary:  { width: '100%', padding: '15px', fontSize: 17, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 54 },
+  error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 10, margin: 0 },
+  roleCard:    { display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 16, cursor: 'pointer', width: '100%', textAlign: 'left', boxSizing: 'border-box' },
+  roleIconWrap:{ width: 48, height: 48, borderRadius: 14, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 }

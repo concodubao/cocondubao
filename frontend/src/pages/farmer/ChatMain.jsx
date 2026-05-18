@@ -208,8 +208,8 @@ export default function ChatMain() {
 
 const styles = {
   page:            { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
-  header:          { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
-  iconBtn:         { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  header:          { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
+  iconBtn:         { width: 44, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   headerTitle:     { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a', textAlign: 'center' },
   chatArea:        { flex: 1, overflowY: 'auto', padding: '16px' },
   emptyState:      { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingTop: 24 },
