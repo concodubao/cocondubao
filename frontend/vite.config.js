@@ -10,7 +10,7 @@ export default defineConfig({
     VitePWA({
       strategies: 'injectManifest',      // Dùng custom SW
       srcDir: 'public',
-      filename: 'sw-push.js',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png', 'icon-512.png'],
       manifest: {
