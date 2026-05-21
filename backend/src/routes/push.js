@@ -76,19 +76,25 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
         active:   true,
       }, { onConflict: 'endpoint' })
 
-    if (error) throw error
+    if (error) {
+      console.error('[PUSH] supabase upsert error:', error)
+      throw error
+    }
 
-    // Gửi thông báo chào mừng (test push hoạt động)
-    await sendPush(subscription, {
+    console.log('[PUSH] subscription saved for user:', req.user.userId, 'endpoint:', subscription.endpoint.slice(0, 60))
+
+    // Gửi thông báo chào mừng để xác nhận push hoạt động
+    const welcomeResult = await sendPush(subscription, {
       title: 'Cò Con Dự Báo!',
-      body:  'Bạn đã bật thông báo thành công. Cò Con sẽ gửi cảnh báo sâu bệnh đến bạn!',
+      body:  'Bạn đã bật thông báo thành công!',
       url:   '/notifications',
     })
+    console.log('[PUSH] welcome push result:', welcomeResult)
 
     res.json({ success: true })
   } catch (err) {
-    console.error('[PUSH] subscribe error:', err)
-    res.status(500).json({ error: 'Không đăng ký được thông báo.' })
+    console.error('[PUSH] subscribe error:', err.message, err.code)
+    res.status(500).json({ error: 'Không đăng ký được thông báo: ' + err.message })
   }
 })
 

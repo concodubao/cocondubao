@@ -1,10 +1,6 @@
-// frontend/src/hooks/usePush.js
-// Hook đăng ký Web Push — gọi khi user đăng nhập xong
-
 import { useEffect, useCallback, useState } from 'react'
 import { pushAPI } from '../services/api'
 
-// Chuyển VAPID public key từ base64url → Uint8Array
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
   const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -13,60 +9,76 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 export function usePush(userId) {
-  const [permission,   setPermission]   = useState(Notification.permission)
+  const [permission,   setPermission]   = useState(() => {
+    try { return Notification.permission } catch { return 'default' }
+  })
   const [isSubscribed, setIsSubscribed] = useState(false)
   const [error,        setError]        = useState(null)
 
-  // Kiểm tra đã subscribe chưa khi mount
+  // Kiểm tra subscription hiện tại khi mount hoặc userId thay đổi
   useEffect(() => {
     if (!userId || !('serviceWorker' in navigator)) return
-
-    navigator.serviceWorker.ready.then(reg => {
+    navigator.serviceWorker.ready.then(reg =>
       reg.pushManager.getSubscription().then(sub => {
+        console.log('[PUSH] existing subscription:', sub ? 'yes' : 'none')
         setIsSubscribed(!!sub)
+        // Nếu browser đã subscribe nhưng server chưa có → re-sync
+        if (sub && Notification.permission === 'granted') {
+          pushAPI.subscribe({ subscription: sub }).catch(() => {})
+        }
       })
-    })
+    )
   }, [userId])
 
   const subscribe = useCallback(async () => {
-    if (!userId) return
+    if (!userId) { console.warn('[PUSH] no userId'); return }
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       setError('Trình duyệt không hỗ trợ push notification.')
       return
     }
+    if (!import.meta.env.VITE_VAPID_PUBLIC_KEY) {
+      console.error('[PUSH] VITE_VAPID_PUBLIC_KEY chưa được set!')
+      setError('Cấu hình VAPID thiếu — liên hệ admin.')
+      return
+    }
 
     try {
-      // 1. Xin quyền notification
       const perm = await Notification.requestPermission()
       setPermission(perm)
+      console.log('[PUSH] permission:', perm)
 
       if (perm !== 'granted') {
         setError('Bạn chưa cho phép nhận thông báo.')
         return
       }
 
-      // 2. Lấy Service Worker registration
       const registration = await navigator.serviceWorker.ready
+      console.log('[PUSH] SW ready, scope:', registration.scope)
 
-      // 3. Subscribe với VAPID key
+      // Huỷ subscription cũ nếu có (tránh lỗi VAPID mismatch)
+      const existing = await registration.pushManager.getSubscription()
+      if (existing) await existing.unsubscribe()
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly:      true,
-        applicationServerKey: urlBase64ToUint8Array(
-          import.meta.env.VITE_VAPID_PUBLIC_KEY
-        ),
+        applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY),
       })
+      console.log('[PUSH] browser subscription created, endpoint:', subscription.endpoint.slice(0, 60) + '...')
 
-      // 4. Gửi subscription lên backend
       await pushAPI.subscribe({ subscription })
+      console.log('[PUSH] subscription saved to server ✓')
       setIsSubscribed(true)
       setError(null)
 
     } catch (err) {
-      console.error('[PUSH] subscribe error:', err)
+      console.error('[PUSH] subscribe error:', err.name, err.message)
       if (err.name === 'NotAllowedError') {
-        setError('Bạn đã từ chối nhận thông báo. Vào cài đặt trình duyệt để bật lại.')
+        setError('Bạn đã từ chối thông báo. Vào cài đặt trình duyệt để bật lại.')
+      } else if (err.response) {
+        // Lỗi từ server
+        setError('Lỗi server: ' + (err.response.data?.error || err.message))
       } else {
-        setError('Không đăng ký được thông báo: ' + err.message)
+        setError('Không đăng ký được: ' + err.message)
       }
     }
   }, [userId])

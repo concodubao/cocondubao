@@ -25,7 +25,7 @@ function AlertBanner({ notifications }) {
 export default function Home() {
   const navigate         = useNavigate()
   const { user, logout } = useAuthStore()
-  const { permission, isSubscribed, subscribe } = usePush(user?.id)
+  const { permission, isSubscribed, error: pushError, subscribe } = usePush(user?.id)
 
   // Tự subscribe nếu user đã cấp quyền từ trước (ví dụ reload trang)
   useEffect(() => {
@@ -68,13 +68,22 @@ export default function Home() {
 
       <AlertBanner notifications={notifications} />
 
-      {permission !== 'granted' && !isSubscribed && (
+      {permission === 'denied' ? (
+        <div style={{ ...styles.pushBanner, background: '#fef2f2', border: '1px solid #fecaca' }}>
+          <Bell size={18} color="#ef4444" strokeWidth={2} />
+          <p style={styles.pushBannerText}>Thông báo đang bị chặn — vào Cài đặt trình duyệt để bật lại</p>
+        </div>
+      ) : !isSubscribed ? (
         <div style={styles.pushBanner}>
           <Bell size={18} color="#16a34a" strokeWidth={2} />
-          <p style={styles.pushBannerText}>Bật thông báo để nhận cảnh báo kịp thời</p>
-          <button onClick={subscribe} style={styles.pushBannerBtn}>Bật</button>
+          <p style={styles.pushBannerText}>
+            {pushError ? pushError : 'Bật thông báo để nhận cảnh báo kịp thời'}
+          </p>
+          <button onClick={subscribe} style={styles.pushBannerBtn}>
+            {pushError ? 'Thử lại' : 'Bật'}
+          </button>
         </div>
-      )}
+      ) : null}
 
       <main style={styles.main}>
         <p style={styles.mainLabel}>Bạn muốn làm gì hôm nay?</p>
