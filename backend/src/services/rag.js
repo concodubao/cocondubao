@@ -9,8 +9,10 @@ const supabase = createClient(
 )
 
 // gemini-embedding-2 mặc định 3072 dims, dùng outputDimensionality=1536 để khớp vector(1536) trong DB
-const EMBED_MODEL = 'gemini-embedding-2'
-const EMBED_DIMS  = 1536
+const EMBED_MODEL  = 'gemini-embedding-2'
+const EMBED_DIMS   = 1536
+const BATCH_SIZE   = 5    // số chunk gửi song song mỗi lần
+const BATCH_DELAY  = 300  // ms nghỉ giữa các batch
 
 async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
@@ -19,15 +21,36 @@ async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const genAI = new GoogleGenerativeAI(key.trim())
   const model  = genAI.getGenerativeModel({ model: EMBED_MODEL })
 
-  const results = await Promise.all(texts.map(async (text) => {
-    const result = await model.embedContent({
-      content:             { parts: [{ text }] },
-      taskType,
-      outputDimensionality: EMBED_DIMS,
-    })
-    if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
-    return result.embedding.values
-  }))
+  async function embedOne(text, attempt = 0) {
+    try {
+      const result = await model.embedContent({
+        content:              { parts: [{ text }] },
+        taskType,
+        outputDimensionality: EMBED_DIMS,
+      })
+      if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
+      return result.embedding.values
+    } catch (e) {
+      const is429 = e.message?.includes('429') || e.status === 429
+      if (is429 && attempt < 4) {
+        const wait = 1000 * 2 ** attempt // 1s → 2s → 4s → 8s
+        console.warn(`[RAG] 429 rate limit, chờ ${wait}ms (attempt ${attempt + 1})`)
+        await new Promise(r => setTimeout(r, wait))
+        return embedOne(text, attempt + 1)
+      }
+      throw e
+    }
+  }
+
+  const results = []
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batch = texts.slice(i, i + BATCH_SIZE)
+    const batchResults = await Promise.all(batch.map(t => embedOne(t)))
+    results.push(...batchResults)
+    if (i + BATCH_SIZE < texts.length) {
+      await new Promise(r => setTimeout(r, BATCH_DELAY))
+    }
+  }
 
   return results
 }
