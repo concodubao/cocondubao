@@ -25,24 +25,32 @@ const upload = multer({
 })
 
 // ─── Helper: trích xuất text từ file ─────────────────────────────────────────
-// Thay hàm extractText trong backend/src/routes/engineer.js
-// Dùng cách import động để tránh pdf-parse chạy test khi load module
-
 async function extractText(buffer, mimetype) {
   if (mimetype === 'text/plain') {
     return buffer.toString('utf-8')
   }
 
   if (mimetype === 'application/pdf') {
-    const { createRequire } = await import('module')
-    const require = createRequire(import.meta.url)
-    const pdfParse = require('pdf-parse')
-    const data = await pdfParse(buffer)
-    return data.text
+    // Dùng pdfjs-dist thay pdf-parse (pdf-parse bị lỗi install trên Railway)
+    const pdfjsLib = await import('pdfjs-dist')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+
+    const pdf = await pdfjsLib.getDocument({
+      data:            new Uint8Array(buffer),
+      useSystemFonts:  true,
+      disableFontFace: true,
+    }).promise
+
+    let text = ''
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page    = await pdf.getPage(i)
+      const content = await page.getTextContent()
+      text += content.items.map(item => item.str || '').join(' ') + '\n'
+    }
+    return text
   }
 
   if (mimetype.includes('wordprocessingml')) {
-    const mammoth = (await import('mammoth')).default
     const { value } = await mammoth.extractRawText({ buffer })
     return value
   }
