@@ -15,18 +15,7 @@ import adminRoutes    from './routes/admin.js'
 const app = express()
 
 app.use(helmet())
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true)
-    if (
-      origin.startsWith('http://localhost') ||
-      origin.endsWith('.vercel.app') ||
-      origin === process.env.FRONTEND_URL
-    ) return cb(null, true)
-    cb(null, false)
-  },
-  credentials: true,
-}))
+app.use(cors({ origin: true, credentials: true }))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
