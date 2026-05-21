@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
@@ -13,9 +13,10 @@ const CROP_OPTIONS = [
 
 function StatusBadge({ status }) {
   const MAP = {
-    draft:    { label: 'Chờ duyệt', bg: '#fffbeb', color: '#d97706' },
-    approved: { label: 'Đang dùng', bg: '#f0fdf4', color: '#16a34a' },
-    archived: { label: 'Lưu trữ',   bg: '#f1f5f9', color: '#94a3b8' },
+    draft:     { label: 'Chờ duyệt',  bg: '#fffbeb', color: '#d97706' },
+    embedding: { label: 'Đang embed…', bg: '#eff6ff', color: '#2563eb' },
+    approved:  { label: 'Đang dùng',  bg: '#f0fdf4', color: '#16a34a' },
+    archived:  { label: 'Lưu trữ',    bg: '#f1f5f9', color: '#94a3b8' },
   }
   const c = MAP[status] || MAP.draft
   return (
@@ -113,11 +114,14 @@ function DocCard({ doc, onApprove, onArchive, approving }) {
         {doc.chunkCount > 0 && <span style={{ ...styles.tag, background: '#eff6ff', color: '#3b82f6' }}>{doc.chunkCount} chunks</span>}
       </div>
       <div style={styles.docActions}>
-        {doc.status === 'draft' && (
+        {(doc.status === 'draft') && (
           <button onClick={() => onApprove(doc.id)} disabled={isApproving}
             style={{ ...styles.btnApprove, opacity: isApproving ? 0.7 : 1 }}>
-            <Check size={14} strokeWidth={2.5} /> {isApproving ? 'Đang embed...' : 'Duyệt & Embed vào RAG'}
+            <Check size={14} strokeWidth={2.5} /> {isApproving ? 'Đang gửi...' : 'Duyệt & Embed vào RAG'}
           </button>
+        )}
+        {doc.status === 'embedding' && (
+          <span style={{ fontSize: 12, color: '#2563eb' }}>⏳ Đang embed, vui lòng chờ...</span>
         )}
         {doc.status === 'approved' && (
           <button onClick={() => onArchive(doc.id)} style={styles.btnArchive}>
@@ -138,9 +142,14 @@ export default function Knowledge() {
   const [showUpload, setShowUpload] = useState(false)
 
   const { data, isLoading } = useQuery({
-    queryKey: ['knowledge-docs', filter],
-    queryFn:  () => engineerAPI.getDocs(filter === 'all' ? undefined : filter).then(r => r.data.docs),
-    staleTime: 30_000,
+    queryKey:  ['knowledge-docs', filter],
+    queryFn:   () => engineerAPI.getDocs(filter === 'all' ? undefined : filter).then(r => r.data.docs),
+    staleTime: 5_000,
+    // Poll mỗi 5s nếu có tài liệu đang embedding
+    refetchInterval: (query) => {
+      const docs = query.state.data || []
+      return docs.some(d => d.status === 'embedding') ? 5000 : false
+    },
   })
 
   const docs     = data || []
@@ -151,9 +160,9 @@ export default function Knowledge() {
   async function handleApprove(id) {
     setApproving(id)
     try {
-      const res = await engineerAPI.approveDoc(id)
-      alert(`Đã embed ${res.data.chunksCreated} chunks vào kho tri thức!`)
+      await engineerAPI.approveDoc(id)
       queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
+      // Không cần alert — status badge tự chuyển draft → embedding → approved
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Embed thất bại. Thử lại nhé.'
       console.error('[Knowledge] approve error:', err.response?.data || err)

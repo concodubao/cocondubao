@@ -357,12 +357,11 @@ router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res
   res.json({ docs })
 })
 
-// PATCH /:id/approve — duyệt + tự động embed vào pgvector
+// PATCH /:id/approve — duyệt + embed nền (trả về ngay, không chờ embed xong)
 router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { id } = req.params
 
   try {
-    // Kiểm tra doc tồn tại
     const { data: doc } = await supabase
       .from('knowledge_docs')
       .select('id, title, status, content')
@@ -372,15 +371,24 @@ router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async 
     if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu.' })
     if (!doc.content) return res.status(422).json({ error: 'Tài liệu không có nội dung.' })
 
-    // Gọi hàm embed từ rag.js (tự chunk + embed + set status = approved)
-    const result = await embedAndStoreDoc(id)
+    // Đánh dấu trạng thái "embedding" ngay lập tức
+    await supabase.from('knowledge_docs')
+      .update({ status: 'embedding', updated_at: new Date().toISOString() })
+      .eq('id', id)
 
-    res.json({
-      success: true,
-      docId:        id,
-      chunksCreated: result.chunksCreated,
-      message: `Đã embed ${result.chunksCreated} chunks vào kho tri thức.`,
-    })
+    // Trả về ngay — không chờ embed xong → không bao giờ timeout
+    res.json({ accepted: true, docId: id, message: 'Đang embed, vui lòng chờ vài phút...' })
+
+    // Embed chạy ngầm sau khi response đã gửi
+    embedAndStoreDoc(id)
+      .then(r => console.log(`[KNOWLEDGE] ✅ "${doc.title}" → ${r.chunksCreated} chunks`))
+      .catch(err => {
+        console.error('[KNOWLEDGE] ❌ background embed error:', err.message)
+        supabase.from('knowledge_docs')
+          .update({ status: 'draft', updated_at: new Date().toISOString() })
+          .eq('id', id)
+          .then(() => {})
+      })
 
   } catch (err) {
     console.error('[KNOWLEDGE] approve error:', err)
