@@ -15,15 +15,15 @@ import adminRoutes    from './routes/admin.js'
 const app = express()
 
 app.use(helmet())
-const ALLOWED_ORIGINS = [
-  'http://localhost:5173',
-  'http://localhost:4173',
-  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map(u => u.trim()) : []),
-]
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true)
-    cb(new Error('Not allowed by CORS'))
+    if (!origin) return cb(null, true)
+    if (
+      origin.startsWith('http://localhost') ||
+      origin.endsWith('.vercel.app') ||
+      origin === process.env.FRONTEND_URL
+    ) return cb(null, true)
+    cb(null, false)
   },
   credentials: true,
 }))
