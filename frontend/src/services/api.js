@@ -24,10 +24,12 @@ api.interceptors.response.use(
 )
 
 export const authAPI = {
-  requestOTP: (phone)           => api.post('/auth/request-otp', { phone }),
-  verifyOTP:  (phone, otp, role)=> api.post('/auth/verify-otp', { phone, otp, role }),
-  me:         ()                => api.get('/auth/me'),
-  updateProfile: (data)         => api.patch('/auth/profile', data),
+  requestOTP:    (phone)                => api.post('/auth/request-otp', { phone }),
+  verifyOTP:     (phone, otp, role)     => api.post('/auth/verify-otp', { phone, otp, role }),
+  loginEmail:    (email, password)      => api.post('/auth/login-email', { email, password }),
+  registerEmail: (email, password, role)=> api.post('/auth/register-email', { email, password, role }),
+  me:            ()                     => api.get('/auth/me'),
+  updateProfile: (data)                 => api.patch('/auth/profile', data),
 }
 
 export const chatAPI = {

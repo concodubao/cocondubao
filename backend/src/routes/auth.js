@@ -1,5 +1,6 @@
-import express from 'express'
-import jwt     from 'jsonwebtoken'
+import express  from 'express'
+import jwt      from 'jsonwebtoken'
+import bcrypt   from 'bcrypt'
 import { createClient } from '@supabase/supabase-js'
 import { verifyJWT } from '../middleware/auth.js'
 
@@ -108,6 +109,55 @@ router.post('/verify-otp', async (req, res) => {
     })
   } catch (err) {
     console.error('[AUTH]', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── POST /auth/register-email ────────────────────────────────────────────────
+router.post('/register-email', async (req, res) => {
+  const { email, password, role } = req.body
+  if (!email || !password) return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu.' })
+  if (!['engineer', 'admin'].includes(role)) return res.status(400).json({ error: 'Vai trò không hợp lệ.' })
+  if (password.length < 8) return res.status(400).json({ error: 'Mật khẩu tối thiểu 8 ký tự.' })
+
+  const { data: existing } = await supabase.from('users').select('id').eq('email', email).single()
+  if (existing) return res.status(400).json({ error: 'Email đã được sử dụng.' })
+
+  try {
+    const password_hash = await bcrypt.hash(password, 10)
+    const is_active = role === 'admin'
+    const { data: user, error } = await supabase.from('users')
+      .insert({ email, password_hash, role, is_active }).select().single()
+    if (error) throw error
+    res.json({ success: true, pending: !is_active })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── POST /auth/login-email ───────────────────────────────────────────────────
+router.post('/login-email', async (req, res) => {
+  const { email, password } = req.body
+  if (!email || !password) return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu.' })
+
+  try {
+    const { data: user } = await supabase.from('users').select('*').eq('email', email).single()
+    if (!user || !user.password_hash) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' })
+
+    const valid = await bcrypt.compare(password, user.password_hash)
+    if (!valid) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' })
+    if (!user.is_active) return res.status(403).json({ error: 'Tài khoản đang chờ phê duyệt hoặc đã bị khoá.' })
+
+    const token = jwt.sign(
+      { userId: user.id, phone: user.phone, role: user.role, name: user.name },
+      process.env.JWT_SECRET, { expiresIn: '7d' }
+    )
+    res.json({
+      success: true, token,
+      user: { id: user.id, email: user.email, phone: user.phone, role: user.role, name: user.name },
+      isNewUser: !user.name,
+    })
+  } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
