@@ -155,7 +155,9 @@ export default function Knowledge() {
       alert(`Đã embed ${res.data.chunksCreated} chunks vào kho tri thức!`)
       queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
     } catch (err) {
-      alert(err.response?.data?.error || 'Embed thất bại. Thử lại nhé.')
+      const msg = err.response?.data?.error || err.message || 'Embed thất bại. Thử lại nhé.'
+      console.error('[Knowledge] approve error:', err.response?.data || err)
+      alert(msg)
     } finally {
       setApproving(null)
     }

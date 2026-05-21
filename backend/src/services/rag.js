@@ -31,7 +31,7 @@ async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
       if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
       return result.embedding.values
     } catch (e) {
-      const is429 = e.message?.includes('429') || e.status === 429
+      const is429 = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED') || e.status === 429
       if (is429 && attempt < 4) {
         const wait = 1000 * 2 ** attempt // 1s → 2s → 4s → 8s
         console.warn(`[RAG] 429 rate limit, chờ ${wait}ms (attempt ${attempt + 1})`)
