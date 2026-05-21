@@ -17,10 +17,10 @@ function UserCard({ user, onToggle, onApprove, onChangeRole }) {
   return (
     <div style={{ ...s.card, opacity: user.is_active ? 1 : 0.6 }}>
       <div style={s.cardHead}>
-        <div style={s.avatar}>{user.name?.[0]?.toUpperCase() || user.phone.slice(-2)}</div>
+        <div style={s.avatar}>{user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || user.phone?.slice(-2) || '?'}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={s.userName}>{user.name || 'Chưa đặt tên'}</p>
-          <p style={s.userPhone}>{user.phone}</p>
+          <p style={s.userPhone}>{user.phone || user.email}</p>
           {user.village && (
             <p style={s.userVillage}>
               <MapPin size={10} strokeWidth={2} /> {user.village}
