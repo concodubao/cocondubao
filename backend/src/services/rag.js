@@ -8,35 +8,23 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// Google AI Studio đổi tên: text-embedding-004 → gemini-embedding-001
-const EMBED_MODELS = ['gemini-embedding-001', 'gemini-embedding-2']
+// gemini-embedding-2 mặc định 3072 dims, dùng outputDimensionality=1536 để khớp vector(1536) trong DB
+const EMBED_MODEL = 'gemini-embedding-2'
+const EMBED_DIMS  = 1536
 
 async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
   if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
 
   const genAI = new GoogleGenerativeAI(key.trim())
+  const model  = genAI.getGenerativeModel({ model: EMBED_MODEL })
 
-  if (!embedTexts._model) {
-    for (const name of EMBED_MODELS) {
-      try {
-        const m      = genAI.getGenerativeModel({ model: name })
-        const result = await m.embedContent({ content: { parts: [{ text: 'test' }] }, taskType: 'RETRIEVAL_DOCUMENT' })
-        if (result.embedding?.values?.length > 0) {
-          embedTexts._model = name
-          console.log(`[RAG] Embedding model: ${name} dim=${result.embedding.values.length}`)
-          break
-        }
-      } catch (e) {
-        console.warn(`[RAG] ${name} không dùng được: ${e.message}`)
-      }
-    }
-    if (!embedTexts._model) throw new Error('Không có embedding model nào hoạt động. Kiểm tra GOOGLE_API_KEY.')
-  }
-
-  const model   = genAI.getGenerativeModel({ model: embedTexts._model })
   const results = await Promise.all(texts.map(async (text) => {
-    const result = await model.embedContent({ content: { parts: [{ text }] }, taskType })
+    const result = await model.embedContent({
+      content:             { parts: [{ text }] },
+      taskType,
+      outputDimensionality: EMBED_DIMS,
+    })
     if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
     return result.embedding.values
   }))
