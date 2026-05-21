@@ -8,11 +8,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// gemini-embedding-2 mặc định 3072 dims, dùng outputDimensionality=1536 để khớp vector(1536) trong DB
+// gemini-embedding-2 free tier: 100 RPM — gửi tuần tự 1 request mỗi 700ms (~60 RPM)
 const EMBED_MODEL  = 'gemini-embedding-2'
 const EMBED_DIMS   = 1536
-const BATCH_SIZE   = 5    // số chunk gửi song song mỗi lần
-const BATCH_DELAY  = 300  // ms nghỉ giữa các batch
+const REQ_DELAY    = 700  // ms giữa mỗi request để giữ dưới 100 RPM
 
 async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
@@ -31,10 +30,14 @@ async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
       if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
       return result.embedding.values
     } catch (e) {
-      const is429 = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED') || e.status === 429
-      if (is429 && attempt < 4) {
-        const wait = 1000 * 2 ** attempt // 1s → 2s → 4s → 8s
-        console.warn(`[RAG] 429 rate limit, chờ ${wait}ms (attempt ${attempt + 1})`)
+      const is429 = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED')
+      if (is429 && attempt < 5) {
+        // Đọc thời gian chờ do Google trả về (vd: "retry in 27.15s")
+        const retryMatch = e.message?.match(/retry in (\d+\.?\d*)s/)
+        const wait = retryMatch
+          ? Math.ceil(parseFloat(retryMatch[1])) * 1000 + 1000
+          : 1000 * Math.min(30, 2 ** attempt)
+        console.warn(`[RAG] 429 — chờ ${wait / 1000}s (attempt ${attempt + 1})`)
         await new Promise(r => setTimeout(r, wait))
         return embedOne(text, attempt + 1)
       }
@@ -42,14 +45,11 @@ async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
     }
   }
 
+  // Tuần tự từng chunk, nghỉ REQ_DELAY ms giữa mỗi cái
   const results = []
-  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-    const batch = texts.slice(i, i + BATCH_SIZE)
-    const batchResults = await Promise.all(batch.map(t => embedOne(t)))
-    results.push(...batchResults)
-    if (i + BATCH_SIZE < texts.length) {
-      await new Promise(r => setTimeout(r, BATCH_DELAY))
-    }
+  for (let i = 0; i < texts.length; i++) {
+    results.push(await embedOne(texts[i]))
+    if (i < texts.length - 1) await new Promise(r => setTimeout(r, REQ_DELAY))
   }
 
   return results
