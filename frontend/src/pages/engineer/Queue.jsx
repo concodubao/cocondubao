@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { engineerAPI } from '../../services/api'
+import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../services/supabase'
 import { ChevronLeft, BookOpen, RefreshCw, CheckCircle, Clock } from 'lucide-react'
 
@@ -20,10 +21,12 @@ function WaitBadge({ minutes }) {
   )
 }
 
-function QueueCard({ item, onTake }) {
-  const msg  = item.messages
-  const user = msg?.chat_sessions?.users
-  const crop = msg?.chat_sessions?.crop_type
+function QueueCard({ item, onTake, currentUserId }) {
+  const msg          = item.messages
+  const user         = msg?.chat_sessions?.users
+  const crop         = msg?.chat_sessions?.crop_type
+  const isMyItem     = item.status === 'in_progress' && item.assigned_to === currentUserId
+  const isOthersItem = item.status === 'in_progress' && item.assigned_to !== currentUserId
 
   return (
     <div style={styles.card}>
@@ -44,15 +47,20 @@ function QueueCard({ item, onTake }) {
           <span style={styles.confTag}>AI tin cậy {Math.round(msg.confidence * 100)}%</span>
         )}
       </div>
-      <button onClick={() => onTake(item)} style={styles.btnTake} aria-label={`Nhận câu hỏi`}>
-        Nhận &amp; Trả lời →
-      </button>
+      {isOthersItem ? (
+        <div style={styles.processingNote}>Kỹ sư khác đang xử lý</div>
+      ) : (
+        <button onClick={() => onTake(item)} style={styles.btnTake}>
+          {isMyItem ? 'Tiếp tục trả lời →' : 'Nhận & Trả lời →'}
+        </button>
+      )}
     </div>
   )
 }
 
 export default function Queue() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const [queue,   setQueue]   = useState([])
   const [loading, setLoading] = useState(true)
   const [tab,     setTab]     = useState('pending')
@@ -79,6 +87,11 @@ export default function Queue() {
   }, [tab])
 
   async function handleTake(item) {
+    // Nếu đang xử lý và là item của mình → vào thẳng Answer, không gọi take lại
+    if (item.status === 'in_progress' && item.assigned_to === user?.id) {
+      navigate(`/engineer/answer/${item.id}`, { state: { queueItem: item } })
+      return
+    }
     try {
       await engineerAPI.take(item.id)
       navigate(`/engineer/answer/${item.id}`, { state: { queueItem: item } })
@@ -125,7 +138,7 @@ export default function Queue() {
             </p>
           </div>
         ) : (
-          queue.map(item => <QueueCard key={item.id} item={item} onTake={handleTake} />)
+          queue.map(item => <QueueCard key={item.id} item={item} onTake={handleTake} currentUserId={user?.id} />)
         )}
       </main>
 
@@ -156,6 +169,7 @@ const styles = {
   cardMeta:   { display: 'flex', gap: 8, flexWrap: 'wrap' },
   cropTag:    { fontSize: 12, background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: 99 },
   confTag:    { fontSize: 12, background: '#fffbeb', color: '#d97706', padding: '2px 8px', borderRadius: 99 },
-  btnTake:    { padding: '11px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, minHeight: 44 },
-  refreshBtn: { background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 14, cursor: 'pointer', padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 },
+  btnTake:       { padding: '11px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, minHeight: 44 },
+  processingNote:{ padding: '11px 14px', background: '#f1f5f9', color: '#94a3b8', borderRadius: 10, fontSize: 14, textAlign: 'center', fontWeight: 500 },
+  refreshBtn:    { background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 14, cursor: 'pointer', padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 },
 }

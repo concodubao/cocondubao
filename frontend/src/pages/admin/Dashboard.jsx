@@ -1,7 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery }    from '@tanstack/react-query'
-import { adminAPI }    from '../../services/api'
-import { ChevronLeft, Users, Send, BookOpen, AlertTriangle, ClipboardList } from 'lucide-react'
+import { adminAPI, engineerAPI } from '../../services/api'
+import { useAuthStore } from '../../stores/authStore'
+import { supabase }    from '../../services/supabase'
+import { useEffect }   from 'react'
+import { ChevronLeft, Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
 
 function BarChart({ data }) {
   if (!data?.length) return null
@@ -38,8 +41,112 @@ function StatCard({ label, value, sub, color = '#0f172a', onClick }) {
   )
 }
 
+function WaitBadge({ minutes }) {
+  const urgent = minutes > 60
+  const warn   = minutes > 30
+  return (
+    <span style={{
+      fontSize: 11, padding: '2px 7px', borderRadius: 99, fontWeight: 600,
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      background: urgent ? '#fef2f2' : warn ? '#fffbeb' : '#f0fdf4',
+      color:      urgent ? '#ef4444' : warn ? '#f59e0b' : '#16a34a',
+    }}>
+      <Clock size={9} strokeWidth={2} />
+      {minutes < 60 ? `${minutes}p` : `${Math.round(minutes / 60)}h`}
+    </span>
+  )
+}
+
+function QueueSection({ navigate, currentUserId }) {
+  const { data: pendingData,     refetch: refetchPending }     = useQuery({ queryKey: ['queue-pending'],     queryFn: () => engineerAPI.getQueue('pending').then(r => r.data),     refetchInterval: 30_000 })
+  const { data: inProgressData, refetch: refetchInProgress } = useQuery({ queryKey: ['queue-inprogress'], queryFn: () => engineerAPI.getQueue('in_progress').then(r => r.data), refetchInterval: 30_000 })
+
+  const pending    = pendingData?.queue     || []
+  const inProgress = inProgressData?.queue  || []
+  const all        = [...pending, ...inProgress]
+
+  // Realtime: reload khi có thay đổi trong engineer_queue
+  useEffect(() => {
+    const ch = supabase.channel('dashboard-queue')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'engineer_queue' }, () => {
+        refetchPending()
+        refetchInProgress()
+      })
+      .subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [])
+
+  async function handleTake(item) {
+    if (item.status === 'in_progress' && item.assigned_to === currentUserId) {
+      navigate(`/engineer/answer/${item.id}`, { state: { queueItem: item } })
+      return
+    }
+    try {
+      await engineerAPI.take(item.id)
+      navigate(`/engineer/answer/${item.id}`, { state: { queueItem: item } })
+    } catch (err) {
+      alert(err.response?.data?.error || 'Không thể nhận câu hỏi này.')
+    }
+  }
+
+  return (
+    <div style={s.card}>
+      <div style={s.cardHead}>
+        <span style={s.cardTitle}>Hàng đợi câu hỏi</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {pending.length > 0 && (
+            <span style={{ fontSize: 12, background: '#fef2f2', color: '#ef4444', padding: '2px 8px', borderRadius: 99, fontWeight: 700 }}>
+              {pending.length} chờ
+            </span>
+          )}
+          <button onClick={() => navigate('/engineer/queue')} style={s.viewAllBtn}>
+            Xem tất cả <ChevronRight size={13} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+
+      {all.length === 0 ? (
+        <p style={{ fontSize: 14, color: '#94a3b8', textAlign: 'center', padding: '12px 0', margin: 0 }}>
+          Không có câu hỏi nào đang chờ
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {all.map(item => {
+            const msg          = item.messages
+            const farmer       = msg?.chat_sessions?.users
+            const isMyItem     = item.status === 'in_progress' && item.assigned_to === currentUserId
+            const isOthersItem = item.status === 'in_progress' && !isMyItem
+            return (
+              <div key={item.id} style={s.queueRow}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{farmer?.name || 'Nông dân'}</span>
+                    <WaitBadge minutes={item.waitMinutes} />
+                    {isOthersItem && <span style={{ fontSize: 11, color: '#94a3b8' }}>· Đang xử lý</span>}
+                  </div>
+                  <p style={{ fontSize: 13, color: '#475569', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {msg?.content || '—'}
+                  </p>
+                </div>
+                {isOthersItem ? (
+                  <span style={s.processingTag}>Đang xử lý</span>
+                ) : (
+                  <button onClick={() => handleTake(item)} style={s.takeBtn}>
+                    {isMyItem ? 'Tiếp tục' : 'Nhận'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
   const { data, isLoading } = useQuery({
     queryKey: ['admin-stats'],
     queryFn:  () => adminAPI.getStats().then(r => r.data),
@@ -90,6 +197,8 @@ export default function Dashboard() {
               <BarChart data={data?.sessionsByDay} />
             </div>
 
+            <QueueSection navigate={navigate} currentUserId={user?.id} />
+
             <div style={s.grid2}>
               <button onClick={() => navigate('/admin/notifications/send')} style={s.actionBtn}>
                 <Send size={20} color="#16a34a" strokeWidth={1.5} />
@@ -131,5 +240,9 @@ const s = {
   cardTitle: { fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 },
   cardSub:   { fontSize: 12, color: '#64748b', margin: 0 },
   progressBg:{ height: 6, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' },
-  actionBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#0f172a' },
+  actionBtn:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#0f172a' },
+  viewAllBtn:   { display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 12, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 },
+  queueRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' },
+  takeBtn:      { flexShrink: 0, padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  processingTag:{ flexShrink: 0, padding: '5px 10px', background: '#f1f5f9', color: '#94a3b8', borderRadius: 8, fontSize: 12, fontWeight: 500 },
 }

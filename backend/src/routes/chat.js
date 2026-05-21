@@ -47,12 +47,12 @@ router.post('/ask', verifyJWT, async (req, res) => {
     // 2. Tạo session
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
-    // 3. Lưu câu hỏi của nông dân
-    await supabase.from('messages').insert({
+    // 3. Lưu câu hỏi của nông dân — lấy id để trỏ vào hàng đợi
+    const { data: userMsg } = await supabase.from('messages').insert({
       session_id: sid,
       role:       'user',
       content:    text.trim(),
-    })
+    }).select('id').single()
 
     // 4. Lưu câu trả lời (hoặc thông báo chuyển kỹ sư)
     const answerContent = result.needEngineer
@@ -72,10 +72,11 @@ router.post('/ask', verifyJWT, async (req, res) => {
       .single()
 
     // 5. Nếu cần kỹ sư → đưa vào hàng đợi + push notify
+    // message_id trỏ vào câu hỏi thật (userMsg), không phải thông báo hệ thống
     let engineerQueued = false
-    if (result.needEngineer && answerMsg) {
+    if (result.needEngineer && userMsg) {
       await supabase.from('engineer_queue').insert({
-        message_id: answerMsg.id,
+        message_id: userMsg.id,
         status:     'pending',
       })
       // Không await để không block response
@@ -149,13 +150,13 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
     // 3. Tạo session
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
-    // 4. Lưu messages
-    await supabase.from('messages').insert({
+    // 4. Lưu messages — lấy id userMsg để trỏ vào hàng đợi
+    const { data: userMsg } = await supabase.from('messages').insert({
       session_id: sid,
       role:       'user',
       content:    question,
       image_url:  imageUrl,
-    })
+    }).select('id').single()
 
     const answerContent = result.needEngineer
       ? 'Ảnh và câu hỏi của bạn đã được gửi cho kỹ sư. Kỹ sư sẽ xem ảnh và trả lời trong 24 giờ.'
@@ -173,9 +174,9 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
       .select('id')
       .single()
 
-    if (result.needEngineer && answerMsg) {
+    if (result.needEngineer && userMsg) {
       await supabase.from('engineer_queue').insert({
-        message_id: answerMsg.id, status: 'pending',
+        message_id: userMsg.id, status: 'pending',
       })
       notifyEngineer('Nông dân gửi ảnh sâu bệnh cần tư vấn', question.slice(0, 100))
         .catch(e => console.warn('[PUSH]', e.message))
