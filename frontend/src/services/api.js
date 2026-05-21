@@ -42,11 +42,12 @@ export const chatAPI = {
 }
 
 export const pushAPI = {
-  subscribe:        data   => api.post('/push/subscribe', data),
-  send:             data   => api.post('/push/send', data),
-  getNotifications: userId => api.get(`/push/notifications/${userId}`),
-  markRead:         (id, userId) => api.patch(`/push/notifications/${id}/read`, { userId }),
-  updateSettings:   settings    => api.patch('/push/notifications/settings', settings),
+  subscribe:        data    => api.post('/push/subscribe', data),
+  unsubscribe:      data    => api.delete('/push/unsubscribe', { data }),
+  send:             data    => api.post('/push/send', data),
+  getNotifications: userId  => api.get(`/push/notifications/${userId}`),
+  markRead:         (id)    => api.patch(`/push/notifications/${id}/read`),
+  updateSettings:   settings => api.patch('/push/notifications/settings', settings),
 }
 
 export const engineerAPI = {
