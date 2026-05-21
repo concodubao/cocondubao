@@ -1,5 +1,4 @@
-import { GoogleGenerativeAI }            from '@google/generative-ai'
-import { ChatGoogleGenerativeAI }        from '@langchain/google-genai'
+import { ChatGoogleGenerativeAI }         from '@langchain/google-genai'
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { createClient } from '@supabase/supabase-js'
 
@@ -8,15 +7,27 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// Dùng Google SDK trực tiếp thay LangChain wrapper — tránh bug parse response
-const genAI         = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
-const embedModel    = genAI.getGenerativeModel({ model: 'embedding-001' })
-
+// Gọi thẳng REST API v1 — SDK hay LangChain wrapper đều dùng v1beta (lỗi 404)
 async function embedTexts(texts) {
-  const results = await Promise.all(
-    texts.map(t => embedModel.embedContent(t))
-  )
-  return results.map(r => r.embedding.values)
+  const key = process.env.GOOGLE_API_KEY
+  const url = `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${key}`
+
+  const results = await Promise.all(texts.map(async (text) => {
+    const res  = await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        model:    'models/text-embedding-004',
+        content:  { parts: [{ text }] },
+        taskType: 'RETRIEVAL_DOCUMENT',
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(`Google embed API ${res.status}: ${data.error?.message}`)
+    return data.embedding.values
+  }))
+
+  return results
 }
 
 const llm = new ChatGoogleGenerativeAI({
