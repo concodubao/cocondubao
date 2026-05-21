@@ -211,8 +211,8 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
 // PHẦN 2 — KHO TRI THỨC RAG
 // ══════════════════════════════════════════════════════════════════════════════
 
-// POST /knowledge/upload — upload tài liệu
-router.post('/knowledge/upload', verifyJWT, requireRole('engineer', 'admin'),
+// POST /upload — upload tài liệu
+router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
   upload.single('file'), async (req, res) => {
 
   if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file.' })
@@ -265,8 +265,8 @@ router.post('/knowledge/upload', verifyJWT, requireRole('engineer', 'admin'),
   }
 })
 
-// GET /knowledge/docs — danh sách tài liệu
-router.get('/knowledge/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+// GET /docs — danh sách tài liệu
+router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { status, crop } = req.query
 
   let query = supabase
@@ -293,8 +293,8 @@ router.get('/knowledge/docs', verifyJWT, requireRole('engineer', 'admin'), async
   res.json({ docs })
 })
 
-// PATCH /knowledge/:id/approve — duyệt + tự động embed vào pgvector
-router.patch('/knowledge/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+// PATCH /:id/approve — duyệt + tự động embed vào pgvector
+router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { id } = req.params
 
   try {
@@ -324,8 +324,8 @@ router.patch('/knowledge/:id/approve', verifyJWT, requireRole('engineer', 'admin
   }
 })
 
-// PATCH /knowledge/:id/archive — lưu trữ (không xoá)
-router.patch('/knowledge/:id/archive', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+// PATCH /:id/archive — lưu trữ (không xoá)
+router.patch('/:id/archive', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { error } = await supabase
     .from('knowledge_docs')
     .update({ status: 'archived', updated_at: new Date().toISOString() })
