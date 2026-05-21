@@ -152,8 +152,8 @@ export async function embedAndStoreDoc(docId) {
   await supabase.from('knowledge_chunks').delete().eq('doc_id', docId)
 
   const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize:    500,
-    chunkOverlap: 50,
+    chunkSize:    1000,
+    chunkOverlap: 100,
     separators:   ['\n\n', '\n', '。', '.', ' ', ''],
   })
   const chunks = await splitter.splitText(doc.content)
