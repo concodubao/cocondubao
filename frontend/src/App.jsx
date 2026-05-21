@@ -26,6 +26,7 @@ import NotifSettings from './pages/farmer/NotifSettings'
 import Queue     from './pages/engineer/Queue'
 import Answer    from './pages/engineer/Answer'
 import Knowledge from './pages/engineer/Knowledge'
+import TestAI    from './pages/engineer/TestAI'
 
 // Pages — Admin
 import Dashboard from './pages/admin/Dashboard'
@@ -87,6 +88,7 @@ export default function App() {
           <Route path="/engineer/queue"      element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><Queue /></DesktopLayout></ProtectedRoute>} />
           <Route path="/engineer/answer/:id" element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><Answer /></DesktopLayout></ProtectedRoute>} />
           <Route path="/engineer/knowledge"  element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><Knowledge /></DesktopLayout></ProtectedRoute>} />
+          <Route path="/engineer/test-ai"    element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><TestAI /></DesktopLayout></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin"                    element={<ProtectedRoute allowedRoles={['admin']}><DesktopLayout><Dashboard /></DesktopLayout></ProtectedRoute>} />
