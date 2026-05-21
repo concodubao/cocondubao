@@ -1,5 +1,5 @@
-import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai'
-import { ChatGoogleGenerativeAI }       from '@langchain/google-genai'
+import { GoogleGenerativeAI }            from '@google/generative-ai'
+import { ChatGoogleGenerativeAI }        from '@langchain/google-genai'
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { createClient } from '@supabase/supabase-js'
 
@@ -8,11 +8,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-const embeddings = new GoogleGenerativeAIEmbeddings({
-  model:    'text-embedding-004',  // 768 dimensions
-  apiKey:   process.env.GOOGLE_API_KEY,
-  taskType: 'RETRIEVAL_DOCUMENT',
-})
+// Dùng Google SDK trực tiếp thay LangChain wrapper — tránh bug parse response
+const genAI         = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
+const embedModel    = genAI.getGenerativeModel({ model: 'text-embedding-004' })
+
+async function embedTexts(texts) {
+  const results = await Promise.all(
+    texts.map(t => embedModel.embedContent({ content: { parts: [{ text: t }] }, taskType: 'RETRIEVAL_DOCUMENT' }))
+  )
+  return results.map(r => r.embedding.values)
+}
 
 const llm = new ChatGoogleGenerativeAI({
   model:           'gemini-1.5-flash',
@@ -38,7 +43,7 @@ export async function askRAG(question, cropType = null) {
 
   try {
     // BƯỚC 1: Embed câu hỏi thành vector 768 chiều
-    const queryEmbedding = await embeddings.embedQuery(question)
+    const [queryEmbedding] = await embedTexts([question])
 
     // BƯỚC 2: Tìm top-5 chunks gần nhất trong pgvector
     const { data: chunks, error } = await supabase.rpc('match_knowledge_chunks', {
@@ -121,7 +126,7 @@ export async function embedAndStoreDoc(docId) {
   // Embed tất cả chunks
   let vectors
   try {
-    vectors = await embeddings.embedDocuments(chunks)
+    vectors = await embedTexts(chunks)
   } catch (embedErr) {
     throw new Error(`Embedding thất bại (kiểm tra GOOGLE_API_KEY trên Railway): ${embedErr.message}`)
   }
