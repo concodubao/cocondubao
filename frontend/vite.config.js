@@ -9,9 +9,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'icon.png'],
       manifest: {
-        name: 'Cò Con Dự Báo',
+        name: 'Cò Con Dự báo',
         short_name: 'CòCon',
         description: 'Trợ lý nông nghiệp thông minh',
         theme_color: '#16a34a',
@@ -19,7 +19,9 @@ export default defineConfig({
         display: 'standalone',
         start_url: '/',
         icons: [
-          { src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml' }
+          { src: '/icon.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon.png', sizes: '512x512', type: 'image/png' },
+          { src: '/icon.png', sizes: 'any', type: 'image/png', purpose: 'maskable any' }
         ]
       },
       workbox: {

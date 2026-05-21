@@ -5,7 +5,7 @@ self.addEventListener('push', (event) => {
   const data = event.data?.json() || {}
   const options = {
     body: data.body || '',
-    icon: '/favicon.svg',
+    icon: '/icon.png',
     data: { url: data.url || '/' },
   }
   // badge và actions chỉ thêm nếu trình duyệt hỗ trợ (Android cũ bỏ qua)
