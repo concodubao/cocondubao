@@ -1,4 +1,5 @@
 import { ChatGoogleGenerativeAI }         from '@langchain/google-genai'
+import { GoogleGenerativeAI }             from '@google/generative-ai'
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { createClient } from '@supabase/supabase-js'
 
@@ -7,24 +8,46 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// Gọi thẳng REST API v1 — SDK hay LangChain wrapper đều dùng v1beta (lỗi 404)
+// Thứ tự ưu tiên: text-embedding-004 → gemini-embedding-exp-03-07 → embedding-001
+const EMBED_MODELS = [
+  'text-embedding-004',
+  'gemini-embedding-exp-03-07',
+  'embedding-001',
+]
+
 async function embedTexts(texts) {
   const key = process.env.GOOGLE_API_KEY
-  const url = `https://generativelanguage.googleapis.com/v1/models/text-embedding-004:embedContent?key=${key}`
+  if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
 
+  console.log(`[RAG] GOOGLE_API_KEY length=${key.length} prefix=${key.slice(0, 6)}`)
+
+  const genAI = new GoogleGenerativeAI(key.trim())
+
+  // Tìm model hoạt động (chỉ test lần đầu rồi cache)
+  if (!embedTexts._model) {
+    for (const name of EMBED_MODELS) {
+      try {
+        const m      = genAI.getGenerativeModel({ model: name })
+        const result = await m.embedContent('test')
+        if (result.embedding?.values?.length > 0) {
+          embedTexts._model = name
+          console.log(`[RAG] Dùng embedding model: ${name} dim=${result.embedding.values.length}`)
+          break
+        }
+      } catch (e) {
+        console.warn(`[RAG] Model ${name} không dùng được: ${e.message}`)
+      }
+    }
+    if (!embedTexts._model) {
+      throw new Error('Không có embedding model nào hoạt động. Kiểm tra GOOGLE_API_KEY và Google AI Studio quota.')
+    }
+  }
+
+  const model   = genAI.getGenerativeModel({ model: embedTexts._model })
   const results = await Promise.all(texts.map(async (text) => {
-    const res  = await fetch(url, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({
-        model:    'models/text-embedding-004',
-        content:  { parts: [{ text }] },
-        taskType: 'RETRIEVAL_DOCUMENT',
-      }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(`Google embed API ${res.status}: ${data.error?.message}`)
-    return data.embedding.values
+    const result = await model.embedContent(text)
+    if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
+    return result.embedding.values
   }))
 
   return results
