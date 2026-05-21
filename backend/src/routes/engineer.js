@@ -57,6 +57,53 @@ async function extractText(buffer, mimetype) {
   throw new Error('Định dạng file không hỗ trợ')
 }
 
+// GET /test-embed — kiểm tra Google embedding API key có hỗ trợ embedContent không
+router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
+  const key = process.env.GOOGLE_API_KEY
+  if (!key) return res.json({ error: 'GOOGLE_API_KEY chưa được set' })
+
+  try {
+    // Liệt kê tất cả models có sẵn cho API key này
+    const listRes  = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=100`)
+    const listData = await listRes.json()
+
+    const embeddingModels = (listData.models || [])
+      .filter(m => m.supportedGenerationMethods?.includes('embedContent'))
+      .map(m => ({ name: m.name, displayName: m.displayName }))
+
+    // Thử embed 1 chuỗi ngắn với model đầu tiên tìm được
+    let embedTest = null
+    if (embeddingModels.length > 0) {
+      const shortName = embeddingModels[0].name.replace('models/', '')
+      const embedRes  = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${shortName}:embedContent?key=${key}`,
+        {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ content: { parts: [{ text: 'test' }] } }),
+        }
+      )
+      const embedData = await embedRes.json()
+      embedTest = {
+        model:  shortName,
+        status: embedRes.status,
+        dim:    embedData.embedding?.values?.length ?? null,
+        error:  embedData.error?.message ?? null,
+      }
+    }
+
+    res.json({
+      listStatus:      listRes.status,
+      totalModels:     listData.models?.length ?? 0,
+      embeddingModels,
+      embedTest,
+      listError:       listData.error?.message ?? null,
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PHẦN 1 — HÀNG ĐỢI KỸ SƯ
 // ══════════════════════════════════════════════════════════════════════════════
