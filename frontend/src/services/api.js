@@ -61,7 +61,7 @@ export const engineerAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   getDocs:    (status)   => api.get('/knowledge/docs' + (status ? `?status=${status}` : '')),
-  approveDoc: (id)       => api.patch(`/knowledge/${id}/approve`),
+  approveDoc: (id)       => api.patch(`/knowledge/${id}/approve`, {}, { timeout: 120000 }),
   archiveDoc: (id)       => api.patch(`/knowledge/${id}/archive`),
 }
 
