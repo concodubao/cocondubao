@@ -190,16 +190,7 @@ export default function Knowledge() {
       <div style={styles.statsRow}>
         <div style={styles.stat}><span style={styles.statNum}>{approved}</span><span style={styles.statLabel}>Đang dùng</span></div>
         <div style={styles.stat}><span style={{ ...styles.statNum, color: draft > 0 ? '#d97706' : '#16a34a' }}>{draft}</span><span style={styles.statLabel}>Chờ duyệt</span></div>
-        <div style={styles.stat}><span style={styles.statNum}>{total}</span><span style={styles.statLabel}>/ 50 mục tiêu</span></div>
-      </div>
-
-      <div style={styles.progressWrap}>
-        <div style={styles.progressBar}>
-          <div style={{ height: '100%', borderRadius: 99, width: `${Math.min(100, (approved/50)*100)}%`, background: approved >= 50 ? '#16a34a' : '#4ade80', transition: 'width 0.4s' }} />
-        </div>
-        <p style={styles.progressLabel}>
-          {approved >= 50 ? 'Đủ 50 tài liệu! Sẵn sàng launch.' : `Còn ${50 - approved} tài liệu cần duyệt trước 20/02/2026`}
-        </p>
+        <div style={styles.stat}><span style={styles.statNum}>{total}</span><span style={styles.statLabel}>Tổng số</span></div>
       </div>
 
       <div style={{ padding: '0 14px' }}>
@@ -245,9 +236,6 @@ const styles = {
   stat:           { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
   statNum:        { fontSize: 22, fontWeight: 700, color: '#0f172a' },
   statLabel:      { fontSize: 11, color: '#94a3b8' },
-  progressWrap:   { padding: '10px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0' },
-  progressBar:    { height: 5, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' },
-  progressLabel:  { fontSize: 12, color: '#64748b', margin: '5px 0 0', textAlign: 'center' },
   btnToggleUpload:{ width: '100%', padding: '11px', fontSize: 14, fontWeight: 600, background: '#f0fdf4', color: '#16a34a', border: '1.5px dashed #bbf7d0', borderRadius: 10, cursor: 'pointer', margin: '12px 0 0' },
   uploadCard:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 },
   filePicker:     { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#f8fafc', border: '2px dashed #bbf7d0', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#64748b', width: '100%', textAlign: 'left', overflow: 'hidden' },

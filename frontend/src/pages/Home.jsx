@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import { pushAPI } from '../services/api'
+import { usePush } from '../hooks/usePush'
 import { MessageCircle, Bell, ClipboardList, BarChart2, User, LogOut, AlertTriangle } from 'lucide-react'
 
 function AlertBanner({ notifications }) {
@@ -23,6 +25,14 @@ function AlertBanner({ notifications }) {
 export default function Home() {
   const navigate         = useNavigate()
   const { user, logout } = useAuthStore()
+  const { permission, isSubscribed, subscribe } = usePush(user?.id)
+
+  // Tự subscribe nếu user đã cấp quyền từ trước (ví dụ reload trang)
+  useEffect(() => {
+    if (permission === 'granted' && !isSubscribed && user?.id) {
+      subscribe()
+    }
+  }, [permission, isSubscribed, user?.id])
 
   const { data } = useQuery({
     queryKey: ['notifications', user?.id],
@@ -57,6 +67,14 @@ export default function Home() {
       </header>
 
       <AlertBanner notifications={notifications} />
+
+      {permission !== 'granted' && !isSubscribed && (
+        <div style={styles.pushBanner}>
+          <Bell size={18} color="#16a34a" strokeWidth={2} />
+          <p style={styles.pushBannerText}>Bật thông báo để nhận cảnh báo kịp thời</p>
+          <button onClick={subscribe} style={styles.pushBannerBtn}>Bật</button>
+        </div>
+      )}
 
       <main style={styles.main}>
         <p style={styles.mainLabel}>Bạn muốn làm gì hôm nay?</p>
@@ -133,8 +151,11 @@ const styles = {
   btnTitle:  { fontSize: 20, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 },
   btnDesc:   { fontSize: 14, color: '#64748b', marginTop: 5, lineHeight: 1.5 },
   badge:     { background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 11, fontWeight: 700, padding: '2px 7px', display: 'inline-block' },
-  quickNav:  { padding: '4px 16px 0', display: 'flex', gap: 10, flexWrap: 'wrap' },
+  quickNav:  { padding: '4px 16px 0', display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' },
   quickBtn:  { padding: '10px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, fontSize: 14, fontWeight: 600, color: '#16a34a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, minHeight: 40 },
   footer:    { padding: '8px 16px', paddingBottom: 'max(16px, env(safe-area-inset-bottom))', display: 'flex', justifyContent: 'center' },
-  logoutBtn: { background: 'transparent', border: 'none', fontSize: 14, color: '#94a3b8', cursor: 'pointer', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 },
+  logoutBtn:      { background: 'transparent', border: 'none', fontSize: 14, color: '#94a3b8', cursor: 'pointer', padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6 },
+  pushBanner:     { margin: '8px 16px 0', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 },
+  pushBannerText: { flex: 1, fontSize: 13, color: '#0f172a', margin: 0 },
+  pushBannerBtn:  { padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' },
 }

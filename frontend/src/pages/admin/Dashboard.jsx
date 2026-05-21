@@ -53,7 +53,7 @@ export default function Dashboard() {
           <ChevronLeft size={22} />
         </button>
         <h1 style={s.title}>Dashboard</h1>
-        <button onClick={() => navigate('/admin/users')} style={s.iconBtn} aria-label="Quản lý users">
+        <button onClick={() => navigate('/admin/users')} style={s.iconBtn} aria-label="Quản lý tài khoản">
           <Users size={20} />
         </button>
       </header>
@@ -64,7 +64,7 @@ export default function Dashboard() {
         ) : (
           <>
             <div style={s.grid4}>
-              <StatCard label="Nông dân"  value={data?.totalUsers}   onClick={() => navigate('/admin/users')} />
+              <StatCard label="Người dùng" value={data?.totalUsers}   onClick={() => navigate('/admin/users')} />
               <StatCard label="Phiên chat" value={data?.totalSessions} />
               <StatCard label="Chờ KS"    value={data?.pendingQueue}  color={data?.pendingQueue > 5 ? '#ef4444' : '#0f172a'} onClick={() => navigate('/engineer/queue')} />
               <StatCard label="Lỗi AI"    value={data?.errorReports}  color={data?.errorReports > 10 ? '#f59e0b' : '#0f172a'} onClick={() => navigate('/admin/ai-errors')} />
@@ -105,7 +105,7 @@ export default function Dashboard() {
               </button>
               <button onClick={() => navigate('/admin/users')} style={s.actionBtn}>
                 <Users size={20} color="#3b82f6" strokeWidth={1.5} />
-                <span>Quản lý user</span>
+                <span>Quản lý tài khoản</span>
               </button>
             </div>
           </>

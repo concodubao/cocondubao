@@ -246,27 +246,35 @@ router.get('/notifications/:userId', verifyJWT, async (req, res) => {
   }
 
   try {
-    // Lấy crops của user để lọc thông báo phù hợp
+    // Lấy role + crops của user
     const { data: user } = await supabase
       .from('users')
-      .select('crops')
+      .select('crops, role')
       .eq('id', userId)
       .single()
 
     const userCrops = user?.crops || []
+    const isStaff   = ['engineer', 'admin'].includes(user?.role)
 
-    // Lấy thông báo phù hợp với cây trồng của user
-    // (crop_tags rỗng = gửi tất cả)
-    const { data: notifications } = await supabase
+    let notifQuery = supabase
       .from('notifications')
       .select(`
         id, title, body, type, image_url, crop_tags, sent_at, created_at,
         notification_reads!left ( read_at )
       `)
-      .or(`crop_tags.eq.{},${userCrops.map(c => `crop_tags.cs.{${c}}`).join(',')}`)
       .not('sent_at', 'is', null)
       .order('sent_at', { ascending: false })
       .limit(50)
+
+    // Kỹ sư/admin xem tất cả; nông dân chỉ xem thông báo phù hợp cây trồng
+    if (!isStaff) {
+      const cropFilter = userCrops.length > 0
+        ? `crop_tags.eq.{},${userCrops.map(c => `crop_tags.cs.{${c}}`).join(',')}`
+        : 'crop_tags.eq.{}'
+      notifQuery = notifQuery.or(cropFilter)
+    }
+
+    const { data: notifications } = await notifQuery
 
     const result = (notifications || []).map(n => ({
       ...n,
