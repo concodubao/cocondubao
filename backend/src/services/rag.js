@@ -115,9 +115,24 @@ export async function embedAndStoreDoc(docId) {
     separators:   ['\n\n', '\n', '。', '.', ' ', ''],
   })
   const chunks = await splitter.splitText(doc.content)
+  if (!chunks.length) throw new Error('Không tách được chunks từ nội dung tài liệu.')
 
   // Embed tất cả chunks
-  const vectors = await embeddings.embedDocuments(chunks)
+  let vectors
+  try {
+    vectors = await embeddings.embedDocuments(chunks)
+  } catch (embedErr) {
+    throw new Error(`Embedding thất bại (kiểm tra GOOGLE_API_KEY trên Railway): ${embedErr.message}`)
+  }
+
+  if (!vectors?.length || vectors.length !== chunks.length) {
+    throw new Error(`Embedding trả về ${vectors?.length ?? 0} vector cho ${chunks.length} chunks — kiểm tra GOOGLE_API_KEY.`)
+  }
+
+  const invalidIdx = vectors.findIndex(v => !Array.isArray(v) || v.length === 0)
+  if (invalidIdx !== -1) {
+    throw new Error(`Vector tại chunk ${invalidIdx} rỗng — GOOGLE_API_KEY có thể sai hoặc hết quota.`)
+  }
 
   const rows = chunks.map((text, i) => ({
     doc_id:      docId,
