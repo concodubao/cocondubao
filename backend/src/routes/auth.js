@@ -4,17 +4,9 @@ import bcrypt   from 'bcrypt'
 import { createClient } from '@supabase/supabase-js'
 import { verifyJWT } from '../middleware/auth.js'
 
-const router   = express.Router()
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-
-// ─── OTP store (in-memory) ────────────────────────────────────────────────────
-const otpStore = new Map()   // phone → { code, expiresAt, lastSentAt }
-const OTP_TTL_MS  = 10 * 60 * 1000   // 10 phút
-const OTP_RATE_MS = 60  * 1000       // 60 giây giữa 2 lần gửi
-
-function generateOTP() {
-  return String(Math.floor(100000 + Math.random() * 900000))
-}
+const router      = express.Router()
+const supabase    = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+const supabaseAuth = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
 
 function isValidPhone(normalized) {
   return /^\+84[3-9]\d{8}$/.test(normalized)
@@ -37,28 +29,26 @@ router.post('/request-otp', async (req, res) => {
     return res.status(400).json({ error: 'Số điện thoại không hợp lệ. Vui lòng dùng số di động Việt Nam (09x, 08x, 07x, 03x, 05x, 056...).' })
   }
 
-  // Rate limit
-  const prev = otpStore.get(normalized)
-  if (prev && Date.now() - prev.lastSentAt < OTP_RATE_MS) {
-    const wait = Math.ceil((OTP_RATE_MS - (Date.now() - prev.lastSentAt)) / 1000)
-    return res.status(429).json({ error: `Vui lòng chờ ${wait} giây trước khi gửi lại.`, retryAfter: wait })
+  const { error } = await supabaseAuth.auth.signInWithOtp({ phone: normalized })
+  if (error) {
+    console.error('[AUTH] signInWithOtp error:', error.message)
+    // Twilio trả về rate limit hoặc lỗi số điện thoại
+    if (error.message.includes('rate') || error.status === 429) {
+      return res.status(429).json({ error: 'Vui lòng chờ trước khi gửi lại OTP.' })
+    }
+    return res.status(400).json({ error: 'Không gửi được OTP: ' + error.message })
   }
-
-  const code = generateOTP()
-  otpStore.set(normalized, { code, expiresAt: Date.now() + OTP_TTL_MS, lastSentAt: Date.now() })
-
-  // Production: gửi SMS thật tại đây
-  console.log(`[AUTH] OTP cho ${normalized}: ${code}`)
 
   const { data: existingUser } = await supabase
     .from('users').select('id, role').eq('phone', normalized).single()
+
+  console.log(`[AUTH] OTP gửi qua Twilio đến ${normalized}`)
 
   res.json({
     success:        true,
     phone:          normalized,
     isExistingUser: !!existingUser,
     existingRole:   existingUser?.role ?? null,
-    ...(process.env.NODE_ENV !== 'production' && { devOtp: code }),
   })
 })
 
@@ -72,19 +62,15 @@ router.post('/verify-otp', async (req, res) => {
     return res.status(400).json({ error: 'Số điện thoại không hợp lệ.' })
   }
 
-  const stored = otpStore.get(normalized)
-  if (!stored) {
-    return res.status(400).json({ error: 'OTP chưa được gửi hoặc đã hết hạn. Vui lòng yêu cầu mã mới.' })
+  const { error: verifyError } = await supabaseAuth.auth.verifyOtp({
+    phone: normalized,
+    token: otp,
+    type:  'sms',
+  })
+  if (verifyError) {
+    console.error('[AUTH] verifyOtp error:', verifyError.message)
+    return res.status(400).json({ error: 'OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.' })
   }
-  if (Date.now() > stored.expiresAt) {
-    otpStore.delete(normalized)
-    return res.status(400).json({ error: 'OTP đã hết hạn. Vui lòng yêu cầu mã mới.' })
-  }
-  if (otp !== stored.code) {
-    return res.status(400).json({ error: 'OTP không đúng. Vui lòng kiểm tra lại.' })
-  }
-
-  otpStore.delete(normalized)  // dùng 1 lần
 
   try {
     let { data: user } = await supabase.from('users').select('*').eq('phone', normalized).single()

@@ -65,8 +65,8 @@ function StepPhone({ onNext }) {
   )
 }
 
-function StepOTP({ phone, role, devOtp, onResend }) {
-  const [otp,       setOtp]       = useState(devOtp || '')
+function StepOTP({ phone, role, onResend }) {
+  const [otp,       setOtp]       = useState('')
   const [loading,   setLoading]   = useState(false)
   const [error,     setError]     = useState('')
   const [countdown, setCountdown] = useState(60)
@@ -99,8 +99,7 @@ function StepOTP({ phone, role, devOtp, onResend }) {
     setResending(true)
     setError('')
     try {
-      const newDevOtp = await onResend()
-      if (newDevOtp) setOtp(newDevOtp)
+      await onResend()
       setCountdown(60)
     } catch (err) {
       setError(err.response?.data?.error || 'Không gửi lại được. Thử lại sau.')
@@ -118,11 +117,6 @@ function StepOTP({ phone, role, devOtp, onResend }) {
         onKeyDown={e => e.key === 'Enter' && handleVerify()}
         style={{ ...s.input, textAlign: 'center', fontSize: 28, letterSpacing: 8 }}
         autoFocus />
-      {devOtp && (
-        <p style={{ fontSize: 13, color: '#16a34a', background: '#f0fdf4', padding: '8px 12px', borderRadius: 8, margin: 0 }}>
-          [DEV] OTP: <strong>{devOtp}</strong>
-        </p>
-      )}
       <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, textAlign: 'center' }}>Mã hết hạn sau 10 phút</p>
       {error && <p style={s.error}>{error}</p>}
       <button onClick={handleVerify} disabled={loading || otp.length !== 6}
@@ -227,7 +221,6 @@ export default function Login() {
   const [step,           setStep]           = useState('role')
   const [role,           setRole]           = useState('farmer')
   const [phone,          setPhone]          = useState('')
-  const [devOtp,         setDevOtp]         = useState('')
   const [isExistingUser, setIsExistingUser] = useState(false)
 
   const { token } = useAuthStore()
@@ -251,19 +244,15 @@ export default function Login() {
     else setStep('email')
   }
 
-  function handlePhoneNext({ phone: p, devOtp: otp, isExistingUser: exists, existingRole }) {
+  function handlePhoneNext({ phone: p, isExistingUser: exists, existingRole }) {
     setPhone(p)
-    setDevOtp(otp || '')
     setIsExistingUser(exists)
     setRole(exists ? (existingRole || 'farmer') : 'farmer')
     setStep('otp')
   }
 
   async function handleResend() {
-    const res = await authAPI.requestOTP(phone)
-    const newDevOtp = res.data.devOtp || ''
-    setDevOtp(newDevOtp)
-    return newDevOtp
+    await authAPI.requestOTP(phone)
   }
 
   return (
@@ -283,7 +272,7 @@ export default function Login() {
         {step === 'role'  && <StepRole onNext={handleRoleNext} />}
         {step === 'phone' && <StepPhone onNext={handlePhoneNext} />}
         {step === 'otp'   && (
-          <StepOTP phone={phone} role={role} devOtp={devOtp}
+          <StepOTP phone={phone} role={role}
             isExistingUser={isExistingUser} onResend={handleResend} />
         )}
         {step === 'email' && <StepEmailPassword role={role} />}
