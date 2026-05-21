@@ -213,26 +213,36 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
 
 // POST /upload — upload tài liệu
 router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
-  upload.single('file'), async (req, res) => {
+  (req, res, next) => {
+    // Multer 2.x: phải wrap để bắt lỗi file filter / size limit đúng cách
+    upload.single('file')(req, res, (err) => {
+      if (err) return res.status(400).json({ error: 'Lỗi file: ' + err.message })
+      next()
+    })
+  },
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file.' })
 
-  if (!req.file) return res.status(400).json({ error: 'Vui lòng chọn file.' })
+    const { title, cropTags, source } = req.body
+    if (!title?.trim()) return res.status(400).json({ error: 'Vui lòng nhập tên tài liệu.' })
 
-  const { title, cropTags, source } = req.body
-  if (!title?.trim()) return res.status(400).json({ error: 'Vui lòng nhập tên tài liệu.' })
-
-  try {
-    // Trích xuất text từ PDF/DOCX/TXT
-    const content = await extractText(req.file.buffer, req.file.mimetype)
-
-    if (!content?.trim()) {
-      return res.status(422).json({ error: 'Không đọc được nội dung file. Thử file khác nhé.' })
+    // Bước 1: Trích xuất text
+    let content
+    try {
+      content = await extractText(req.file.buffer, req.file.mimetype)
+    } catch (err) {
+      console.error('[KNOWLEDGE] extractText error:', err.message)
+      return res.status(422).json({ error: 'Không đọc được nội dung file: ' + err.message })
     }
 
-    // Parse cropTags từ JSON string
+    if (!content?.trim()) {
+      return res.status(422).json({ error: 'File không có nội dung text. Thử file khác nhé.' })
+    }
+
     let tags = []
     try { tags = JSON.parse(cropTags || '[]') } catch { tags = [] }
 
-    // Lưu vào DB với status = draft
+    // Bước 2: Lưu vào Supabase
     const { data: doc, error } = await supabase
       .from('knowledge_docs')
       .insert({
@@ -246,24 +256,23 @@ router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[KNOWLEDGE] supabase insert error:', error)
+      return res.status(500).json({ error: 'Lỗi lưu DB: ' + error.message })
+    }
 
     res.json({
       success: true,
       doc: {
-        id:       doc.id,
-        title:    doc.title,
-        status:   doc.status,
-        charCount: content.length,
+        id:              doc.id,
+        title:           doc.title,
+        status:          doc.status,
+        charCount:       content.length,
         estimatedChunks: Math.ceil(content.length / 500),
       },
     })
-
-  } catch (err) {
-    console.error('[KNOWLEDGE] upload error:', err)
-    res.status(500).json({ error: 'Upload thất bại: ' + err.message })
   }
-})
+)
 
 // GET /docs — danh sách tài liệu
 router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
