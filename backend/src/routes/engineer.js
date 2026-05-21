@@ -31,23 +31,22 @@ async function extractText(buffer, mimetype) {
   }
 
   if (mimetype === 'application/pdf') {
-    // Dùng pdfjs-dist thay pdf-parse (pdf-parse bị lỗi install trên Railway)
-    const pdfjsLib = await import('pdfjs-dist')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+    // Dùng pdftotext (poppler_utils) — không cần browser API như pdfjs-dist
+    const { execFile }    = await import('child_process')
+    const { promisify }   = await import('util')
+    const { writeFile, unlink } = await import('fs/promises')
+    const { join }        = await import('path')
+    const { tmpdir }      = await import('os')
+    const execFileAsync   = promisify(execFile)
 
-    const pdf = await pdfjsLib.getDocument({
-      data:            new Uint8Array(buffer),
-      useSystemFonts:  true,
-      disableFontFace: true,
-    }).promise
-
-    let text = ''
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page    = await pdf.getPage(i)
-      const content = await page.getTextContent()
-      text += content.items.map(item => item.str || '').join(' ') + '\n'
+    const tmpPath = join(tmpdir(), `upload_${Date.now()}.pdf`)
+    await writeFile(tmpPath, buffer)
+    try {
+      const { stdout } = await execFileAsync('pdftotext', [tmpPath, '-'], { maxBuffer: 10 * 1024 * 1024 })
+      return stdout
+    } finally {
+      unlink(tmpPath).catch(() => {})
     }
-    return text
   }
 
   if (mimetype.includes('wordprocessingml')) {
