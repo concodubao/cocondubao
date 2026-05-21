@@ -8,44 +8,35 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// Thứ tự ưu tiên: text-embedding-004 → gemini-embedding-exp-03-07 → embedding-001
-const EMBED_MODELS = [
-  'text-embedding-004',
-  'gemini-embedding-exp-03-07',
-  'embedding-001',
-]
+// Google AI Studio đổi tên: text-embedding-004 → gemini-embedding-001
+const EMBED_MODELS = ['gemini-embedding-001', 'gemini-embedding-2']
 
-async function embedTexts(texts) {
+async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
   if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
 
-  console.log(`[RAG] GOOGLE_API_KEY length=${key.length} prefix=${key.slice(0, 6)}`)
-
   const genAI = new GoogleGenerativeAI(key.trim())
 
-  // Tìm model hoạt động (chỉ test lần đầu rồi cache)
   if (!embedTexts._model) {
     for (const name of EMBED_MODELS) {
       try {
         const m      = genAI.getGenerativeModel({ model: name })
-        const result = await m.embedContent('test')
+        const result = await m.embedContent({ content: { parts: [{ text: 'test' }] }, taskType: 'RETRIEVAL_DOCUMENT' })
         if (result.embedding?.values?.length > 0) {
           embedTexts._model = name
-          console.log(`[RAG] Dùng embedding model: ${name} dim=${result.embedding.values.length}`)
+          console.log(`[RAG] Embedding model: ${name} dim=${result.embedding.values.length}`)
           break
         }
       } catch (e) {
-        console.warn(`[RAG] Model ${name} không dùng được: ${e.message}`)
+        console.warn(`[RAG] ${name} không dùng được: ${e.message}`)
       }
     }
-    if (!embedTexts._model) {
-      throw new Error('Không có embedding model nào hoạt động. Kiểm tra GOOGLE_API_KEY và Google AI Studio quota.')
-    }
+    if (!embedTexts._model) throw new Error('Không có embedding model nào hoạt động. Kiểm tra GOOGLE_API_KEY.')
   }
 
   const model   = genAI.getGenerativeModel({ model: embedTexts._model })
   const results = await Promise.all(texts.map(async (text) => {
-    const result = await model.embedContent(text)
+    const result = await model.embedContent({ content: { parts: [{ text }] }, taskType })
     if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
     return result.embedding.values
   }))
@@ -77,7 +68,7 @@ export async function askRAG(question, cropType = null) {
 
   try {
     // BƯỚC 1: Embed câu hỏi thành vector 768 chiều
-    const [queryEmbedding] = await embedTexts([question])
+    const [queryEmbedding] = await embedTexts([question], 'RETRIEVAL_QUERY')
 
     // BƯỚC 2: Tìm top-5 chunks gần nhất trong pgvector
     const { data: chunks, error } = await supabase.rpc('match_knowledge_chunks', {
