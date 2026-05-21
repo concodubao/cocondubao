@@ -9,8 +9,9 @@ const supabase = createClient(
 )
 
 const embeddings = new GoogleGenerativeAIEmbeddings({
-  model:  'text-embedding-004',   // 768 dimensions
-  apiKey: process.env.GOOGLE_API_KEY,
+  model:    'text-embedding-004',  // 768 dimensions
+  apiKey:   process.env.GOOGLE_API_KEY,
+  taskType: 'RETRIEVAL_DOCUMENT',
 })
 
 const llm = new ChatGoogleGenerativeAI({
@@ -133,6 +134,8 @@ export async function embedAndStoreDoc(docId) {
   if (invalidIdx !== -1) {
     throw new Error(`Vector tại chunk ${invalidIdx} rỗng — GOOGLE_API_KEY có thể sai hoặc hết quota.`)
   }
+
+  console.log(`[RAG] Embedded ${chunks.length} chunks, dim=${vectors[0].length}`)
 
   const rows = chunks.map((text, i) => ({
     doc_id:      docId,
