@@ -34,8 +34,9 @@ async function extractText(buffer, mimetype) {
   }
 
   if (mimetype === 'application/pdf') {
-    // Import động — tránh pdf-parse chạy file test khi khởi động
-    const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default
+    const { createRequire } = await import('module')
+    const require = createRequire(import.meta.url)
+    const pdfParse = require('pdf-parse')
     const data = await pdfParse(buffer)
     return data.text
   }
