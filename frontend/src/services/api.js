@@ -43,6 +43,7 @@ export const chatAPI = {
 
 export const pushAPI = {
   subscribe:        data   => api.post('/push/subscribe', data),
+  send:             data   => api.post('/push/send', data),
   getNotifications: userId => api.get(`/push/notifications/${userId}`),
   markRead:         (id, userId) => api.patch(`/push/notifications/${id}/read`, { userId }),
   updateSettings:   settings    => api.patch('/push/notifications/settings', settings),
