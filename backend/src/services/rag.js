@@ -10,11 +10,11 @@ const supabase = createClient(
 
 // Dùng Google SDK trực tiếp thay LangChain wrapper — tránh bug parse response
 const genAI         = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
-const embedModel    = genAI.getGenerativeModel({ model: 'text-embedding-004' })
+const embedModel    = genAI.getGenerativeModel({ model: 'embedding-001' })
 
 async function embedTexts(texts) {
   const results = await Promise.all(
-    texts.map(t => embedModel.embedContent({ content: { parts: [{ text: t }] }, taskType: 'RETRIEVAL_DOCUMENT' }))
+    texts.map(t => embedModel.embedContent(t))
   )
   return results.map(r => r.embedding.values)
 }
