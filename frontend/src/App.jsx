@@ -35,6 +35,7 @@ import SendNotif from './pages/admin/SendNotif'
 import AIErrors  from './pages/admin/AIErrors'
 
 import DesktopLayout from './components/DesktopLayout'
+import ToastContainer from './components/Toast'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 1000 * 60 * 5 } },
@@ -60,6 +61,7 @@ function ProtectedRoute({ children, allowedRoles }) {
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ToastContainer />
       <BrowserRouter>
         <Routes>
           {/* Chung — không cần đăng nhập */}
