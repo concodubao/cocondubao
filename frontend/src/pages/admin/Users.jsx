@@ -33,7 +33,7 @@ function UserCard({ user, onToggle, onApprove, onChangeRole }) {
       {user.crops?.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {user.crops.map(c => (
-            <span key={c} style={s.cropTag}>{c === 'rice' ? 'Lúa' : c}</span>
+            <span key={c} style={s.cropTag}>{{ rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }[c] || c}</span>
           ))}
         </div>
       )}

@@ -4,6 +4,13 @@ import { useAuthStore } from '../stores/authStore'
 import { authAPI } from '../services/api'
 import { ChevronLeft } from 'lucide-react'
 
+const CROP_OPTIONS = [
+  { id: 'rice',   label: 'Lúa' },
+  { id: 'veggie', label: 'Rau màu' },
+  { id: 'fruit',  label: 'Cây ăn trái' },
+  { id: 'other',  label: 'Khác' },
+]
+
 export default function Profile() {
   const navigate       = useNavigate()
   const [params]       = useSearchParams()
@@ -14,11 +21,15 @@ export default function Profile() {
 
   const [name,    setName]    = useState(user?.name    || '')
   const [village, setVillage] = useState(user?.village || '')
+  const [crops,   setCrops]   = useState(user?.crops   || [])
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
 
-  const profileComplete = user?.name && (!isFarmer || user?.crops?.length > 0)
-  if (isOnboard && profileComplete) return <Navigate to="/home" replace />
+  if (isOnboard && user?.name) return <Navigate to="/home" replace />
+
+  function toggleCrop(id) {
+    setCrops(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
+  }
 
   async function handleSave() {
     if (!name.trim()) return setError('Vui lòng nhập tên của bạn.')
@@ -28,13 +39,12 @@ export default function Profile() {
       const res = await authAPI.updateProfile({
         name:    name.trim(),
         village: village.trim(),
-        crops:   isFarmer ? ['rice'] : [],
+        crops,
       })
       setUser(res.data.user)
       navigate('/home', { replace: true })
     } catch (err) {
-      const msg = err.response?.data?.error || err.message || 'Không lưu được. Thử lại nhé.'
-      setError(msg)
+      setError(err.response?.data?.error || err.message || 'Không lưu được. Thử lại nhé.')
     } finally {
       setLoading(false)
     }
@@ -78,6 +88,29 @@ export default function Profile() {
             style={s.input}
           />
         </section>
+
+        {isFarmer && (
+          <section style={s.section}>
+            <label style={s.label}>Cây trồng <span style={{ color: '#94a3b8', fontWeight: 400 }}>(tuỳ chọn)</span></label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
+              {CROP_OPTIONS.map(c => {
+                const active = crops.includes(c.id)
+                return (
+                  <button key={c.id} onClick={() => toggleCrop(c.id)} type="button"
+                    style={{
+                      padding: '8px 16px', borderRadius: 20, fontSize: 14, fontWeight: active ? 700 : 500,
+                      border: `1.5px solid ${active ? '#16a34a' : '#e2e8f0'}`,
+                      background: active ? '#f0fdf4' : '#f8fafc',
+                      color: active ? '#16a34a' : '#64748b',
+                      cursor: 'pointer',
+                    }}>
+                    {c.label}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         {error && <p style={s.error} role="alert">{error}</p>}
 
