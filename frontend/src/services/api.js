@@ -52,10 +52,11 @@ export const pushAPI = {
 
 export const engineerAPI = {
   // Hàng đợi
-  getQueue: (status = 'pending') => api.get(`/engineer/queue?status=${status}`),
-  take:     (id)                 => api.patch(`/engineer/queue/${id}/take`),
-  answer:   (id, data)           => api.patch(`/engineer/queue/${id}/answer`, data),
- 
+  getQueue:        (status = 'pending') => api.get(`/engineer/queue?status=${status}`),
+  take:            (id)                 => api.patch(`/engineer/queue/${id}/take`),
+  answer:          (id, data)           => api.patch(`/engineer/queue/${id}/answer`, data),
+  deleteQueueItem: (id)                 => api.delete(`/engineer/queue/${id}`),
+
   // Kho tri thức
   uploadDoc:  (formData) => api.post('/knowledge/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -63,6 +64,7 @@ export const engineerAPI = {
   getDocs:    (status)   => api.get('/knowledge/docs' + (status ? `?status=${status}` : '')),
   approveDoc: (id)       => api.patch(`/knowledge/${id}/approve`, {}, { timeout: 120000 }),
   archiveDoc: (id)       => api.patch(`/knowledge/${id}/archive`),
+  deleteDoc:  (id)       => api.delete(`/knowledge/${id}`),
 }
 
 export const adminAPI = {

@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
-import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive } from 'lucide-react'
+import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive, Trash2 } from 'lucide-react'
 
 const CROP_OPTIONS = [
   { id: 'rice',   label: 'Lúa' },
@@ -13,10 +13,10 @@ const CROP_OPTIONS = [
 
 function StatusBadge({ status }) {
   const MAP = {
-    draft:     { label: 'Chờ duyệt',  bg: '#fffbeb', color: '#d97706' },
+    draft:     { label: 'Chờ duyệt',   bg: '#fffbeb', color: '#d97706' },
     embedding: { label: 'Đang embed…', bg: '#eff6ff', color: '#2563eb' },
-    approved:  { label: 'Đang dùng',  bg: '#f0fdf4', color: '#16a34a' },
-    archived:  { label: 'Lưu trữ',    bg: '#f1f5f9', color: '#94a3b8' },
+    approved:  { label: 'Đang dùng',   bg: '#f0fdf4', color: '#16a34a' },
+    archived:  { label: 'Lưu trữ',     bg: '#f1f5f9', color: '#94a3b8' },
   }
   const c = MAP[status] || MAP.draft
   return (
@@ -40,8 +40,8 @@ function UploadForm({ onSuccess }) {
   }
 
   async function handleUpload() {
-    if (!file)           return setError('Chọn file trước nhé.')
-    if (!title.trim())   return setError('Nhập tên tài liệu.')
+    if (!file)              return setError('Chọn file trước nhé.')
+    if (!title.trim())      return setError('Nhập tên tài liệu.')
     if (crops.length === 0) return setError('Chọn ít nhất 1 loại cây trồng.')
     setLoading(true)
     setError('')
@@ -87,7 +87,7 @@ function UploadForm({ onSuccess }) {
           ))}
         </div>
       </div>
-      {error && <p style={styles.error} role="alert">{error}</p>}
+      {error && <p style={styles.errorText} role="alert">{error}</p>}
       <button onClick={handleUpload} disabled={loading} style={{ ...styles.btnUpload, opacity: loading ? 0.7 : 1 }}>
         <Upload size={16} strokeWidth={2} /> {loading ? 'Đang xử lý...' : 'Upload tài liệu'}
       </button>
@@ -95,8 +95,11 @@ function UploadForm({ onSuccess }) {
   )
 }
 
-function DocCard({ doc, onApprove, onArchive, approving }) {
+function DocCard({ doc, onApprove, onArchive, onDelete, approving, deleting }) {
   const isApproving = approving === doc.id
+  const isDeleting  = deleting  === doc.id
+  const canDelete   = doc.status === 'draft' || doc.status === 'embedding'
+
   return (
     <div style={styles.docCard}>
       <div style={styles.docHead}>
@@ -114,7 +117,7 @@ function DocCard({ doc, onApprove, onArchive, approving }) {
         {doc.chunkCount > 0 && <span style={{ ...styles.tag, background: '#eff6ff', color: '#3b82f6' }}>{doc.chunkCount} chunks</span>}
       </div>
       <div style={styles.docActions}>
-        {(doc.status === 'draft') && (
+        {doc.status === 'draft' && (
           <button onClick={() => onApprove(doc.id)} disabled={isApproving}
             style={{ ...styles.btnApprove, opacity: isApproving ? 0.7 : 1 }}>
             <Check size={14} strokeWidth={2.5} /> {isApproving ? 'Đang gửi...' : 'Duyệt & Embed vào RAG'}
@@ -128,7 +131,16 @@ function DocCard({ doc, onApprove, onArchive, approving }) {
             <Archive size={13} strokeWidth={1.5} /> Lưu trữ
           </button>
         )}
-        {doc.status === 'archived' && <span style={{ fontSize: 12, color: '#94a3b8' }}>Đã lưu trữ — không dùng trong RAG</span>}
+        {doc.status === 'archived' && (
+          <span style={{ fontSize: 12, color: '#94a3b8' }}>Đã lưu trữ — không dùng trong RAG</span>
+        )}
+        {canDelete && (
+          <button onClick={() => onDelete(doc.id, doc.title)} disabled={isDeleting}
+            style={{ ...styles.btnDelete, opacity: isDeleting ? 0.6 : 1 }}
+            aria-label="Xóa tài liệu">
+            <Trash2 size={13} strokeWidth={1.5} /> {isDeleting ? 'Đang xóa...' : 'Xóa'}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -139,13 +151,13 @@ export default function Knowledge() {
   const queryClient = useQueryClient()
   const [filter,     setFilter]     = useState('all')
   const [approving,  setApproving]  = useState(null)
+  const [deleting,   setDeleting]   = useState(null)
   const [showUpload, setShowUpload] = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey:  ['knowledge-docs', filter],
     queryFn:   () => engineerAPI.getDocs(filter === 'all' ? undefined : filter).then(r => r.data.docs),
     staleTime: 5_000,
-    // Poll mỗi 5s nếu có tài liệu đang embedding
     refetchInterval: (query) => {
       const docs = query.state.data || []
       return docs.some(d => d.status === 'embedding') ? 5000 : false
@@ -162,7 +174,6 @@ export default function Knowledge() {
     try {
       await engineerAPI.approveDoc(id)
       queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
-      // Không cần alert — status badge tự chuyển draft → embedding → approved
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Embed thất bại. Thử lại nhé.'
       console.error('[Knowledge] approve error:', err.response?.data || err)
@@ -179,6 +190,19 @@ export default function Knowledge() {
       queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
     } catch {
       alert('Không thể lưu trữ. Thử lại nhé.')
+    }
+  }
+
+  async function handleDelete(id, title) {
+    if (!confirm(`Xóa vĩnh viễn tài liệu "${title}"? Hành động này không thể hoàn tác.`)) return
+    setDeleting(id)
+    try {
+      await engineerAPI.deleteDoc(id)
+      queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
+    } catch (err) {
+      alert(err.response?.data?.error || 'Không thể xóa. Thử lại nhé.')
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -208,7 +232,12 @@ export default function Knowledge() {
         <button onClick={() => setShowUpload(v => !v)} style={styles.btnToggleUpload} aria-expanded={showUpload}>
           {showUpload ? 'Đóng form upload' : '+ Upload tài liệu mới'}
         </button>
-        {showUpload && <UploadForm onSuccess={() => { setShowUpload(false); queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] }) }} />}
+        {showUpload && (
+          <UploadForm onSuccess={() => {
+            setShowUpload(false)
+            queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
+          }} />
+        )}
       </div>
 
       <div style={styles.filterRow} role="tablist">
@@ -230,7 +259,15 @@ export default function Knowledge() {
           </div>
         ) : (
           docs.map(doc => (
-            <DocCard key={doc.id} doc={doc} onApprove={handleApprove} onArchive={handleArchive} approving={approving} />
+            <DocCard
+              key={doc.id}
+              doc={doc}
+              onApprove={handleApprove}
+              onArchive={handleArchive}
+              onDelete={handleDelete}
+              approving={approving}
+              deleting={deleting}
+            />
           ))
         )}
       </main>
@@ -252,7 +289,7 @@ const styles = {
   filePicker:     { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#f8fafc', border: '2px dashed #bbf7d0', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#64748b', width: '100%', textAlign: 'left', overflow: 'hidden' },
   input:          { padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', width: '100%', boxSizing: 'border-box' },
   cropBtn:        { padding: '6px 12px', borderRadius: 99, cursor: 'pointer', fontSize: 13, transition: 'all 0.15s' },
-  error:          { color: '#ef4444', fontSize: 13, background: '#fef2f2', padding: '8px 10px', borderRadius: 8, margin: 0 },
+  errorText:      { color: '#ef4444', fontSize: 13, background: '#fef2f2', padding: '8px 10px', borderRadius: 8, margin: 0 },
   btnUpload:      { padding: '11px', fontSize: 15, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   filterRow:      { display: 'flex', padding: '8px 12px', gap: 6, background: '#fff', borderBottom: '1px solid #e2e8f0', overflowX: 'auto' },
   filterBtn:      { padding: '6px 12px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' },
@@ -266,4 +303,5 @@ const styles = {
   docActions:     { display: 'flex', gap: 8, flexWrap: 'wrap' },
   btnApprove:     { padding: '8px 12px', fontSize: 13, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 },
   btnArchive:     { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
+  btnDelete:      { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
 }

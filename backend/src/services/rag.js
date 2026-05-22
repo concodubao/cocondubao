@@ -78,7 +78,7 @@ export async function askRAG(question, cropType = null) {
   const startTime = Date.now()
 
   try {
-    // BƯỚC 1: Embed câu hỏi thành vector 768 chiều
+    // BƯỚC 1: Embed câu hỏi thành vector 1536 chiều
     const [queryEmbedding] = await embedTexts([question], 'RETRIEVAL_QUERY')
 
     // BƯỚC 2: Tìm top-5 chunks gần nhất trong pgvector

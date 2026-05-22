@@ -7,10 +7,9 @@
 
 import express from 'express'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../services/supabase.js'
 
-const router   = express.Router()
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+const router = express.Router()
 
 // ── GET /admin/stats ─────────────────────────────────────────────────────────
 router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
@@ -31,7 +30,6 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
       supabase.from('ai_error_reports').select('*', { count: 'exact', head: true }),
     ])
 
-    // Tỷ lệ RAG tự trả lời
     const { data: confData } = await supabase
       .from('messages')
       .select('confidence')
@@ -43,7 +41,6 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
     const ragTotal    = (confData || []).length
     const ragRate     = ragTotal > 0 ? Math.round(ragAnswered / ragTotal * 100) : 0
 
-    // Sessions 7 ngày gần nhất (theo ngày)
     const { data: sessionsByDay } = await supabase
       .from('chat_sessions')
       .select('created_at')
@@ -82,7 +79,7 @@ router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
 
   let query = supabase
     .from('users')
-    .select('*')
+    .select('id, phone, email, role, name, village, crops, is_active, created_at')
     .order('created_at', { ascending: false })
     .range(Number(offset), Number(offset) + Number(limit) - 1)
 
@@ -106,7 +103,7 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
     .from('users')
     .update(updates)
     .eq('id', req.params.id)
-    .select()
+    .select('id, phone, email, role, name, is_active')
     .single()
 
   if (error) return res.status(500).json({ error: error.message })

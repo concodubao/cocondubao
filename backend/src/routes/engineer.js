@@ -1,13 +1,12 @@
-﻿import express from 'express'
+import express from 'express'
 import multer  from 'multer'
-import mammoth from 'mammoth'         // đọc .docx
+import mammoth from 'mammoth'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
-import { embedAndStoreDoc }        from '../services/rag.js'
-import { notifyFarmer }            from '../services/webpush.js'
-import { createClient }            from '@supabase/supabase-js'
+import { embedAndStoreDoc }       from '../services/rag.js'
+import { notifyFarmer }           from '../services/webpush.js'
+import { supabase }               from '../services/supabase.js'
 
-const router   = express.Router()
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+const router = express.Router()
 
 // Multer: nhận PDF / DOCX / TXT tối đa 20MB
 const upload = multer({
@@ -31,13 +30,12 @@ async function extractText(buffer, mimetype) {
   }
 
   if (mimetype === 'application/pdf') {
-    // Dùng pdftotext (poppler_utils) — không cần browser API như pdfjs-dist
-    const { execFile }    = await import('child_process')
-    const { promisify }   = await import('util')
-    const { writeFile, unlink } = await import('fs/promises')
-    const { join }        = await import('path')
-    const { tmpdir }      = await import('os')
-    const execFileAsync   = promisify(execFile)
+    const { execFile }           = await import('child_process')
+    const { promisify }          = await import('util')
+    const { writeFile, unlink }  = await import('fs/promises')
+    const { join }               = await import('path')
+    const { tmpdir }             = await import('os')
+    const execFileAsync          = promisify(execFile)
 
     const tmpPath = join(tmpdir(), `upload_${Date.now()}.pdf`)
     await writeFile(tmpPath, buffer)
@@ -57,13 +55,12 @@ async function extractText(buffer, mimetype) {
   throw new Error('Định dạng file không hỗ trợ')
 }
 
-// GET /test-embed — kiểm tra Google embedding API key có hỗ trợ embedContent không
+// GET /test-embed — kiểm tra Google embedding API
 router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
   const key = process.env.GOOGLE_API_KEY
   if (!key) return res.json({ error: 'GOOGLE_API_KEY chưa được set' })
 
   try {
-    // Liệt kê tất cả models có sẵn cho API key này
     const listRes  = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=100`)
     const listData = await listRes.json()
 
@@ -71,7 +68,6 @@ router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
       .filter(m => m.supportedGenerationMethods?.includes('embedContent'))
       .map(m => ({ name: m.name, displayName: m.displayName }))
 
-    // Thử embed 1 chuỗi ngắn với model đầu tiên tìm được
     let embedTest = null
     if (embeddingModels.length > 0) {
       const shortName = embeddingModels[0].name.replace('models/', '')
@@ -109,7 +105,6 @@ router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 // GET /engineer/queue — danh sách câu hỏi cần trả lời
-// Realtime subscribe ở frontend (Supabase channel), API này để load lần đầu
 router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { status = 'pending', limit = 20, offset = 0 } = req.query
 
@@ -136,12 +131,11 @@ router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, re
       )
     `)
     .eq('status', status)
-    .order('created_at', { ascending: true })  // Ưu tiên câu hỏi cũ nhất trước
+    .order('created_at', { ascending: true })
     .range(Number(offset), Number(offset) + Number(limit) - 1)
 
   if (error) return res.status(500).json({ error: error.message })
 
-  // Tính thời gian chờ để ưu tiên
   const queue = (data || []).map(item => ({
     ...item,
     waitMinutes: Math.round((Date.now() - new Date(item.created_at)) / 60000),
@@ -150,31 +144,29 @@ router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, re
   res.json({ queue, total: queue.length })
 })
 
-// PATCH /engineer/queue/:id/take — kỹ sư nhận câu hỏi (in_progress)
+// PATCH /engineer/queue/:id/take — kỹ sư nhận câu hỏi (atomic, tránh race condition)
 router.patch('/queue/:id/take', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { id } = req.params
 
-  // Kiểm tra câu hỏi còn pending không
-  const { data: item } = await supabase
-    .from('engineer_queue')
-    .select('status, assigned_to')
-    .eq('id', id)
-    .single()
-
-  if (!item) return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' })
-  if (item.status !== 'pending') {
-    return res.status(409).json({ error: 'Câu hỏi này đã được kỹ sư khác nhận.' })
-  }
-
+  // UPDATE với điều kiện status=pending — atomic, không cần SELECT trước
   const { data, error } = await supabase
     .from('engineer_queue')
     .update({ status: 'in_progress', assigned_to: req.user.userId })
     .eq('id', id)
+    .eq('status', 'pending')
     .select()
-    .single()
 
   if (error) return res.status(500).json({ error: error.message })
-  res.json({ success: true, item: data })
+
+  if (!data?.length) {
+    // 0 hàng bị update = không tồn tại hoặc đã bị nhận
+    const { data: exists } = await supabase
+      .from('engineer_queue').select('status').eq('id', id).single()
+    if (!exists) return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' })
+    return res.status(409).json({ error: 'Câu hỏi này đã được kỹ sư khác nhận.' })
+  }
+
+  res.json({ success: true, item: data[0] })
 })
 
 // PATCH /engineer/queue/:id/answer — kỹ sư trả lời
@@ -185,11 +177,12 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
   if (!answer?.trim()) return res.status(400).json({ error: 'Câu trả lời không được để trống.' })
 
   try {
-    // 1. Lấy thông tin câu hỏi để biết session và farmer
     const { data: queueItem } = await supabase
       .from('engineer_queue')
       .select(`
         message_id,
+        assigned_to,
+        status,
         messages (
           session_id,
           content,
@@ -201,11 +194,16 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
 
     if (!queueItem) return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' })
 
+    // Engineer chỉ trả lời được câu hỏi do mình nhận, admin có thể override
+    if (req.user.role !== 'admin' && queueItem.assigned_to && queueItem.assigned_to !== req.user.userId) {
+      return res.status(403).json({ error: 'Câu hỏi này đang được kỹ sư khác xử lý.' })
+    }
+
     const sessionId = queueItem.messages?.session_id
     const farmerId  = queueItem.messages?.chat_sessions?.user_id
     const question  = queueItem.messages?.content
 
-    // 2. Lưu câu trả lời của kỹ sư vào messages
+    // Lưu câu trả lời vào messages
     await supabase.from('messages').insert({
       session_id: sessionId,
       role:       'engineer',
@@ -213,7 +211,7 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
       source:     'engineer',
     })
 
-    // 3. Cập nhật trạng thái queue → resolved
+    // Cập nhật trạng thái queue → resolved
     await supabase.from('engineer_queue').update({
       status:           'resolved',
       answer:           answer.trim(),
@@ -221,31 +219,29 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
       resolved_at:      new Date().toISOString(),
     }).eq('id', id)
 
-    // 4. Nếu kỹ sư đánh dấu "Tin cậy" → tự thêm vào kho tri thức
+    // Nếu đánh dấu "Tin cậy" → tự thêm vào kho tri thức và embed luôn
     if (addToKnowledge && question) {
       try {
-        // Tạo doc mới từ QA pair
         const { data: newDoc } = await supabase
           .from('knowledge_docs')
           .insert({
             title:       `QA: ${question.slice(0, 60)}`,
             source:      'engineer_answer',
             content:     `Câu hỏi: ${question}\n\nCâu trả lời: ${answer.trim()}`,
-            status:      'draft', // Kỹ sư cần vào E-03 để approve
+            status:      'embedding',
             uploaded_by: req.user.userId,
           })
           .select('id')
           .single()
 
-        // Tự approve + embed luôn vì đã được kỹ sư xác nhận
-        if (newDoc) await embedAndStoreDoc(newDoc.id)
+        if (newDoc) embedAndStoreDoc(newDoc.id)
+          .catch(err => console.warn('[ENGINEER] embed QA failed:', err.message))
       } catch (embedErr) {
-        // Lỗi embed không làm fail response
         console.warn('[ENGINEER] embed QA failed:', embedErr.message)
       }
     }
 
-    // 5. Push notification đến nông dân
+    // Push notification đến nông dân
     if (farmerId) {
       notifyFarmer(
         farmerId,
@@ -262,6 +258,33 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
   }
 })
 
+// DELETE /engineer/queue/:id — xóa câu hỏi chưa trả lời
+router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+  const { id } = req.params
+
+  const { data: item } = await supabase
+    .from('engineer_queue')
+    .select('id, status, assigned_to')
+    .eq('id', id)
+    .single()
+
+  if (!item) return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' })
+
+  if (!['pending', 'in_progress'].includes(item.status)) {
+    return res.status(400).json({ error: 'Chỉ có thể xóa câu hỏi chưa được trả lời.' })
+  }
+
+  // Engineer chỉ xóa được câu hỏi của mình hoặc chưa ai nhận; admin xóa được tất cả
+  if (req.user.role !== 'admin' && item.status === 'in_progress' && item.assigned_to !== req.user.userId) {
+    return res.status(403).json({ error: 'Câu hỏi này đang được kỹ sư khác xử lý.' })
+  }
+
+  const { error } = await supabase.from('engineer_queue').delete().eq('id', id)
+  if (error) return res.status(500).json({ error: error.message })
+
+  res.json({ success: true })
+})
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PHẦN 2 — KHO TRI THỨC RAG
 // ══════════════════════════════════════════════════════════════════════════════
@@ -269,7 +292,6 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
 // POST /upload — upload tài liệu
 router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
   (req, res, next) => {
-    // Multer 2.x: phải wrap để bắt lỗi file filter / size limit đúng cách
     upload.single('file')(req, res, (err) => {
       if (err) return res.status(400).json({ error: 'Lỗi file: ' + err.message })
       next()
@@ -281,7 +303,6 @@ router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
     const { title, cropTags, source } = req.body
     if (!title?.trim()) return res.status(400).json({ error: 'Vui lòng nhập tên tài liệu.' })
 
-    // Bước 1: Trích xuất text
     let content
     try {
       content = await extractText(req.file.buffer, req.file.mimetype)
@@ -297,7 +318,6 @@ router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
     let tags = []
     try { tags = JSON.parse(cropTags || '[]') } catch { tags = [] }
 
-    // Bước 2: Lưu vào Supabase
     const { data: doc, error } = await supabase
       .from('knowledge_docs')
       .insert({
@@ -357,7 +377,7 @@ router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res
   res.json({ docs })
 })
 
-// PATCH /:id/approve — duyệt + embed nền (trả về ngay, không chờ embed xong)
+// PATCH /:id/approve — duyệt + embed nền
 router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { id } = req.params
 
@@ -371,15 +391,12 @@ router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async 
     if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu.' })
     if (!doc.content) return res.status(422).json({ error: 'Tài liệu không có nội dung.' })
 
-    // Đánh dấu trạng thái "embedding" ngay lập tức
     await supabase.from('knowledge_docs')
       .update({ status: 'embedding', updated_at: new Date().toISOString() })
       .eq('id', id)
 
-    // Trả về ngay — không chờ embed xong → không bao giờ timeout
     res.json({ accepted: true, docId: id, message: 'Đang embed, vui lòng chờ vài phút...' })
 
-    // Embed chạy ngầm sau khi response đã gửi
     embedAndStoreDoc(id)
       .then(r => console.log(`[KNOWLEDGE] ✅ "${doc.title}" → ${r.chunksCreated} chunks`))
       .catch(err => {
@@ -396,14 +413,39 @@ router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async 
   }
 })
 
-// PATCH /:id/archive — lưu trữ (không xoá)
+// PATCH /:id/archive — lưu trữ tài liệu đã duyệt
 router.patch('/:id/archive', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { error } = await supabase
     .from('knowledge_docs')
     .update({ status: 'archived', updated_at: new Date().toISOString() })
-    .eq('id', req.params.id)
+    .eq(req.params.id ? 'id' : 'id', req.params.id)
 
   if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true })
+})
+
+// DELETE /:id — xóa tài liệu chưa duyệt (draft hoặc embedding bị lỗi)
+router.delete('/:id', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+  const { id } = req.params
+
+  const { data: doc } = await supabase
+    .from('knowledge_docs')
+    .select('id, status, title')
+    .eq('id', id)
+    .single()
+
+  if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu.' })
+
+  if (!['draft', 'embedding'].includes(doc.status)) {
+    return res.status(400).json({ error: 'Chỉ có thể xóa tài liệu chưa duyệt. Tài liệu đã duyệt cần dùng chức năng Lưu trữ.' })
+  }
+
+  // Xóa chunks liên quan trước (nếu có từ lần embed trước)
+  await supabase.from('knowledge_chunks').delete().eq('doc_id', id)
+
+  const { error } = await supabase.from('knowledge_docs').delete().eq('id', id)
+  if (error) return res.status(500).json({ error: error.message })
+
   res.json({ success: true })
 })
 

@@ -1,12 +1,24 @@
-import express  from 'express'
-import jwt      from 'jsonwebtoken'
-import bcrypt   from 'bcrypt'
+import express    from 'express'
+import jwt         from 'jsonwebtoken'
+import bcrypt      from 'bcrypt'
+import rateLimit   from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
-import { verifyJWT } from '../middleware/auth.js'
+import { supabase }     from '../services/supabase.js'
+import { verifyJWT }    from '../middleware/auth.js'
 
-const router      = express.Router()
-const supabase    = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+const router = express.Router()
+
+// Anon key chỉ dùng để gọi Supabase Auth (signInWithOtp, verifyOtp)
 const supabaseAuth = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
+
+// Rate limiter: tối đa 5 request OTP / phút / IP
+const otpLimiter = rateLimit({
+  windowMs:        60_000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message:         { error: 'Quá nhiều yêu cầu OTP. Vui lòng thử lại sau 1 phút.' },
+})
 
 function isValidPhone(normalized) {
   return /^\+84[3-9]\d{8}$/.test(normalized)
@@ -20,7 +32,7 @@ function normalizePhone(raw) {
 }
 
 // ─── POST /auth/request-otp ───────────────────────────────────────────────────
-router.post('/request-otp', async (req, res) => {
+router.post('/request-otp', otpLimiter, async (req, res) => {
   const { phone } = req.body
   if (!phone) return res.status(400).json({ error: 'Vui lòng nhập số điện thoại.' })
 
@@ -32,7 +44,6 @@ router.post('/request-otp', async (req, res) => {
   const { error } = await supabaseAuth.auth.signInWithOtp({ phone: normalized })
   if (error) {
     console.error('[AUTH] signInWithOtp error:', error.message)
-    // Twilio trả về rate limit hoặc lỗi số điện thoại
     if (error.message.includes('rate') || error.status === 429) {
       return res.status(429).json({ error: 'Vui lòng chờ trước khi gửi lại OTP.' })
     }
@@ -53,8 +64,8 @@ router.post('/request-otp', async (req, res) => {
 })
 
 // ─── POST /auth/verify-otp ────────────────────────────────────────────────────
-router.post('/verify-otp', async (req, res) => {
-  const { phone, otp, role } = req.body
+router.post('/verify-otp', otpLimiter, async (req, res) => {
+  const { phone, otp } = req.body
   if (!phone || !otp) return res.status(400).json({ error: 'Thiếu số điện thoại hoặc OTP.' })
 
   const normalized = normalizePhone(phone)
@@ -75,9 +86,9 @@ router.post('/verify-otp', async (req, res) => {
   try {
     let { data: user } = await supabase.from('users').select('*').eq('phone', normalized).single()
     if (!user) {
-      const newRole = ['farmer', 'engineer', 'admin'].includes(role) ? role : 'farmer'
+      // OTP chỉ dành cho nông dân — engineer/admin đăng ký qua email
       const { data: newUser, error } = await supabase.from('users')
-        .insert({ phone: normalized, role: newRole, is_active: true }).select().single()
+        .insert({ phone: normalized, role: 'farmer', is_active: true }).select().single()
       if (error) throw error
       user = newUser
     }
@@ -151,7 +162,11 @@ router.post('/login-email', async (req, res) => {
 // ─── GET /auth/me ─────────────────────────────────────────────────────────────
 router.get('/me', verifyJWT, async (req, res) => {
   try {
-    const { data: user } = await supabase.from('users').select('*').eq('id', req.user.userId).single()
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, phone, email, role, name, village, crops, is_active, created_at')
+      .eq('id', req.user.userId)
+      .single()
     if (!user) return res.status(404).json({ error: 'Không tìm thấy.' })
     res.json({ user })
   } catch (err) {
@@ -164,14 +179,16 @@ router.patch('/profile', verifyJWT, async (req, res) => {
   try {
     const { name, village, crops } = req.body
     const updates = {}
-    if (name)                          updates.name    = name.trim()
-    if (village !== undefined)         updates.village = (village ?? '').trim()
-    if (Array.isArray(crops))          updates.crops   = crops
+    if (name)                 updates.name    = name.trim()
+    if (village !== undefined) updates.village = (village ?? '').trim()
+    if (Array.isArray(crops)) updates.crops   = crops
 
     console.log('[PROFILE] userId:', req.user.userId, '| updates:', updates)
 
     const { data: user, error } = await supabase
-      .from('users').update(updates).eq('id', req.user.userId).select().single()
+      .from('users').update(updates).eq('id', req.user.userId)
+      .select('id, phone, email, role, name, village, crops, is_active, created_at')
+      .single()
 
     if (error) {
       console.error('[PROFILE] Supabase error:', error)

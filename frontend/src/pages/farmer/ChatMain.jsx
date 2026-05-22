@@ -27,10 +27,10 @@ function TypingIndicator() {
   )
 }
 
-function MessageBubble({ msg, onReport }) {
-  const { speak, isSpeaking, stop } = useTTS()
-  const isUser   = msg.role === 'user'
-  const isSystem = msg.role === 'system'
+function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
+  const isUser      = msg.role === 'user'
+  const isSystem    = msg.role === 'system'
+  const isThisSpeaking = speakingMsgId === msg.id
 
   return (
     <div style={{
@@ -39,7 +39,7 @@ function MessageBubble({ msg, onReport }) {
       gap: 4, marginBottom: 14,
       animation: 'fadeUp 0.25s ease both',
     }}>
-      {/* Avatar for AI */}
+      {/* Avatar + bubble cho AI */}
       {!isUser && !isSystem && (
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
           <div style={styles.aiAvatar}>
@@ -94,19 +94,19 @@ function MessageBubble({ msg, onReport }) {
         </>
       )}
 
-      {/* AI actions row */}
+      {/* AI action buttons */}
       {!isUser && !isSystem && (
         <div style={{ display: 'flex', gap: 6, paddingLeft: 36 }}>
           <button
-            onClick={() => isSpeaking ? stop() : speak(msg.content)}
+            onClick={() => onSpeak(msg.id, msg.content)}
             style={styles.actionBtn}
-            aria-label={isSpeaking ? 'Dừng đọc' : 'Nghe câu trả lời'}
+            aria-label={isThisSpeaking ? 'Dừng đọc' : 'Nghe câu trả lời'}
           >
-            {isSpeaking
+            {isThisSpeaking
               ? <VolumeX size={12} strokeWidth={2} />
               : <Volume2 size={12} strokeWidth={2} />
             }
-            {isSpeaking ? 'Dừng' : 'Nghe'}
+            {isThisSpeaking ? 'Dừng' : 'Nghe'}
           </button>
 
           {msg.source === 'engineer' && (
@@ -134,6 +134,15 @@ export default function ChatMain() {
   const { user }  = useAuthStore()
   const { transcript, isListening, error: sttError, startListening, stopListening, resetTranscript } = useSTT()
 
+  // TTS lifted lên đây để state isSpeaking được share qua tất cả bubbles
+  const { speak, stop, isSpeaking } = useTTS()
+  const [speakingMsgId, setSpeakingMsgId] = useState(null)
+
+  // Khi TTS kết thúc, xóa speakingMsgId
+  useEffect(() => {
+    if (!isSpeaking) setSpeakingMsgId(null)
+  }, [isSpeaking])
+
   const [messages,   setMessages]   = useState([])
   const [inputText,  setInputText]  = useState(location.state?.prefillText || '')
   const [sessionId,  setSessionId]  = useState(location.state?.sessionId   || null)
@@ -154,6 +163,16 @@ export default function ChatMain() {
     textareaRef.current.style.height = 'auto'
     textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px'
   }, [inputText])
+
+  function handleSpeak(msgId, content) {
+    if (speakingMsgId === msgId) {
+      stop()
+      setSpeakingMsgId(null)
+    } else {
+      speak(content)
+      setSpeakingMsgId(msgId)
+    }
+  }
 
   async function handleSend(text = inputText) {
     const q = text.trim()
@@ -227,7 +246,6 @@ export default function ChatMain() {
             </div>
             <p style={styles.emptyText}>Xin chào! Bạn cần hỏi gì về cây trồng không?</p>
 
-            {/* Horizontal suggestion chips */}
             <div style={styles.suggestionsWrap}>
               {suggestions.map(sg => (
                 <button key={sg} onClick={() => handleSend(sg)} style={styles.suggestionChip}>
@@ -239,7 +257,13 @@ export default function ChatMain() {
         )}
 
         {messages.map(msg => (
-          <MessageBubble key={msg.id} msg={msg} onReport={id => setShowReport(id)} />
+          <MessageBubble
+            key={msg.id}
+            msg={msg}
+            onReport={id => setShowReport(id)}
+            onSpeak={handleSpeak}
+            speakingMsgId={speakingMsgId}
+          />
         ))}
 
         {loading && <TypingIndicator />}
@@ -315,6 +339,7 @@ export default function ChatMain() {
       <style>{`
         @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
         @keyframes blink  { 0%,80%,100%{opacity:0.15} 40%{opacity:1} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
       `}</style>
     </div>
   )

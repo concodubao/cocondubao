@@ -4,10 +4,9 @@ import sharp    from 'sharp'
 import { verifyJWT }       from '../middleware/auth.js'
 import { askRAG }          from '../services/rag.js'
 import { notifyEngineer }  from '../services/webpush.js'
-import { createClient }    from '@supabase/supabase-js'
+import { supabase }        from '../services/supabase.js'
 
-const router   = express.Router()
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+const router = express.Router()
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -35,26 +34,22 @@ async function getOrCreateSession(userId, cropType, sessionId) {
 // ─── POST /chat/ask — hỏi bằng text ─────────────────────────────────────────
 router.post('/ask', verifyJWT, async (req, res) => {
   const { text, cropType, sessionId } = req.body
-  const userId = req.user.userId   // lấy từ JWT, không tin body
+  const userId = req.user.userId
 
   if (!text?.trim()) return res.status(400).json({ error: 'Vui lòng nhập câu hỏi.' })
   if (text.length > 1000) return res.status(400).json({ error: 'Câu hỏi quá dài (tối đa 1000 ký tự).' })
 
   try {
-    // 1. RAG pipeline
     const result = await askRAG(text.trim(), cropType)
 
-    // 2. Tạo session
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
-    // 3. Lưu câu hỏi của nông dân — lấy id để trỏ vào hàng đợi
     const { data: userMsg } = await supabase.from('messages').insert({
       session_id: sid,
       role:       'user',
       content:    text.trim(),
     }).select('id').single()
 
-    // 4. Lưu câu trả lời (hoặc thông báo chuyển kỹ sư)
     const answerContent = result.needEngineer
       ? 'Câu hỏi của bạn đã được chuyển cho kỹ sư nông nghiệp. Kỹ sư sẽ trả lời trong vòng 24 giờ.'
       : result.answer
@@ -71,22 +66,19 @@ router.post('/ask', verifyJWT, async (req, res) => {
       .select('id')
       .single()
 
-    // 5. Nếu cần kỹ sư → đưa vào hàng đợi + push notify
-    // message_id trỏ vào câu hỏi thật (userMsg), không phải thông báo hệ thống
     let engineerQueued = false
     if (result.needEngineer && userMsg) {
       await supabase.from('engineer_queue').insert({
         message_id: userMsg.id,
         status:     'pending',
       })
-      // Không await để không block response
       notifyEngineer('Có câu hỏi mới từ nông dân', text.trim().slice(0, 100))
         .catch(e => console.warn('[PUSH] notify engineer failed:', e.message))
       engineerQueued = true
     }
 
     res.json({
-      answer:        result.answer,          // null nếu cần kỹ sư
+      answer:        result.answer,
       confidence:    result.confidence,
       source:        result.source,
       sessionId:     sid,
@@ -104,42 +96,36 @@ router.post('/ask', verifyJWT, async (req, res) => {
 // ─── POST /chat/ask-with-image — hỏi kèm ảnh sâu bệnh ───────────────────────
 router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, res) => {
   const { text, cropType, sessionId } = req.body
-  const userId = req.user.userId   // lấy từ JWT, không tin body
+  const userId = req.user.userId
 
   try {
     let imageUrl = null
 
-    // 1. Nén và upload ảnh nếu có
     if (req.file) {
-      const compressed = await sharp(req.file.buffer)
+      // Nén ảnh — 2 bước nếu vẫn còn lớn sau lần đầu
+      let imageBuffer = await sharp(req.file.buffer)
         .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer()
 
-      // Kiểm tra kích thước sau nén
-      if (compressed.length > 500 * 1024) {
-        // Nén thêm lần nữa nếu vẫn > 500KB
-        const compressed2 = await sharp(compressed)
+      if (imageBuffer.length > 500 * 1024) {
+        imageBuffer = await sharp(imageBuffer)
           .resize(800, 800, { fit: 'inside' })
           .jpeg({ quality: 65 })
           .toBuffer()
-        const fileName = `pest-images/${userId}/${Date.now()}.jpg`
-        await supabase.storage.from('images').upload(fileName, compressed2, {
-          contentType: 'image/jpeg', upsert: false,
-        })
-        const { data } = supabase.storage.from('images').getPublicUrl(fileName)
-        imageUrl = data.publicUrl
-      } else {
-        const fileName = `pest-images/${userId}/${Date.now()}.jpg`
-        await supabase.storage.from('images').upload(fileName, compressed, {
-          contentType: 'image/jpeg', upsert: false,
-        })
-        const { data } = supabase.storage.from('images').getPublicUrl(fileName)
-        imageUrl = data.publicUrl
       }
+
+      const fileName = `pest-images/${userId}/${Date.now()}.jpg`
+      const { error: uploadError } = await supabase.storage
+        .from('images')
+        .upload(fileName, imageBuffer, { contentType: 'image/jpeg', upsert: false })
+
+      if (uploadError) throw uploadError
+
+      const { data } = supabase.storage.from('images').getPublicUrl(fileName)
+      imageUrl = data.publicUrl
     }
 
-    // 2. Gọi RAG với câu hỏi (kèm note có ảnh)
     const question = text?.trim() || 'Cây bị bệnh gì vậy?'
     const questionWithNote = imageUrl
       ? `[Nông dân gửi ảnh sâu bệnh kèm theo] ${question}`
@@ -147,10 +133,8 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
 
     const result = await askRAG(questionWithNote, cropType)
 
-    // 3. Tạo session
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
-    // 4. Lưu messages — lấy id userMsg để trỏ vào hàng đợi
     const { data: userMsg } = await supabase.from('messages').insert({
       session_id: sid,
       role:       'user',
@@ -183,14 +167,14 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
     }
 
     res.json({
-      answer:       result.answer,
-      confidence:   result.confidence,
-      source:       result.source,
-      sessionId:    sid,
+      answer:         result.answer,
+      confidence:     result.confidence,
+      source:         result.source,
+      sessionId:      sid,
       imageUrl,
       engineerQueued: result.needEngineer,
-      needEngineer: result.needEngineer,
-      messageId:    answerMsg?.id,
+      needEngineer:   result.needEngineer,
+      messageId:      answerMsg?.id,
     })
 
   } catch (err) {
@@ -210,7 +194,6 @@ router.post('/stt-fallback', verifyJWT, upload.single('audio'), async (req, res)
     const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY)
     const genAI       = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
 
-    // Upload audio buffer lên Gemini Files API
     const uploadResult = await fileManager.uploadFile(req.file.buffer, {
       mimeType:    req.file.mimetype || 'audio/webm',
       displayName: 'voice-query',
@@ -235,8 +218,8 @@ router.post('/report-error', verifyJWT, async (req, res) => {
   const { messageId, errorType, note } = req.body
   const VALID_TYPES = ['wrong_info', 'irrelevant', 'hard_to_understand']
 
-  if (!messageId)                   return res.status(400).json({ error: 'Thiếu messageId.' })
-  if (!VALID_TYPES.includes(errorType)) return res.status(400).json({ error: 'Loại lỗi không hợp lệ.' })
+  if (!messageId)                        return res.status(400).json({ error: 'Thiếu messageId.' })
+  if (!VALID_TYPES.includes(errorType))  return res.status(400).json({ error: 'Loại lỗi không hợp lệ.' })
 
   try {
     await supabase.from('ai_error_reports').insert({
@@ -253,7 +236,6 @@ router.post('/report-error', verifyJWT, async (req, res) => {
 
 // ─── GET /chat/sessions/:userId — lịch sử phiên chat ─────────────────────────
 router.get('/sessions/:userId', verifyJWT, async (req, res) => {
-  // Chỉ cho xem session của chính mình (trừ admin)
   const targetId = req.params.userId
   if (req.user.role === 'farmer' && req.user.userId !== targetId) {
     return res.status(403).json({ error: 'Không có quyền xem session của người khác.' })
@@ -272,10 +254,26 @@ router.get('/sessions/:userId', verifyJWT, async (req, res) => {
 
 // ─── GET /chat/messages/:sessionId — tin nhắn trong 1 session ─────────────────
 router.get('/messages/:sessionId', verifyJWT, async (req, res) => {
+  const sessionId = req.params.sessionId
+
+  // Nông dân chỉ được xem session của mình
+  if (req.user.role === 'farmer') {
+    const { data: session } = await supabase
+      .from('chat_sessions')
+      .select('user_id')
+      .eq('id', sessionId)
+      .single()
+
+    if (!session) return res.status(404).json({ error: 'Không tìm thấy session.' })
+    if (session.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Không có quyền xem tin nhắn này.' })
+    }
+  }
+
   const { data, error } = await supabase
     .from('messages')
     .select('*')
-    .eq('session_id', req.params.sessionId)
+    .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
 
   if (error) return res.status(500).json({ error: error.message })

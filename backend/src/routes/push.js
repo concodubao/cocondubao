@@ -1,4 +1,4 @@
-﻿// backend/src/routes/push.js
+// backend/src/routes/push.js
 // POST /api/v1/push/subscribe      — đăng ký nhận push
 // DELETE /api/v1/push/unsubscribe  — huỷ đăng ký
 // POST /api/v1/push/send           — admin gửi thông báo
@@ -9,17 +9,9 @@
 import express   from 'express'
 import webpush   from 'web-push'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
-import { createClient } from '@supabase/supabase-js'
+import { supabase } from '../services/supabase.js'
 
-const router   = express.Router()
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
-
-// Cấu hình VAPID — chạy 1 lần khi khởi động
-webpush.setVapidDetails(
-  process.env.VAPID_CONTACT,
-  process.env.VAPID_PUBLIC_KEY,
-  process.env.VAPID_PRIVATE_KEY
-)
+const router = express.Router()
 
 // ─── Helper: gửi push đến 1 subscription, bắt lỗi nhẹ ────────────────────────
 async function sendPush(subscription, payload) {
@@ -27,7 +19,6 @@ async function sendPush(subscription, payload) {
     await webpush.sendNotification(subscription, JSON.stringify(payload))
     return { success: true }
   } catch (err) {
-    // 410 Gone = subscription đã hết hạn → xóa khỏi DB
     if (err.statusCode === 410) {
       await supabase
         .from('push_subscriptions')
@@ -59,14 +50,12 @@ function isQuietHour(quietStart, quietEnd) {
 // POST /push/subscribe
 router.post('/subscribe', verifyJWT, async (req, res) => {
   const { subscription } = req.body
-  // subscription = { endpoint, keys: { p256dh, auth } }
 
   if (!subscription?.endpoint || !subscription?.keys) {
     return res.status(400).json({ error: 'Thiếu thông tin subscription.' })
   }
 
   try {
-    // Upsert: nếu endpoint đã tồn tại thì cập nhật, không thì tạo mới
     const { error } = await supabase
       .from('push_subscriptions')
       .upsert({
@@ -83,7 +72,6 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
 
     console.log('[PUSH] subscription saved for user:', req.user.userId, 'endpoint:', subscription.endpoint.slice(0, 60))
 
-    // Gửi thông báo chào mừng để xác nhận push hoạt động
     const welcomeResult = await sendPush(subscription, {
       title: 'Cò Con Dự Báo!',
       body:  'Bạn đã bật thông báo thành công!',
@@ -121,11 +109,11 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
   const {
     title,
     body,
-    type       = 'alert',   // alert | promotion | weather
+    type       = 'alert',
     imageUrl,
-    cropTags   = [],         // [] = gửi tất cả
+    cropTags   = [],
     region,
-    scheduleAt,              // ISO string nếu muốn lên lịch (optional)
+    scheduleAt,
   } = req.body
 
   if (!title?.trim() || !body?.trim()) {
@@ -133,7 +121,6 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
   }
 
   try {
-    // 1. Lưu notification vào DB
     const { data: notif, error: notifError } = await supabase
       .from('notifications')
       .insert({
@@ -151,41 +138,32 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
 
     if (notifError) throw notifError
 
-    // 2. Nếu có lên lịch → trả về ngay (không gửi push bây giờ)
+    // scheduleAt: lưu DB nhưng chưa gửi push (cần cron job xử lý sent_at=null)
     if (scheduleAt) {
       return res.json({
-        success:         true,
-        notificationId:  notif.id,
-        scheduled:       true,
-        scheduledAt:     scheduleAt,
-        message:         'Đã lưu thông báo, sẽ gửi vào lúc ' + scheduleAt,
+        success:        true,
+        notificationId: notif.id,
+        scheduled:      true,
+        scheduledAt:    scheduleAt,
+        message:        'Đã lưu thông báo, sẽ gửi vào lúc ' + scheduleAt,
       })
     }
 
-    // 3. Tìm subscriptions phù hợp
-    let query = supabase
+    const { data: subscriptions } = await supabase
       .from('push_subscriptions')
       .select('endpoint, keys, user_id, notif_types, quiet_start, quiet_end')
       .eq('active', true)
-
-    const { data: subscriptions } = await query
 
     if (!subscriptions?.length) {
       return res.json({ success: true, sent: 0, message: 'Không có thiết bị nào đăng ký.' })
     }
 
-    // 4. Lọc theo loại thông báo người dùng muốn nhận
-    //    và bỏ qua giờ yên tĩnh
     const filtered = subscriptions.filter(sub => {
-      // Kiểm tra loại thông báo
       if (sub.notif_types && !sub.notif_types.includes(type)) return false
-      // Kiểm tra giờ yên tĩnh
       if (isQuietHour(sub.quiet_start, sub.quiet_end)) return false
       return true
     })
 
-    // 5. Lọc theo cây trồng (nếu có cropTags)
-    //    Cần join với bảng users để lấy crops của từng user
     let targetSubs = filtered
     if (cropTags.length > 0) {
       const userIds = [...new Set(filtered.map(s => s.user_id))]
@@ -194,21 +172,19 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
         .select('id, crops')
         .in('id', userIds)
 
-      const userMap = Object.fromEntries(users.map(u => [u.id, u.crops || []]))
+      const userMap = Object.fromEntries((users || []).map(u => [u.id, u.crops || []]))
       targetSubs = filtered.filter(sub => {
         const userCrops = userMap[sub.user_id] || []
-        // Gửi nếu user trồng ít nhất 1 loại cây trong cropTags
         return cropTags.some(tag => userCrops.includes(tag))
       })
     }
 
-    // 6. Gửi song song, không block nếu 1 thiết bị lỗi
     const payload = {
-      title:    title.trim(),
-      body:     body.trim(),
-      image:    imageUrl || null,
-      url:      `/notifications`,
-      notifId:  notif.id,
+      title:   title.trim(),
+      body:    body.trim(),
+      image:   imageUrl || null,
+      url:     `/notifications`,
+      notifId: notif.id,
     }
 
     const results = await Promise.allSettled(
@@ -218,19 +194,18 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
     const sent   = results.filter(r => r.status === 'fulfilled' && r.value.success).length
     const failed = results.length - sent
 
-    // 7. Cập nhật sent_at
     await supabase
       .from('notifications')
       .update({ sent_at: new Date().toISOString() })
       .eq('id', notif.id)
 
     res.json({
-      success:         true,
-      notificationId:  notif.id,
+      success:        true,
+      notificationId: notif.id,
       sent,
       failed,
-      total:           targetSubs.length,
-      message:         `Đã gửi đến ${sent}/${targetSubs.length} thiết bị.`,
+      total:          targetSubs.length,
+      message:        `Đã gửi đến ${sent}/${targetSubs.length} thiết bị.`,
     })
 
   } catch (err) {
@@ -246,13 +221,11 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
 // GET /notifications/:userId — danh sách thông báo của user
 router.get('/notifications/:userId', verifyJWT, async (req, res) => {
   const { userId } = req.params
-  // Chỉ xem thông báo của mình (trừ admin)
   if (req.user.role === 'farmer' && req.user.userId !== userId) {
     return res.status(403).json({ error: 'Không có quyền xem.' })
   }
 
   try {
-    // Lấy role + crops của user
     const { data: user } = await supabase
       .from('users')
       .select('crops, role')
@@ -272,7 +245,6 @@ router.get('/notifications/:userId', verifyJWT, async (req, res) => {
       .order('sent_at', { ascending: false })
       .limit(50)
 
-    // Kỹ sư/admin xem tất cả; nông dân chỉ xem thông báo phù hợp cây trồng
     if (!isStaff) {
       const cropFilter = userCrops.length > 0
         ? `crop_tags.eq.{},${userCrops.map(c => `crop_tags.cs.{${c}}`).join(',')}`
@@ -284,8 +256,8 @@ router.get('/notifications/:userId', verifyJWT, async (req, res) => {
 
     const result = (notifications || []).map(n => ({
       ...n,
-      read_at:  n.notification_reads?.[0]?.read_at || null,
-      is_read:  !!n.notification_reads?.[0]?.read_at,
+      read_at: n.notification_reads?.[0]?.read_at || null,
+      is_read: !!n.notification_reads?.[0]?.read_at,
     }))
 
     res.json({ notifications: result })
@@ -316,10 +288,9 @@ router.patch('/notifications/settings', verifyJWT, async (req, res) => {
   const { notifTypes, cropsFilter, quietStart, quietEnd } = req.body
 
   try {
-    // Cập nhật tất cả subscription của user này
     const updates = {}
-    if (notifTypes)   updates.notif_types   = notifTypes
-    if (cropsFilter)  updates.crops_filter  = cropsFilter
+    if (notifTypes)            updates.notif_types  = notifTypes
+    if (cropsFilter)           updates.crops_filter = cropsFilter
     if (quietStart !== undefined) updates.quiet_start = quietStart
     if (quietEnd   !== undefined) updates.quiet_end   = quietEnd
 
