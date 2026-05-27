@@ -2,20 +2,26 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { authAPI } from '../services/api'
-import { ChevronLeft } from 'lucide-react'
+import BottomNav from '../components/BottomNav'
 
 const CROP_OPTIONS = [
-  { id: 'rice',   label: 'Lúa' },
-  { id: 'veggie', label: 'Rau màu' },
-  { id: 'fruit',  label: 'Cây ăn trái' },
-  { id: 'other',  label: 'Khác' },
+  { id: 'rice',   label: 'Lúa',          icon: 'grass' },
+  { id: 'veggie', label: 'Rau màu',      icon: 'eco' },
+  { id: 'fruit',  label: 'Cây ăn trái', icon: 'forest' },
+  { id: 'other',  label: 'Khác',         icon: 'more_horiz' },
 ]
+
+const ROLE_LABELS = {
+  farmer:   'Nông dân',
+  engineer: 'Kỹ sư nông nghiệp',
+  admin:    'Quản trị viên',
+}
 
 export default function Profile() {
   const navigate       = useNavigate()
   const [params]       = useSearchParams()
   const isOnboard      = params.get('onboard') === 'true'
-  const { user, setUser } = useAuthStore()
+  const { user, setUser, logout } = useAuthStore()
 
   const isFarmer = user?.role === 'farmer'
 
@@ -51,107 +57,162 @@ export default function Profile() {
   }
 
   return (
-    <div style={s.page}>
-      <header style={s.header}>
-        {!isOnboard && (
-          <button onClick={() => navigate('/home')} style={s.back} aria-label="Quay lại">
-            <ChevronLeft size={22} />
+    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      {!isOnboard ? (
+        <header className="flex items-center gap-3 px-5 pt-5 pb-4">
+          <button
+            onClick={() => navigate('/home')}
+            aria-label="Quay lại"
+            className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center flex-shrink-0"
+          >
+            <span className="material-symbols-outlined text-[22px] text-[#006b2c]">arrow_back</span>
           </button>
-        )}
-        <h1 style={s.title}>{isOnboard ? 'Hoàn tất hồ sơ' : 'Hồ sơ cá nhân'}</h1>
-      </header>
-
-      <main style={s.main}>
-        {isOnboard && (
-          <div style={s.welcomeBox}>
-            <div style={s.logoMark}>C</div>
-            <p style={s.welcomeText}>Chào mừng đến với Cò Con! Cho mình biết thêm một chút nhé.</p>
+          <h1 className="text-[20px] font-extrabold text-[#0b1c30] flex-1">Hồ sơ cá nhân</h1>
+        </header>
+      ) : (
+        /* Onboarding hero */
+        <div className="flex flex-col items-center gap-4 px-5 pt-10 pb-6 text-center fade-up">
+          <div className="w-20 h-20 rounded-[28px] bg-gradient-to-br from-[#00873a] to-[#006b2c]
+                          flex items-center justify-center shadow-[0_8px_24px_rgba(0,107,44,0.35)]">
+            <span className="material-symbols-outlined text-white text-[40px] ms-fill">eco</span>
           </div>
-        )}
+          <div>
+            <h1 className="text-[24px] font-extrabold text-[#0b1c30] leading-tight">Chào mừng!</h1>
+            <p className="text-[15px] text-[#6e7b6c] mt-1 max-w-[280px]">
+              Cho Cò Con biết thêm một chút để hỗ trợ bạn tốt hơn nhé.
+            </p>
+          </div>
+        </div>
+      )}
 
-        <section style={s.section}>
-          <label style={s.label} htmlFor="name">Tên của bạn *</label>
-          <input
-            id="name" type="text" autoComplete="name"
-            placeholder="Ví dụ: Chú Hai, Anh Ba Lúa..."
-            value={name} onChange={e => setName(e.target.value)}
-            style={s.input} aria-required="true"
-          />
-        </section>
+      {/* ── Form ──────────────────────────────────────────────── */}
+      <main className="flex-1 flex flex-col gap-5 px-5 pb-8">
 
-        <section style={s.section}>
-          <label style={s.label} htmlFor="village">Ấp / Xã</label>
-          <input
-            id="village" type="text" autoComplete="address-level3"
-            placeholder="Ví dụ: Ấp Trường Thọ, xã Trường Khánh"
-            value={village} onChange={e => setVillage(e.target.value)}
-            style={s.input}
-          />
-        </section>
+        {/* Identity card */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#e5eeff] flex flex-col gap-5">
 
+          <div className="flex flex-col gap-2">
+            <label htmlFor="name" className="text-[15px] font-semibold text-[#0b1c30]">
+              Tên của bạn <span className="text-[#EF4444]">*</span>
+            </label>
+            <input
+              id="name"
+              type="text"
+              autoComplete="name"
+              placeholder="Ví dụ: Chú Hai, Anh Ba Lúa..."
+              value={name}
+              onChange={e => setName(e.target.value)}
+              aria-required="true"
+              className="w-full px-4 py-3.5 text-[17px] text-[#0b1c30] bg-[#f8f9ff]
+                         border-[1.5px] border-[#e5eeff] rounded-2xl placeholder-[#bdcaba]"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="village" className="text-[15px] font-semibold text-[#0b1c30]">
+              Ấp / Xã
+            </label>
+            <input
+              id="village"
+              type="text"
+              autoComplete="address-level3"
+              placeholder="Ví dụ: Ấp Trường Thọ, xã Trường Khánh"
+              value={village}
+              onChange={e => setVillage(e.target.value)}
+              className="w-full px-4 py-3.5 text-[17px] text-[#0b1c30] bg-[#f8f9ff]
+                         border-[1.5px] border-[#e5eeff] rounded-2xl placeholder-[#bdcaba]"
+            />
+          </div>
+        </div>
+
+        {/* Crop chips */}
         {isFarmer && (
-          <section style={s.section}>
-            <label style={s.label}>Cây trồng <span style={{ color: '#94a3b8', fontWeight: 400 }}>(tuỳ chọn)</span></label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
+          <div className="flex flex-col gap-3">
+            <div className="text-[15px] font-semibold text-[#0b1c30]">
+              Cây trồng{' '}
+              <span className="text-[#6e7b6c] font-normal">(tuỳ chọn)</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
               {CROP_OPTIONS.map(c => {
                 const active = crops.includes(c.id)
                 return (
-                  <button key={c.id} onClick={() => toggleCrop(c.id)} type="button"
-                    style={{
-                      padding: '8px 16px', borderRadius: 20, fontSize: 14, fontWeight: active ? 700 : 500,
-                      border: `1.5px solid ${active ? '#16a34a' : '#e2e8f0'}`,
-                      background: active ? '#f0fdf4' : '#f8fafc',
-                      color: active ? '#16a34a' : '#64748b',
-                      cursor: 'pointer',
-                    }}>
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleCrop(c.id)}
+                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[15px] font-semibold
+                                transition-all border-[1.5px]
+                                ${active
+                                  ? 'bg-[#f0fdf4] border-[#006b2c] text-[#006b2c]'
+                                  : 'bg-white border-[#e5eeff] text-[#6e7b6c]'
+                                }`}
+                  >
+                    <span className={`material-symbols-outlined text-[16px] ${active ? 'ms-fill' : ''}`}>
+                      {c.icon}
+                    </span>
                     {c.label}
                   </button>
                 )
               })}
             </div>
-          </section>
+          </div>
         )}
 
-        {error && <p style={s.error} role="alert">{error}</p>}
+        {/* Error */}
+        {error && (
+          <p role="alert" className="text-[14px] text-[#ba1a1a] bg-[#ffdad6] px-4 py-3 rounded-2xl m-0">
+            {error}
+          </p>
+        )}
 
-        <button onClick={handleSave} disabled={loading}
-          style={{ ...s.btnSave, opacity: loading ? 0.7 : 1 }} aria-busy={loading}>
+        {/* Save button */}
+        <button
+          onClick={handleSave}
+          disabled={loading}
+          aria-busy={loading}
+          className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[17px] font-bold
+                     shadow-[0_4px_16px_rgba(0,107,44,0.3)] disabled:opacity-60 transition-opacity"
+        >
           {loading ? 'Đang lưu...' : isOnboard ? 'Bắt đầu dùng Cò Con →' : 'Lưu hồ sơ'}
         </button>
 
-        <div style={s.infoBox}>
-          <div style={s.infoRow}>
-            <span style={s.infoLabel}>Số điện thoại</span>
-            <span style={s.infoValue}>{user?.phone}</span>
+        {/* Info rows */}
+        <div className="bg-white rounded-3xl border border-[#e5eeff] shadow-sm divide-y divide-[#e5eeff]">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[20px] text-[#006b2c]">phone</span>
+              <span className="text-[14px] text-[#6e7b6c]">Số điện thoại</span>
+            </div>
+            <span className="text-[15px] font-semibold text-[#0b1c30]">{user?.phone || '—'}</span>
           </div>
-          <div style={s.infoRow}>
-            <span style={s.infoLabel}>Vai trò</span>
-            <span style={s.infoValue}>
-              {user?.role === 'farmer' ? 'Nông dân' : user?.role === 'engineer' ? 'Kỹ sư nông nghiệp' : 'Quản trị viên'}
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[20px] text-[#006b2c]">badge</span>
+              <span className="text-[14px] text-[#6e7b6c]">Vai trò</span>
+            </div>
+            <span className="text-[15px] font-semibold text-[#0b1c30]">
+              {ROLE_LABELS[user?.role] || user?.role}
             </span>
           </div>
         </div>
+
+        {/* Logout row */}
+        {!isOnboard && (
+          <button
+            onClick={logout}
+            className="flex items-center justify-center gap-2 text-[14px] text-[#6e7b6c] font-semibold py-2 mx-auto"
+          >
+            <span className="material-symbols-outlined text-[18px]">logout</span>
+            Đăng xuất
+          </button>
+        )}
       </main>
+
+      {/* ── Bottom Nav (farmers, non-onboard) ─────────────────── */}
+      {isFarmer && !isOnboard && <BottomNav />}
+      {isFarmer && !isOnboard && <div className="h-20" aria-hidden="true" />}
     </div>
   )
-}
-
-const s = {
-  page:        { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
-  header:      { display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
-  back:        { width: 44, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  title:       { fontSize: 18, fontWeight: 700, color: '#0f172a', margin: 0 },
-  main:        { flex: 1, padding: '20px 18px', display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 'max(32px, env(safe-area-inset-bottom))' },
-  welcomeBox:  { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '24px 20px', background: '#f0fdf4', borderRadius: 20, textAlign: 'center' },
-  logoMark:    { width: 56, height: 56, borderRadius: 16, background: '#16a34a', color: '#fff', fontSize: 24, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  welcomeText: { fontSize: 15, color: '#15803d', margin: 0, lineHeight: 1.65 },
-  section:     { display: 'flex', flexDirection: 'column', gap: 8 },
-  label:       { fontSize: 15, fontWeight: 600, color: '#0f172a', margin: 0 },
-  input:       { width: '100%', padding: '14px 16px', fontSize: 17, borderRadius: 12, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', boxSizing: 'border-box', textAlign: 'left', minHeight: 52 },
-  error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '12px 16px', borderRadius: 12, margin: 0 },
-  btnSave:     { padding: '16px', fontSize: 17, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 54, marginTop: 4 },
-  infoBox:     { background: '#fff', borderRadius: 14, padding: '16px 18px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 14, marginTop: 4 },
-  infoRow:     { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  infoLabel:   { fontSize: 14, color: '#94a3b8' },
-  infoValue:   { fontSize: 15, fontWeight: 600, color: '#0f172a' },
 }

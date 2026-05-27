@@ -5,16 +5,13 @@ import { chatAPI } from '../../services/api'
 import { useSTT } from '../../hooks/useSTT'
 import { useTTS } from '../../hooks/useTTS'
 import { toast } from '../../components/Toast'
-import {
-  ChevronLeft, Camera, Mic, MicOff, Send, Volume2, VolumeX,
-  Flag, CheckCircle, Leaf, ChevronDown,
-} from 'lucide-react'
+import BottomNav from '../../components/BottomNav'
 
 const CROP_OPTIONS = [
-  { id: 'rice',   label: 'Lúa' },
-  { id: 'veggie', label: 'Rau màu' },
-  { id: 'fruit',  label: 'Cây ăn trái' },
-  { id: 'other',  label: 'Khác' },
+  { id: 'rice',   label: 'Lúa',          icon: 'grass' },
+  { id: 'veggie', label: 'Rau màu',      icon: 'eco' },
+  { id: 'fruit',  label: 'Cây ăn trái', icon: 'forest' },
+  { id: 'other',  label: 'Khác',         icon: 'more_horiz' },
 ]
 
 const SUGGESTIONS = {
@@ -27,33 +24,34 @@ const SUGGESTIONS = {
 // ─── Typing indicator ─────────────────────────────────────────────────────────
 function TypingIndicator() {
   return (
-    <div style={styles.typingRow} aria-label="Cò Con đang trả lời">
-      <div style={styles.typingAvatar}><Leaf size={12} color="#16a34a" strokeWidth={1.5} /></div>
-      <div style={styles.typingBubble}>
-        <span style={styles.typingDot} />
-        <span style={{ ...styles.typingDot, animationDelay: '0.2s' }} />
-        <span style={{ ...styles.typingDot, animationDelay: '0.4s' }} />
+    <div className="flex items-end gap-2 mb-4" aria-label="Cò Con đang trả lời">
+      <div className="w-7 h-7 rounded-xl bg-[#f0fdf4] border-[1.5px] border-[#bbf7d0]
+                      flex items-center justify-center flex-shrink-0">
+        <span className="material-symbols-outlined text-[14px] text-[#006b2c] ms-fill">eco</span>
+      </div>
+      <div className="flex items-center gap-1.5 px-4 py-3 bg-white
+                      rounded-[4px_18px_18px_18px] border border-[#f1f5f9] shadow-sm">
+        <span className="w-2 h-2 rounded-full bg-[#006b2c] inline-block"
+              style={{ animation: 'blink 1.4s ease infinite' }} />
+        <span className="w-2 h-2 rounded-full bg-[#006b2c] inline-block"
+              style={{ animation: 'blink 1.4s ease infinite', animationDelay: '0.2s' }} />
+        <span className="w-2 h-2 rounded-full bg-[#006b2c] inline-block"
+              style={{ animation: 'blink 1.4s ease infinite', animationDelay: '0.4s' }} />
       </div>
     </div>
   )
 }
 
-// ─── Waveform bars khi đang ghi âm ───────────────────────────────────────────
+// ─── Waveform bars ─────────────────────────────────────────────────────────────
 function VolumeWave({ volume }) {
-  // 5 thanh, chiều cao thay đổi theo volume
   const bars = [0.4, 0.7, 1.0, 0.7, 0.4]
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 2, height: 20 }}>
+    <div className="flex items-center gap-0.5 h-5">
       {bars.map((scale, i) => (
         <div
           key={i}
-          style={{
-            width: 3,
-            borderRadius: 99,
-            background: '#ef4444',
-            height: Math.max(4, Math.round(volume * scale * 0.18)),
-            transition: 'height 0.08s ease',
-          }}
+          className="w-[3px] rounded-full bg-white transition-all duration-75"
+          style={{ height: Math.max(4, Math.round(volume * scale * 0.18)) }}
         />
       ))}
     </div>
@@ -62,37 +60,32 @@ function VolumeWave({ volume }) {
 
 // ─── MessageBubble ────────────────────────────────────────────────────────────
 function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
-  const isUser      = msg.role === 'user'
-  const isSystem    = msg.role === 'system'
+  const isUser         = msg.role === 'user'
+  const isSystem       = msg.role === 'system'
   const isThisSpeaking = speakingMsgId === msg.id
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column',
-      alignItems: isUser ? 'flex-end' : 'flex-start',
-      gap: 4, marginBottom: 14,
-      animation: 'fadeUp 0.25s ease both',
-    }}>
+    <div className={`flex flex-col gap-1 mb-4 fade-up ${isUser ? 'items-end' : 'items-start'}`}>
+
       {/* AI bubble */}
       {!isUser && !isSystem && (
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-          <div style={styles.aiAvatar}><Leaf size={12} color="#16a34a" strokeWidth={1.5} /></div>
+        <div className="flex items-end gap-2">
+          <div className="w-7 h-7 rounded-xl bg-[#f0fdf4] border-[1.5px] border-[#bbf7d0]
+                          flex items-center justify-center flex-shrink-0 mb-0.5">
+            <span className="material-symbols-outlined text-[14px] text-[#006b2c] ms-fill">eco</span>
+          </div>
           <div>
             {msg.image_url && (
               <img src={msg.image_url} alt="Ảnh sâu bệnh"
-                style={{ maxWidth: 200, borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 4, display: 'block' }} />
+                className="max-w-[200px] rounded-xl border border-[#e5eeff] mb-1 block" />
             )}
-            <div style={{
-              maxWidth: '80%', padding: '12px 15px',
-              borderRadius: '4px 18px 18px 18px',
-              background: '#fff', color: '#0f172a',
-              fontSize: 15, lineHeight: 1.65,
-              border: '1px solid #f1f5f9',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-            }}>
+            <div className="max-w-[80%] px-4 py-3 text-[15px] leading-relaxed text-[#0b1c30]
+                            bg-white border border-[#f1f5f9] shadow-sm
+                            rounded-[4px_18px_18px_18px]">
               {msg.source === 'vision' && (
-                <div style={{ fontSize: 11, color: '#7c3aed', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <span>👁</span> Phân tích ảnh bằng AI Vision
+                <div className="flex items-center gap-1 text-[11px] text-[#7c3aed] mb-1.5">
+                  <span className="material-symbols-outlined text-[14px]">visibility</span>
+                  Phân tích ảnh bằng AI Vision
                 </div>
               )}
               {msg.content}
@@ -103,11 +96,8 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
 
       {/* System message */}
       {isSystem && (
-        <div style={{
-          padding: '10px 14px', borderRadius: 12,
-          background: '#fffbeb', color: '#92400e', fontSize: 14,
-          border: '1px solid #fde68a', maxWidth: '85%', lineHeight: 1.5,
-        }}>
+        <div className="px-4 py-3 rounded-2xl bg-[#fffbeb] border border-[#fde68a]
+                        text-[14px] text-[#92400e] max-w-[85%] leading-snug">
           {msg.content}
         </div>
       )}
@@ -117,35 +107,45 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
         <>
           {msg.image_url && (
             <img src={msg.image_url} alt="Ảnh sâu bệnh"
-              style={{ maxWidth: 200, borderRadius: 12, marginBottom: 2, display: 'block' }} />
+              className="max-w-[200px] rounded-xl mb-1 block" />
           )}
-          <div style={{
-            maxWidth: '80%', padding: '12px 15px',
-            borderRadius: '18px 18px 4px 18px',
-            background: 'linear-gradient(135deg, #16a34a, #15803d)',
-            color: '#fff', fontSize: 15, lineHeight: 1.65,
-          }}>
+          <div className="max-w-[80%] px-4 py-3 text-[15px] leading-relaxed text-white
+                          bg-gradient-to-br from-[#00873a] to-[#006b2c]
+                          rounded-[18px_18px_4px_18px]">
             {msg.content}
           </div>
         </>
       )}
 
-      {/* AI action buttons */}
+      {/* AI action row */}
       {!isUser && !isSystem && (
-        <div style={{ display: 'flex', gap: 6, paddingLeft: 36 }}>
-          <button onClick={() => onSpeak(msg.id, msg.content)} style={styles.actionBtn}
-            aria-label={isThisSpeaking ? 'Dừng đọc' : 'Nghe câu trả lời'}>
-            {isThisSpeaking
-              ? <><VolumeX size={12} strokeWidth={2} /> Dừng</>
-              : <><Volume2 size={12} strokeWidth={2} /> Nghe</>}
+        <div className="flex items-center gap-1.5 pl-9">
+          <button
+            onClick={() => onSpeak(msg.id, msg.content)}
+            aria-label={isThisSpeaking ? 'Dừng đọc' : 'Nghe câu trả lời'}
+            className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#006b2c] font-semibold
+                       bg-white border border-[#e5eeff] rounded-lg"
+          >
+            <span className="material-symbols-outlined text-[13px]">
+              {isThisSpeaking ? 'volume_off' : 'volume_up'}
+            </span>
+            {isThisSpeaking ? 'Dừng' : 'Nghe'}
           </button>
           {msg.source === 'engineer' && (
-            <span style={styles.engineerBadge}><CheckCircle size={11} strokeWidth={2} /> Kỹ sư xác nhận</span>
+            <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#15803d] font-semibold
+                             bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg">
+              <span className="material-symbols-outlined text-[13px] ms-fill">check_circle</span>
+              Kỹ sư xác nhận
+            </span>
           )}
-          <button onClick={() => onReport(msg.id)}
-            style={{ ...styles.actionBtn, color: '#94a3b8', borderColor: '#e8edf2' }}
-            aria-label="Báo câu trả lời sai">
-            <Flag size={11} strokeWidth={2} /> Báo lỗi
+          <button
+            onClick={() => onReport(msg.id)}
+            aria-label="Báo câu trả lời sai"
+            className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#6e7b6c]
+                       bg-white border border-[#e5eeff] rounded-lg"
+          >
+            <span className="material-symbols-outlined text-[13px]">flag</span>
+            Báo lỗi
           </button>
         </div>
       )}
@@ -153,27 +153,47 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
   )
 }
 
-// ─── CropSelector dropdown ────────────────────────────────────────────────────
+// ─── CropSelector ─────────────────────────────────────────────────────────────
 function CropSelector({ crops, activeCrop, onChange }) {
   const [open, setOpen] = useState(false)
   const label = CROP_OPTIONS.find(c => c.id === activeCrop)?.label || 'Chọn cây'
   if (!crops?.length) return null
   return (
-    <div style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(v => !v)} style={styles.cropSelectorBtn} aria-haspopup="listbox">
-        <Leaf size={13} color="#16a34a" />
-        <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>{label}</span>
-        <ChevronDown size={12} color="#16a34a" />
+    <div className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="listbox"
+        className="flex items-center gap-1 px-3 py-1.5 border-[1.5px] border-[#bbf7d0]
+                   rounded-full bg-[#f0fdf4] text-[13px] text-[#006b2c] font-semibold"
+      >
+        <span className="material-symbols-outlined text-[15px] ms-fill">eco</span>
+        {label}
+        <span className="material-symbols-outlined text-[15px]">expand_more</span>
       </button>
       {open && (
-        <div style={styles.cropDropdown} role="listbox">
+        <div
+          role="listbox"
+          className="absolute top-[110%] right-0 bg-white border border-[#e5eeff]
+                     rounded-2xl shadow-lg z-50 min-w-[130px] overflow-hidden"
+        >
           {crops.map(id => {
             const opt = CROP_OPTIONS.find(c => c.id === id)
             if (!opt) return null
             return (
-              <button key={id} role="option" aria-selected={id === activeCrop}
+              <button
+                key={id}
+                role="option"
+                aria-selected={id === activeCrop}
                 onClick={() => { onChange(id); setOpen(false) }}
-                style={{ ...styles.cropDropdownItem, background: id === activeCrop ? '#f0fdf4' : '#fff', color: id === activeCrop ? '#16a34a' : '#0f172a' }}>
+                className={`flex items-center gap-2 w-full px-4 py-3 text-[14px] text-left
+                            ${id === activeCrop
+                              ? 'bg-[#f0fdf4] text-[#006b2c] font-semibold'
+                              : 'text-[#0b1c30]'
+                            }`}
+              >
+                <span className={`material-symbols-outlined text-[16px] ${id === activeCrop ? 'ms-fill text-[#006b2c]' : 'text-[#6e7b6c]'}`}>
+                  {opt.icon}
+                </span>
                 {opt.label}
               </button>
             )
@@ -194,14 +214,13 @@ export default function ChatMain() {
   const { speak, stop, isSpeaking } = useTTS()
   const [speakingMsgId, setSpeakingMsgId] = useState(null)
 
-  const [messages,    setMessages]   = useState([])
-  const [inputText,   setInputText]  = useState(location.state?.prefillText || '')
-  const [sessionId,   setSessionId]  = useState(location.state?.sessionId   || null)
-  const [loading,     setLoading]    = useState(false)
-  const [loadingHist, setLoadingHist]= useState(false)
-  const [showReport,  setShowReport] = useState(null)
+  const [messages,    setMessages]    = useState([])
+  const [inputText,   setInputText]   = useState(location.state?.prefillText || '')
+  const [sessionId,   setSessionId]   = useState(location.state?.sessionId   || null)
+  const [loading,     setLoading]     = useState(false)
+  const [loadingHist, setLoadingHist] = useState(false)
+  const [showReport,  setShowReport]  = useState(null)
 
-  // Crop hiện đang được chọn (mặc định = crop đầu tiên của user)
   const [activeCrop, setActiveCrop] = useState(user?.crops?.[0] || null)
   const userCrops   = user?.crops || []
   const suggestions = SUGGESTIONS[activeCrop] || SUGGESTIONS.default
@@ -209,10 +228,8 @@ export default function ChatMain() {
   const bottomRef   = useRef(null)
   const textareaRef = useRef(null)
 
-  // Khi TTS kết thúc, xóa speakingMsgId
   useEffect(() => { if (!isSpeaking) setSpeakingMsgId(null) }, [isSpeaking])
 
-  // Load lịch sử chat khi có sessionId từ state
   useEffect(() => {
     const sid = location.state?.sessionId
     if (!sid) return
@@ -220,13 +237,13 @@ export default function ChatMain() {
     chatAPI.getMessages(sid)
       .then(res => {
         const msgs = (res.data.messages || []).map(m => ({
-          id:        m.id,
-          role:      m.role,
-          content:   m.content,
-          image_url: m.image_url,
-          confidence:m.confidence,
-          source:    m.source,
-          created_at:m.created_at,
+          id:         m.id,
+          role:       m.role,
+          content:    m.content,
+          image_url:  m.image_url,
+          confidence: m.confidence,
+          source:     m.source,
+          created_at: m.created_at,
         }))
         setMessages(msgs)
       })
@@ -237,7 +254,6 @@ export default function ChatMain() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
   useEffect(() => { if (transcript) setInputText(transcript) }, [transcript])
 
-  // Auto-resize textarea
   useEffect(() => {
     if (!textareaRef.current) return
     textareaRef.current.style.height = 'auto'
@@ -300,43 +316,73 @@ export default function ChatMain() {
   }
 
   return (
-    <div style={styles.page}>
-      {/* Header */}
-      <header style={styles.header}>
-        <button onClick={() => navigate('/home')} style={styles.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} strokeWidth={2} />
+    <div className="h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <header className="flex items-center gap-2 px-3 py-2.5 bg-white
+                         border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]
+                         sticky top-0 z-10">
+        <button
+          onClick={() => navigate('/home')}
+          aria-label="Quay lại"
+          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#6e7b6c] flex-shrink-0"
+        >
+          <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
-        <div style={styles.headerCenter}>
-          <div style={styles.headerAvatar}><Leaf size={14} color="#fff" strokeWidth={1.5} /></div>
+
+        <div className="flex-1 flex items-center gap-2.5 justify-center">
+          <div className="w-9 h-9 rounded-[12px] bg-gradient-to-br from-[#00873a] to-[#006b2c]
+                          flex items-center justify-center flex-shrink-0">
+            <span className="material-symbols-outlined text-white text-[18px] ms-fill">eco</span>
+          </div>
           <div>
-            <div style={styles.headerTitle}>Cò Con</div>
-            <div style={styles.headerSub}>Trợ lý nông nghiệp AI</div>
+            <div className="text-[15px] font-bold text-[#0b1c30] leading-tight">Cò Con</div>
+            <div className="text-[11px] text-[#6e7b6c]">Trợ lý nông nghiệp AI</div>
           </div>
         </div>
-        {/* Crop selector — chỉ hiện khi user có ≥ 2 loại cây */}
+
         {userCrops.length >= 2 && (
           <CropSelector crops={userCrops} activeCrop={activeCrop} onChange={setActiveCrop} />
         )}
-        <button onClick={() => navigate('/chat/image')} style={styles.iconBtn} aria-label="Gửi ảnh sâu bệnh">
-          <Camera size={20} strokeWidth={1.5} />
+
+        <button
+          onClick={() => navigate('/chat/image')}
+          aria-label="Gửi ảnh sâu bệnh"
+          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#6e7b6c] flex-shrink-0"
+        >
+          <span className="material-symbols-outlined text-[22px]">photo_camera</span>
         </button>
       </header>
 
-      {/* Chat area */}
-      <main style={styles.chatArea} role="log" aria-live="polite" aria-label="Lịch sử chat">
+      {/* ── Chat area ──────────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto px-4 py-4"
+            role="log" aria-live="polite" aria-label="Lịch sử chat">
+
         {loadingHist && (
-          <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '16px 0' }}>
+          <p className="text-center text-[13px] text-[#6e7b6c] py-4">
             Đang tải lịch sử chat...
           </p>
         )}
 
         {messages.length === 0 && !loadingHist && (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyAvatar}><Leaf size={28} color="#16a34a" strokeWidth={1.5} /></div>
-            <p style={styles.emptyText}>Xin chào! Bạn cần hỏi gì về cây trồng không?</p>
-            <div style={styles.suggestionsWrap}>
+          <div className="flex flex-col items-center gap-4 pt-8">
+            <div className="w-18 h-18 rounded-[22px] bg-[#f0fdf4] border-2 border-[#bbf7d0]
+                            flex items-center justify-center" style={{ width: 72, height: 72 }}>
+              <span className="material-symbols-outlined text-[36px] text-[#006b2c] ms-fill">eco</span>
+            </div>
+            <p className="text-[15px] text-[#6e7b6c] text-center m-0">
+              Xin chào! Bạn cần hỏi gì về cây trồng không?
+            </p>
+            <div className="w-full flex flex-col gap-2 mt-1">
               {suggestions.map(sg => (
-                <button key={sg} onClick={() => handleSend(sg)} style={styles.suggestionChip}>{sg}</button>
+                <button
+                  key={sg}
+                  onClick={() => handleSend(sg)}
+                  className="w-full px-4 py-3 bg-white border border-[#e5eeff] rounded-2xl
+                             text-[14px] text-[#0b1c30] text-left leading-snug"
+                >
+                  {sg}
+                </button>
               ))}
             </div>
           </div>
@@ -353,121 +399,100 @@ export default function ChatMain() {
         ))}
 
         {loading && <TypingIndicator />}
-        <div ref={bottomRef} style={{ height: 8 }} />
+        <div ref={bottomRef} className="h-2" />
       </main>
 
-      {/* Input bar */}
-      <footer style={styles.inputBar}>
+      {/* ── Input bar ──────────────────────────────────────────── */}
+      <footer className="px-3 py-2.5 bg-white border-t border-[#f1f5f9]
+                         shadow-[0_-1px_8px_rgba(0,0,0,0.04)] sticky bottom-0"
+              style={{ paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
         {sttError && (
-          <p style={{ fontSize: 12, color: '#ef4444', margin: '0 0 6px', textAlign: 'center' }}>{sttError}</p>
+          <p className="text-[12px] text-[#ba1a1a] text-center mb-1.5">{sttError}</p>
         )}
         {isProcessing && (
-          <p style={{ fontSize: 12, color: '#7c3aed', margin: '0 0 6px', textAlign: 'center' }}>
+          <p className="text-[12px] text-[#7c3aed] text-center mb-1.5">
             ⏳ Đang nhận dạng giọng nói...
           </p>
         )}
-        <div style={styles.inputRow}>
+        <div className="flex items-end gap-2">
           <textarea
             ref={textareaRef}
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
             placeholder="Nhập câu hỏi hoặc nhấn mic..."
-            style={styles.textarea} rows={1} aria-label="Nhập câu hỏi"
+            rows={1}
+            aria-label="Nhập câu hỏi"
+            className="flex-1 px-4 py-3 text-[15px] text-[#0b1c30] bg-[#f8f9ff]
+                       border-[1.5px] border-[#e5eeff] rounded-2xl resize-none
+                       leading-snug overflow-y-auto placeholder-[#bdcaba]"
+            style={{ maxHeight: 120 }}
           />
           <button
             onClick={isListening ? stopListening : startListening}
-            style={{
-              ...styles.micBtn,
-              background: isListening ? '#ef4444' : '#e2e8f0',
-              animation: isListening ? 'pulse 1s infinite' : 'none',
-            }}
-            aria-label={isListening ? 'Dừng ghi âm' : 'Nhấn để nói'} aria-pressed={isListening}
+            aria-label={isListening ? 'Dừng ghi âm' : 'Nhấn để nói'}
+            aria-pressed={isListening}
+            className={`w-11 h-11 rounded-full flex items-center justify-center
+                        flex-shrink-0 transition-all
+                        ${isListening
+                          ? 'bg-[#EF4444] shadow-[0_2px_8px_rgba(239,68,68,0.4)]'
+                          : 'bg-[#e5eeff]'
+                        }`}
+            style={isListening ? { animation: 'pulse 1s infinite' } : {}}
           >
             {isListening
               ? <VolumeWave volume={volume} />
-              : <Mic size={18} color="#64748b" />
+              : <span className="material-symbols-outlined text-[20px] text-[#6e7b6c]">mic</span>
             }
           </button>
           <button
             onClick={() => handleSend()}
             disabled={!inputText.trim() || loading}
-            style={{
-              ...styles.sendBtn,
-              opacity: (!inputText.trim() || loading) ? 0.4 : 1,
-              transform: inputText.trim() && !loading ? 'scale(1)' : 'scale(0.95)',
-            }}
             aria-label="Gửi câu hỏi"
+            className="w-11 h-11 rounded-full bg-gradient-to-br from-[#00873a] to-[#006b2c]
+                       flex items-center justify-center flex-shrink-0
+                       shadow-[0_2px_8px_rgba(0,107,44,0.3)]
+                       disabled:opacity-40 transition-opacity"
           >
-            <Send size={18} color="#fff" strokeWidth={2} />
+            <span className="material-symbols-outlined text-[20px] text-white ms-fill">send</span>
           </button>
         </div>
       </footer>
 
-      {/* Report modal */}
+      {/* ── Report modal ───────────────────────────────────────── */}
       {showReport && (
-        <div style={styles.modalOverlay} role="dialog" aria-modal="true"
-          onClick={e => e.target === e.currentTarget && setShowReport(null)}>
-          <div style={styles.modal} className="slide-up">
-            <div style={styles.modalHandle} />
-            <h2 style={{ fontSize: 17, margin: '4px 0 14px', color: '#0f172a', fontWeight: 700 }}>
-              Câu trả lời bị lỗi?
-            </h2>
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-black/45 backdrop-blur-sm flex items-end z-50"
+          onClick={e => e.target === e.currentTarget && setShowReport(null)}
+        >
+          <div className="bg-white rounded-t-[28px] px-5 pt-3 pb-10 w-full flex flex-col gap-2 slide-up">
+            <div className="w-10 h-1 bg-[#e5eeff] rounded-full mx-auto mb-3" />
+            <h2 className="text-[17px] font-bold text-[#0b1c30] mb-2">Câu trả lời bị lỗi?</h2>
             {[
               { type: 'wrong_info',         label: 'Thông tin sai' },
               { type: 'irrelevant',         label: 'Không liên quan đến câu hỏi' },
               { type: 'hard_to_understand', label: 'Khó hiểu, cần giải thích thêm' },
             ].map(({ type, label }) => (
-              <button key={type} onClick={() => handleReport(showReport, type)} style={styles.reportBtn}>
+              <button
+                key={type}
+                onClick={() => handleReport(showReport, type)}
+                className="w-full px-4 py-4 text-[15px] text-[#0b1c30] text-left
+                           bg-[#f8f9ff] border border-[#e5eeff] rounded-2xl"
+              >
                 {label}
               </button>
             ))}
-            <button onClick={() => setShowReport(null)} style={styles.cancelBtn}>Bỏ qua</button>
+            <button
+              onClick={() => setShowReport(null)}
+              className="py-3 text-[15px] text-[#6e7b6c] text-center"
+            >
+              Bỏ qua
+            </button>
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
-        @keyframes blink  { 0%,80%,100%{opacity:0.15} 40%{opacity:1} }
-        @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-      `}</style>
     </div>
   )
-}
-
-const styles = {
-  page:            { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
-  header:          { display: 'flex', alignItems: 'center', gap: 6, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #f1f5f9', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' },
-  iconBtn:         { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10, flexShrink: 0 },
-  headerCenter:    { flex: 1, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center' },
-  headerAvatar:    { width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#16a34a,#15803d)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  headerTitle:     { fontSize: 15, fontWeight: 700, color: '#0f172a', lineHeight: 1.2 },
-  headerSub:       { fontSize: 11, color: '#64748b' },
-  cropSelectorBtn: { display: 'flex', alignItems: 'center', gap: 4, padding: '5px 9px', border: '1.5px solid #bbf7d0', borderRadius: 99, background: '#f0fdf4', cursor: 'pointer', flexShrink: 0 },
-  cropDropdown:    { position: 'absolute', top: '110%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', zIndex: 50, minWidth: 120 },
-  cropDropdownItem:{ display: 'block', width: '100%', padding: '10px 14px', border: 'none', textAlign: 'left', cursor: 'pointer', fontSize: 14, fontFamily: "'Noto Sans', sans-serif" },
-  chatArea:        { flex: 1, overflowY: 'auto', padding: '16px 14px' },
-  emptyState:      { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, paddingTop: 28 },
-  emptyAvatar:     { width: 72, height: 72, borderRadius: 22, background: '#f0fdf4', border: '2px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  emptyText:       { fontSize: 15, color: '#64748b', textAlign: 'center', margin: 0 },
-  suggestionsWrap: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 },
-  suggestionChip:  { padding: '12px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, fontSize: 14, color: '#374151', cursor: 'pointer', textAlign: 'left', lineHeight: 1.4, width: '100%', fontFamily: "'Noto Sans', sans-serif" },
-  aiAvatar:        { width: 28, height: 28, borderRadius: 8, background: '#f0fdf4', border: '1.5px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginBottom: 2 },
-  typingRow:       { display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 14 },
-  typingAvatar:    { width: 28, height: 28, borderRadius: 8, background: '#f0fdf4', border: '1.5px solid #bbf7d0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  typingBubble:    { display: 'flex', gap: 5, alignItems: 'center', padding: '12px 16px', background: '#fff', borderRadius: '4px 18px 18px 18px', border: '1px solid #f1f5f9', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' },
-  typingDot:       { width: 7, height: 7, borderRadius: '50%', background: '#16a34a', display: 'inline-block', animation: 'blink 1.4s ease infinite' },
-  actionBtn:       { padding: '4px 9px', fontSize: 11, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', color: '#16a34a', minHeight: 26, display: 'flex', alignItems: 'center', gap: 3, fontFamily: "'Noto Sans', sans-serif" },
-  engineerBadge:   { padding: '4px 9px', fontSize: 11, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 },
-  inputBar:        { padding: '10px 12px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#fff', borderTop: '1px solid #f1f5f9', position: 'sticky', bottom: 0, boxShadow: '0 -1px 8px rgba(0,0,0,0.04)' },
-  inputRow:        { display: 'flex', gap: 8, alignItems: 'flex-end' },
-  textarea:        { flex: 1, padding: '11px 13px', fontSize: 15, borderRadius: 14, border: '1.5px solid #e2e8f0', resize: 'none', outline: 'none', background: '#f8fafc', color: '#0f172a', lineHeight: 1.55, maxHeight: 120, fontFamily: "'Noto Sans', sans-serif", overflowY: 'auto' },
-  micBtn:          { width: 44, height: 44, borderRadius: '50%', border: 'none', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  sendBtn:         { width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'linear-gradient(135deg,#16a34a,#15803d)', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(22,163,74,0.3)', transition: 'opacity 0.15s, transform 0.15s' },
-  modalOverlay:    { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 100, backdropFilter: 'blur(2px)' },
-  modal:           { background: '#fff', borderRadius: '24px 24px 0 0', padding: '12px 20px 36px', width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-  modalHandle:     { width: 40, height: 4, background: '#e2e8f0', borderRadius: 99, margin: '0 auto 12px', flexShrink: 0 },
-  reportBtn:       { padding: '14px 16px', fontSize: 15, background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 12, cursor: 'pointer', color: '#0f172a', textAlign: 'left', fontFamily: "'Noto Sans', sans-serif" },
-  cancelBtn:       { padding: '12px', fontSize: 15, background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', textAlign: 'center', fontFamily: "'Noto Sans', sans-serif" },
 }

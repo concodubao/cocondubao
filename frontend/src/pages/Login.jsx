@@ -2,21 +2,21 @@ import { useState, useEffect, useRef } from 'react'
 import { Navigate } from 'react-router-dom'
 import { authAPI } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
-import { ChevronLeft, Wheat, Wrench, Shield, CheckCircle2 } from 'lucide-react'
 
+// ─── Role cards data ────────────────────────────────────────
 const ROLES = [
-  { id: 'farmer',   label: 'Nông Dân',  Icon: Wheat,   desc: 'Hỏi Cò Con về sâu bệnh, thời vụ' },
-  { id: 'engineer', label: 'Kỹ Sư',     Icon: Wrench,  desc: 'Trả lời câu hỏi, quản lý tri thức' },
-  { id: 'admin',    label: 'Quản Trị',  Icon: Shield,  desc: 'Quản lý hệ thống, gửi thông báo' },
+  { id: 'farmer',   label: 'Nông dân',        icon: 'agriculture',        desc: 'Tôi cần tư vấn canh tác',    iconBg: '#F0FDF4', iconColor: '#006b2c' },
+  { id: 'engineer', label: 'Kỹ sư',           icon: 'engineering',        desc: 'Tôi là chuyên gia kỹ thuật', iconBg: '#E0F2FE', iconColor: '#00628d' },
+  { id: 'admin',    label: 'Quản trị viên',   icon: 'admin_panel_settings',desc: 'Quản lý hệ thống',           iconBg: '#FEF3C7', iconColor: '#855300' },
 ]
 
-// ─── Step indicator ────────────────────────────────────────
+// ─── Step dots ──────────────────────────────────────────────
 function StepDots({ step }) {
   const steps = ['role', 'phone', 'otp']
   const idx   = steps.indexOf(step)
   if (idx < 0) return null
   return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+    <div className="flex gap-1.5 items-center justify-center mb-2">
       {steps.map((_, i) => (
         <div key={i} style={{
           height: 5, borderRadius: 99,
@@ -31,19 +31,30 @@ function StepDots({ step }) {
 
 // ─── Step: chọn role ───────────────────────────────────────
 function StepRole({ onNext }) {
+  const [selected, setSelected] = useState(null)
+
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div className="flex flex-col gap-4 fade-up">
       {ROLES.map((r, i) => (
-        <button key={r.id} onClick={() => onNext(r.id)} style={{
-          ...s.roleCard,
-          animationDelay: `${i * 0.06}s`,
-        }} className="fade-up">
-          <div style={s.roleIconWrap}><r.Icon size={22} color="#16a34a" strokeWidth={1.5} /></div>
-          <div style={{ textAlign: 'left', flex: 1 }}>
-            <div style={{ fontSize: 17, fontWeight: 700, color: '#0f172a' }}>{r.label}</div>
-            <div style={{ fontSize: 13, color: '#64748b', marginTop: 3 }}>{r.desc}</div>
+        <button
+          key={r.id}
+          onClick={() => { setSelected(r.id); onNext(r.id) }}
+          className={`flex items-center p-4 rounded-[20px] border-2 shadow-sm transition-all active:scale-[0.98]
+            ${selected === r.id ? 'border-[#006b2c] bg-[#F0FDF4] shadow-[0_8px_20px_rgba(0,107,44,0.1)] -translate-y-1' : 'border-transparent bg-white'}`}
+          style={{ animationDelay: `${i * 0.07}s` }}
+        >
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+               style={{ background: r.iconBg }}>
+            <span className="material-symbols-outlined text-[32px]" style={{ color: r.iconColor }}>{r.icon}</span>
           </div>
-          <ChevronLeft size={16} color="#cbd5e1" style={{ transform: 'rotate(180deg)', flexShrink: 0 }} />
+          <div className="ml-4 text-left flex-1">
+            <div className="text-[20px] font-bold text-[#0b1c30]">{r.label}</div>
+            <div className="text-sm text-[#3e4a3d] mt-0.5">{r.desc}</div>
+          </div>
+          <span className="material-symbols-outlined text-[#006b2c] ml-2 opacity-0 transition-opacity"
+                style={{ opacity: selected === r.id ? 1 : 0 }}>
+            check_circle
+          </span>
         </button>
       ))}
     </div>
@@ -56,7 +67,6 @@ function StepPhone({ onNext }) {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
   const inputRef = useRef(null)
-
   useEffect(() => { inputRef.current?.focus() }, [])
 
   async function handleSend() {
@@ -64,8 +74,7 @@ function StepPhone({ onNext }) {
     if (!trimmed) return setError('Vui lòng nhập số điện thoại.')
     const digits = trimmed.replace(/\D/g, '')
     if (digits.length < 9 || digits.length > 11) return setError('Số điện thoại không hợp lệ.')
-    setError('')
-    setLoading(true)
+    setError(''); setLoading(true)
     try {
       const res = await authAPI.requestOTP(trimmed)
       onNext(res.data)
@@ -77,33 +86,40 @@ function StepPhone({ onNext }) {
   }
 
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={s.label} htmlFor="phone">Số điện thoại</label>
-        <input ref={inputRef} id="phone" type="tel" inputMode="numeric" autoComplete="tel"
-          placeholder="0901 234 567" value={phone}
-          onChange={e => setPhone(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
-          style={s.input} />
+    <div className="flex flex-col gap-4 fade-up">
+      <div className="space-y-2">
+        <label className="text-[18px] font-bold text-[#0b1c30]" htmlFor="phone">Số điện thoại</label>
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#6e7b6c]">call</span>
+          <input
+            ref={inputRef} id="phone" type="tel" inputMode="numeric" autoComplete="tel"
+            placeholder="Nhập số điện thoại của bà con"
+            value={phone} onChange={e => setPhone(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSend()}
+            className="w-full h-[58px] pl-12 pr-4 bg-white border-2 border-[#bdcaba] rounded-2xl
+                       text-[20px] font-bold placeholder:text-[#bdcaba] placeholder:font-normal
+                       focus:border-[#006b2c] transition-colors"
+          />
+        </div>
       </div>
-      {error && <p style={s.error} role="alert">{error}</p>}
-      <button onClick={handleSend} disabled={loading} style={{ ...s.btnPrimary, opacity: loading ? 0.7 : 1 }}>
-        {loading ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <span style={s.spinner} /> Đang gửi...
-          </span>
-        ) : 'Nhận mã OTP →'}
+      {error && <ErrorBox msg={error} />}
+      <button onClick={handleSend} disabled={loading}
+        className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[20px] font-bold
+                   shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all
+                   disabled:opacity-60 disabled:cursor-not-allowed">
+        {loading
+          ? <><Spinner /> Đang gửi...</>
+          : <><span>Nhận mã OTP</span><span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
     </div>
   )
 }
 
-// ─── OTP 6-box input ──────────────────────────────────────
+// ─── OTP Boxes ──────────────────────────────────────────────
 function OTPBoxes({ value, onChange }) {
-  const r0 = useRef(null); const r1 = useRef(null); const r2 = useRef(null)
-  const r3 = useRef(null); const r4 = useRef(null); const r5 = useRef(null)
-  const refs = [r0, r1, r2, r3, r4, r5]
+  const refs = Array.from({ length: 6 }, () => useRef(null))
   const digits = value.split('')
+  useEffect(() => { refs[0].current?.focus() }, [])
 
   function handleInput(i, char) {
     const d = char.replace(/\D/g, '')
@@ -113,58 +129,32 @@ function OTPBoxes({ value, onChange }) {
     onChange(next.join('').slice(0, 6))
     if (i < 5) refs[i + 1].current?.focus()
   }
-
   function handleKeyDown(i, e) {
     if (e.key === 'Backspace') {
-      if (digits[i]) {
-        const next = digits.slice()
-        next[i] = ''
-        onChange(next.join(''))
-      } else if (i > 0) {
-        refs[i - 1].current?.focus()
-      }
-    } else if (e.key === 'ArrowLeft' && i > 0) {
-      refs[i - 1].current?.focus()
-    } else if (e.key === 'ArrowRight' && i < 5) {
-      refs[i + 1].current?.focus()
-    }
+      if (digits[i]) { const n = digits.slice(); n[i] = ''; onChange(n.join('')) }
+      else if (i > 0) refs[i - 1].current?.focus()
+    } else if (e.key === 'ArrowLeft'  && i > 0) refs[i - 1].current?.focus()
+    else if   (e.key === 'ArrowRight' && i < 5) refs[i + 1].current?.focus()
   }
-
   function handlePaste(e) {
     e.preventDefault()
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
-    onChange(pasted)
-    const focusIdx = Math.min(pasted.length, 5)
-    refs[focusIdx].current?.focus()
+    const p = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    onChange(p)
+    refs[Math.min(p.length, 5)].current?.focus()
   }
 
-  useEffect(() => { refs[0].current?.focus() }, [])
-
   return (
-    <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+    <div className="flex gap-2 justify-center">
       {Array.from({ length: 6 }).map((_, i) => (
-        <input
-          key={i}
-          ref={refs[i]}
-          type="tel"
-          inputMode="numeric"
-          maxLength={1}
+        <input key={i} ref={refs[i]} type="tel" inputMode="numeric" maxLength={1}
           autoComplete={i === 0 ? 'one-time-code' : 'off'}
           value={digits[i] || ''}
           onChange={e => handleInput(i, e.target.value)}
           onKeyDown={e => handleKeyDown(i, e)}
           onPaste={i === 0 ? handlePaste : undefined}
-          style={{
-            width: 44, height: 54,
-            textAlign: 'center', fontSize: 22, fontWeight: 700,
-            borderRadius: 12,
-            border: digits[i] ? '2px solid #16a34a' : '1.5px solid #e2e8f0',
-            background: digits[i] ? '#f0fdf4' : '#f8fafc',
-            color: '#0f172a',
-            outline: 'none',
-            caretColor: 'transparent',
-            transition: 'border-color 0.15s, background 0.15s',
-          }}
+          className={`w-11 h-14 text-center text-[22px] font-bold rounded-xl border-2 transition-all
+            ${digits[i] ? 'border-[#006b2c] bg-[#F0FDF4] text-[#006b2c]' : 'border-[#bdcaba] bg-[#f8f9ff] text-[#0b1c30]'}`}
+          style={{ caretColor: 'transparent', outline: 'none' }}
         />
       ))}
     </div>
@@ -173,13 +163,13 @@ function OTPBoxes({ value, onChange }) {
 
 // ─── Step: OTP ────────────────────────────────────────────
 function StepOTP({ phone, role, onResend }) {
-  const [otp,       setOtp]       = useState('')
-  const [loading,   setLoading]   = useState(false)
-  const [error,     setError]     = useState('')
+  const [otp, setOtp]             = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState('')
   const [countdown, setCountdown] = useState(60)
   const [resending, setResending] = useState(false)
-  const [success,   setSuccess]   = useState(false)
-  const { setUser, setToken } = useAuthStore()
+  const [success, setSuccess]     = useState(false)
+  const { setUser, setToken }     = useAuthStore()
 
   useEffect(() => {
     if (countdown <= 0) return
@@ -189,17 +179,12 @@ function StepOTP({ phone, role, onResend }) {
 
   async function handleVerify() {
     if (otp.length !== 6) return setError('OTP gồm 6 chữ số.')
-    setError('')
-    setLoading(true)
+    setError(''); setLoading(true)
     try {
       const res = await authAPI.verifyOTP(phone, otp, role)
       const { token, user, isNewUser } = res.data
-      setSuccess(true)
-      setToken(token)
-      setUser(user)
-      setTimeout(() => {
-        window.location.href = isNewUser ? '/profile?onboard=true' : '/home'
-      }, 400)
+      setSuccess(true); setToken(token); setUser(user)
+      setTimeout(() => { window.location.href = isNewUser ? '/profile?onboard=true' : '/home' }, 400)
     } catch (err) {
       setError(err.response?.data?.error || 'OTP không đúng. Thử lại nhé.')
       setLoading(false)
@@ -207,69 +192,43 @@ function StepOTP({ phone, role, onResend }) {
   }
 
   async function handleResend() {
-    setResending(true)
-    setError('')
-    try {
-      await onResend()
-      setCountdown(60)
-      setOtp('')
-    } catch (err) {
-      setError(err.response?.data?.error || 'Không gửi lại được. Thử lại sau.')
-    } finally {
-      setResending(false)
-    }
+    setResending(true); setError('')
+    try { await onResend(); setCountdown(60); setOtp('') }
+    catch (err) { setError(err.response?.data?.error || 'Không gửi lại được.') }
+    finally { setResending(false) }
   }
 
-  const filled = otp.length === 6
-
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, textAlign: 'center' }}>
-        Mã đã gửi đến <strong style={{ color: '#64748b' }}>{phone}</strong>
+    <div className="flex flex-col gap-5 fade-up">
+      <p className="text-center text-[#3e4a3d] text-[16px]">
+        Mã đã gửi đến <strong className="text-[#0b1c30]">{phone}</strong>
       </p>
-
       <OTPBoxes value={otp} onChange={setOtp} />
-
-      <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, textAlign: 'center' }}>
-        Mã hết hạn sau 10 phút
-      </p>
-
-      {error && <p style={s.error} role="alert">{error}</p>}
-
-      <button onClick={handleVerify} disabled={loading || !filled || success}
-        style={{
-          ...s.btnPrimary,
-          opacity: (!filled || loading || success) ? 0.6 : 1,
-          background: success ? '#15803d' : '#16a34a',
-        }}>
-        {success ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <CheckCircle2 size={18} /> Xác nhận thành công!
-          </span>
-        ) : loading ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <span style={s.spinner} /> Đang xác nhận...
-          </span>
-        ) : 'Xác nhận OTP'}
+      <p className="text-center text-sm text-[#6e7b6c]">Mã hết hạn sau 10 phút</p>
+      {error && <ErrorBox msg={error} />}
+      <button onClick={handleVerify} disabled={loading || otp.length !== 6 || success}
+        className={`w-full h-[60px] rounded-full text-white text-[20px] font-bold
+                   flex items-center justify-center gap-2 transition-all active:scale-95
+                   disabled:opacity-60 disabled:cursor-not-allowed
+                   ${success ? 'bg-[#15803d]' : 'bg-[#006b2c]'}`}>
+        {success
+          ? <><span className="material-symbols-outlined ms-fill">check_circle</span> Xác nhận thành công!</>
+          : loading ? <><Spinner /> Đang xác nhận...</>
+          : 'Xác nhận OTP'}
       </button>
-
-      <div style={{ textAlign: 'center' }}>
-        {countdown > 0 ? (
-          <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>
-            Gửi lại sau <strong style={{ color: '#64748b' }}>{countdown}s</strong>
-          </p>
-        ) : (
-          <button onClick={handleResend} disabled={resending}
-            style={{ background: 'none', border: 'none', color: '#16a34a', fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '8px 0' }}>
-            {resending ? 'Đang gửi lại...' : 'Gửi lại OTP'}
-          </button>
-        )}
+      <div className="text-center">
+        {countdown > 0
+          ? <p className="text-sm text-[#6e7b6c]">Gửi lại sau <strong className="text-[#0b1c30]">{countdown}s</strong></p>
+          : <button onClick={handleResend} disabled={resending}
+              className="text-[#006b2c] text-[16px] font-bold py-2 px-4">
+              {resending ? 'Đang gửi lại...' : 'Gửi lại OTP'}
+            </button>}
       </div>
     </div>
   )
 }
 
-// ─── Step: Email / Password ───────────────────────────────
+// ─── Step: Email/Password (kỹ sư & admin) ────────────────
 function StepEmailPassword({ role }) {
   const [mode,     setMode]     = useState('login')
   const [email,    setEmail]    = useState('')
@@ -277,7 +236,7 @@ function StepEmailPassword({ role }) {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
   const [success,  setSuccess]  = useState('')
-  const { setUser, setToken } = useAuthStore()
+  const { setUser, setToken }   = useAuthStore()
 
   async function handleLogin() {
     if (!email || !password) return setError('Vui lòng nhập đầy đủ.')
@@ -285,8 +244,7 @@ function StepEmailPassword({ role }) {
     try {
       const res = await authAPI.loginEmail(email, password)
       const { token, user, isNewUser } = res.data
-      setToken(token)
-      setUser(user)
+      setToken(token); setUser(user)
       window.location.href = isNewUser ? '/profile?onboard=true' : '/home'
     } catch (err) {
       setError(err.response?.data?.error || 'Đăng nhập thất bại.')
@@ -300,11 +258,7 @@ function StepEmailPassword({ role }) {
     setError(''); setLoading(true)
     try {
       const res = await authAPI.registerEmail(email, password, role)
-      if (res.data.pending) {
-        setSuccess('Tài khoản đã tạo! Vui lòng chờ admin phê duyệt.')
-      } else {
-        setSuccess('Đăng ký thành công! Đăng nhập để tiếp tục.')
-      }
+      setSuccess(res.data.pending ? 'Tài khoản đã tạo! Chờ admin phê duyệt.' : 'Đăng ký thành công! Đăng nhập để tiếp tục.')
       setMode('login')
     } catch (err) {
       setError(err.response?.data?.error || 'Đăng ký thất bại.')
@@ -314,143 +268,128 @@ function StepEmailPassword({ role }) {
   }
 
   return (
-    <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Toggle login / register */}
-      <div style={{ display: 'flex', gap: 4, background: '#f8fafc', padding: 4, borderRadius: 12, border: '1px solid #e2e8f0' }}>
+    <div className="flex flex-col gap-4 fade-up">
+      {/* Toggle */}
+      <div className="flex gap-1 bg-[#f8f9ff] p-1 rounded-xl border border-[#e5eeff]">
         {['login', 'register'].map(m => (
           <button key={m} onClick={() => { setMode(m); setError(''); setSuccess('') }}
-            style={{
-              flex: 1, padding: '9px', borderRadius: 9,
-              border: 'none', cursor: 'pointer', fontSize: 14,
-              fontWeight: mode === m ? 700 : 500,
-              background: mode === m ? '#fff' : 'transparent',
-              color: mode === m ? '#16a34a' : '#94a3b8',
-              boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
-            }}>
+            className={`flex-1 py-2.5 rounded-lg text-[16px] font-bold transition-all
+              ${mode === m ? 'bg-white text-[#006b2c] shadow-sm' : 'text-[#6e7b6c]'}`}>
             {m === 'login' ? 'Đăng nhập' : 'Đăng ký'}
           </button>
         ))}
       </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={s.label} htmlFor="email">Email</label>
-        <input id="email" type="email" autoComplete="email"
-          placeholder="email@example.com" value={email}
-          onChange={e => setEmail(e.target.value)}
+      <div className="space-y-1">
+        <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="email">Email</label>
+        <input id="email" type="email" autoComplete="email" placeholder="email@example.com"
+          value={email} onChange={e => setEmail(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleRegister())}
-          style={s.input} autoFocus />
+          className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" autoFocus />
       </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <label style={s.label} htmlFor="password">Mật khẩu</label>
+      <div className="space-y-1">
+        <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="password">Mật khẩu</label>
         <input id="password" type="password"
           autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           placeholder={mode === 'login' ? '••••••••' : 'Tối thiểu 8 ký tự'}
           value={password} onChange={e => setPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleRegister())}
-          style={s.input} />
+          className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" />
       </div>
-
-      {error   && <p style={s.error} role="alert">{error}</p>}
-      {success && <p style={{ color: '#15803d', fontSize: 14, background: '#f0fdf4', padding: '10px 14px', borderRadius: 10, margin: 0 }}>{success}</p>}
-
-      <button onClick={mode === 'login' ? handleLogin : handleRegister}
-        disabled={loading}
-        style={{ ...s.btnPrimary, opacity: loading ? 0.7 : 1 }}>
-        {loading ? (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <span style={s.spinner} /> Đang xử lý...
-          </span>
-        ) : mode === 'login' ? 'Đăng nhập →' : 'Tạo tài khoản →'}
+      {error   && <ErrorBox msg={error} />}
+      {success && <div className="text-[#006b2c] text-[15px] bg-[#F0FDF4] px-4 py-3 rounded-xl">{success}</div>}
+      <button onClick={mode === 'login' ? handleLogin : handleRegister} disabled={loading}
+        className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[20px] font-bold
+                   flex items-center justify-center gap-2 shadow-lg active:scale-95
+                   disabled:opacity-60 disabled:cursor-not-allowed transition-all">
+        {loading ? <><Spinner /> Đang xử lý...</>
+          : <><span>{mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}</span>
+              <span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
     </div>
   )
 }
 
+// ─── Shared helpers ─────────────────────────────────────────
+function ErrorBox({ msg }) {
+  return (
+    <div className="flex items-start gap-2 bg-[#fef2f2] border-l-4 border-[#EF4444] px-4 py-3 rounded-xl text-[#b91c1c] text-[15px]">
+      <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">error</span>
+      {msg}
+    </div>
+  )
+}
+function Spinner() {
+  return <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin inline-block" />
+}
+
 // ─── Main Login ────────────────────────────────────────────
 export default function Login() {
-  const [step,           setStep]           = useState('role')
-  const [role,           setRole]           = useState('farmer')
-  const [phone,          setPhone]          = useState('')
-  const [isExistingUser, setIsExistingUser] = useState(false)
-
+  const [step,  setStep]  = useState('role')
+  const [role,  setRole]  = useState('farmer')
+  const [phone, setPhone] = useState('')
   const { token } = useAuthStore()
   if (token) return <Navigate to="/home" replace />
 
-  const HERO_INFO = {
-    role:  { title: 'Xin chào!',           sub: 'Chọn vai trò của bạn để tiếp tục' },
-    phone: { title: 'Đăng nhập',           sub: 'Nhập số điện thoại để nhận OTP' },
-    otp:   { title: 'Nhập mã OTP',         sub: `Đã gửi mã đến ${phone || '...'}` },
+  const HERO = {
+    role:  { title: 'Đăng nhập',       sub: 'Chào mừng bà con đến với Cò Con!' },
+    phone: { title: 'Đăng nhập',       sub: 'Nhập số điện thoại để nhận OTP' },
+    otp:   { title: 'Nhập mã OTP',     sub: `Đã gửi mã đến ${phone || '...'}` },
     email: { title: role === 'engineer' ? 'Kỹ Sư' : 'Quản Trị', sub: 'Đăng nhập hoặc tạo tài khoản' },
   }[step]
 
   function handleBack() {
-    if (step === 'phone' || step === 'email') setStep('role')
-    else if (step === 'otp') setStep('phone')
+    if      (step === 'phone' || step === 'email') setStep('role')
+    else if (step === 'otp')                       setStep('phone')
   }
 
-  function handleRoleNext(r) {
-    setRole(r)
-    setStep(r === 'farmer' ? 'phone' : 'email')
-  }
+  function handleRoleNext(r) { setRole(r); setStep(r === 'farmer' ? 'phone' : 'email') }
 
   function handlePhoneNext({ phone: p, isExistingUser: exists, existingRole }) {
     setPhone(p)
-    setIsExistingUser(exists)
     setRole(exists ? (existingRole || 'farmer') : 'farmer')
     setStep('otp')
   }
 
-  async function handleResend() {
-    await authAPI.requestOTP(phone)
-  }
-
   return (
-    <div style={s.page}>
-      {/* Hero section */}
-      <div style={s.hero}>
-        <div style={s.logoMark}>
-          <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"
-              fill="rgba(255,255,255,0.9)" />
-            <circle cx="12" cy="9" r="2.5" fill="rgba(22,163,74,0.6)" />
-          </svg>
+    <div className="min-h-dvh flex flex-col bg-[#006b2c] overflow-hidden max-w-[480px] mx-auto">
+      {/* Hero */}
+      <header className="flex-shrink-0 flex flex-col items-center gap-4 px-5 pb-8 fade-in"
+              style={{ paddingTop: 'max(48px, env(safe-area-inset-top))' }}>
+        {/* Mascot */}
+        <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center
+                        shadow-[0_0_0_2px_rgba(255,255,255,0.3)] backdrop-blur-sm">
+          <span className="material-symbols-outlined text-[56px] text-white">eco</span>
         </div>
-        <h1 style={s.heroTitle}>{HERO_INFO.title}</h1>
-        <p style={s.heroSub}>{HERO_INFO.sub}</p>
+        <div className="text-center">
+          <h1 className="text-[28px] font-extrabold text-white tracking-tight">{HERO.title}</h1>
+          <p className="text-[16px] text-white/80 mt-1">{HERO.sub}</p>
+        </div>
         {(step === 'phone' || step === 'otp') && <StepDots step={step} />}
-      </div>
+      </header>
 
       {/* Sheet */}
-      <div style={s.sheet}>
+      <div className="flex-1 bg-white rounded-t-[28px] px-5 pt-6 overflow-y-auto"
+           style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
         {step !== 'role' && (
-          <button onClick={handleBack} style={s.backBtn}>
-            <ChevronLeft size={18} strokeWidth={2.5} /> Quay lại
+          <button onClick={handleBack}
+            className="flex items-center gap-1 text-[#006b2c] font-bold text-[16px] mb-5">
+            <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+            Quay lại
           </button>
         )}
-
-        {step === 'role'  && <StepRole onNext={handleRoleNext} />}
+        {step === 'role'  && <StepRole  onNext={handleRoleNext} />}
         {step === 'phone' && <StepPhone onNext={handlePhoneNext} />}
-        {step === 'otp'   && <StepOTP phone={phone} role={role} isExistingUser={isExistingUser} onResend={handleResend} />}
+        {step === 'otp'   && <StepOTP  phone={phone} role={role} onResend={() => authAPI.requestOTP(phone)} />}
         {step === 'email' && <StepEmailPassword role={role} />}
+
+        <p className="text-center text-[#6e7b6c] text-[13px] mt-8">
+          Bằng cách tiếp tục, bạn đồng ý với Điều khoản của Cò Con
+        </p>
       </div>
+
+      {/* Bottom ambient glow */}
+      <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-32
+                      bg-gradient-to-t from-[#006b2c]/10 to-transparent pointer-events-none -z-10" />
     </div>
   )
-}
-
-const s = {
-  page:        { height: '100dvh', display: 'flex', flexDirection: 'column', fontFamily: "'Noto Sans', sans-serif", background: '#16a34a', overflow: 'hidden' },
-  hero:        { flex: '0 0 auto', minHeight: '36%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '0 28px 20px', paddingTop: 'max(32px, env(safe-area-inset-top))' },
-  logoMark:    { width: 80, height: 80, borderRadius: 24, background: 'rgba(255,255,255,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px rgba(255,255,255,0.2), inset 0 1px 0 rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)' },
-  heroTitle:   { fontSize: 26, fontWeight: 800, color: '#fff', margin: 0, textAlign: 'center', letterSpacing: '-0.5px' },
-  heroSub:     { fontSize: 14, color: 'rgba(255,255,255,0.82)', margin: 0, textAlign: 'center', lineHeight: 1.55 },
-  sheet:       { flex: 1, background: '#fff', borderRadius: '28px 28px 0 0', padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 0, overflowY: 'auto', paddingBottom: 'max(40px, env(safe-area-inset-bottom))' },
-  backBtn:     { alignSelf: 'flex-start', background: 'none', border: 'none', color: '#16a34a', fontSize: 14, cursor: 'pointer', padding: '0 0 16px', display: 'flex', alignItems: 'center', gap: 3, fontWeight: 600 },
-  label:       { fontSize: 14, fontWeight: 600, color: '#374151' },
-  input:       { width: '100%', padding: '13px 16px', fontSize: 17, borderRadius: 12, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#f8fafc', boxSizing: 'border-box', fontFamily: "'Noto Sans', sans-serif" },
-  btnPrimary:  { width: '100%', padding: '15px', fontSize: 16, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52, fontFamily: "'Noto Sans', sans-serif', letterSpacing: '0.2px" },
-  error:       { color: '#dc2626', fontSize: 13, background: '#fef2f2', padding: '10px 14px', borderRadius: 10, margin: 0, borderLeft: '3px solid #ef4444' },
-  roleCard:    { display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 16, cursor: 'pointer', width: '100%', textAlign: 'left', boxSizing: 'border-box' },
-  roleIconWrap:{ width: 48, height: 48, borderRadius: 14, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  spinner:     { width: 16, height: 16, border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite', flexShrink: 0 },
 }
