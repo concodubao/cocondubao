@@ -157,26 +157,27 @@ h1, h2, h3, h4 { margin: 0; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 99px; }
 
-/* ─── Button reset ──────────────────────────────────────── */
-button {
-  font-family: inherit;
-  cursor: pointer;
-  border: none;
-  background: none;
-  padding: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-button:not(:disabled):active { transform: scale(0.96); }
-button:focus-visible {
-  outline: 2px solid #006b2c;
-  outline-offset: 2px;
-}
+/* ─── Button + Input reset (trong @layer base để Tailwind utilities override được) */
+@layer base {
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled):active { transform: scale(0.96); }
+  button:focus-visible {
+    outline: 2px solid #006b2c;
+    outline-offset: 2px;
+  }
 
-/* Input focus */
-input:focus, textarea:focus {
-  outline: none;
-  border-color: #006b2c !important;
-  box-shadow: 0 0 0 3px rgba(0, 107, 44, 0.12) !important;
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: #006b2c !important;
+    box-shadow: 0 0 0 3px rgba(0, 107, 44, 0.12) !important;
+  }
 }
 
 /* ─── Animations ─────────────────────────────────────────── */
