@@ -8,10 +8,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// gemini-embedding-2 free tier: 100 RPM — gửi tuần tự 1 request mỗi 700ms (~60 RPM)
-const EMBED_MODEL  = 'gemini-embedding-2'
+// gemini-embedding-exp-03-07: 1500 RPD free — gửi tuần tự 1 request mỗi 700ms
+const EMBED_MODEL  = 'gemini-embedding-exp-03-07'
 const EMBED_DIMS   = 1536
-const REQ_DELAY    = 700  // ms giữa mỗi request để giữ dưới 100 RPM
+const REQ_DELAY    = 700  // ms giữa mỗi request
 
 async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
@@ -32,7 +32,6 @@ async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
     } catch (e) {
       const is429 = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED')
       if (is429 && attempt < 5) {
-        // Đọc thời gian chờ do Google trả về (vd: "retry in 27.15s")
         const retryMatch = e.message?.match(/retry in (\d+\.?\d*)s/)
         const wait = retryMatch
           ? Math.ceil(parseFloat(retryMatch[1])) * 1000 + 1000
@@ -45,7 +44,6 @@ async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
     }
   }
 
-  // Tuần tự từng chunk, nghỉ REQ_DELAY ms giữa mỗi cái
   const results = []
   for (let i = 0; i < texts.length; i++) {
     results.push(await embedOne(texts[i]))
@@ -55,10 +53,11 @@ async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   return results
 }
 
+// ─── LLM: gemini-2.0-flash ────────────────────────────────────────────────────
 const llm = new ChatGoogleGenerativeAI({
-  model:           'gemini-1.5-flash',
+  model:           'gemini-2.0-flash',
   temperature:     0.2,
-  maxOutputTokens: 400,
+  maxOutputTokens: 500,
   apiKey:          process.env.GOOGLE_API_KEY,
 })
 
@@ -74,7 +73,8 @@ Nguyên tắc trả lời:
 - Không bịa thông tin khi không có trong tài liệu tham khảo`
 
 // ─── askRAG: hàm chính được gọi từ chat route ─────────────────────────────────
-export async function askRAG(question, cropType = null) {
+// history: mảng { role: 'user'|'assistant', content: string } — 3-5 tin gần nhất
+export async function askRAG(question, cropType = null, history = []) {
   const startTime = Date.now()
 
   try {
@@ -99,14 +99,29 @@ export async function askRAG(question, cropType = null) {
 
     console.log(`[RAG] question="${question.slice(0,50)}..." chunks=${chunks?.length} confidence=${confidence.toFixed(3)} time=${Date.now()-startTime}ms`)
 
-    // BƯỚC 3: Nếu không đủ tin cậy → chuyển kỹ sư
-    if (confidence < 0.7 || !chunks?.length) {
+    // BƯỚC 3: Nếu không đủ tin cậy → fallback LLM hoặc chuyển kỹ sư
+    if (!chunks?.length || confidence < 0.5) {
+      // Không có chunk nào gần → chuyển kỹ sư ngay
       return {
         answer:       null,
-        confidence,
+        confidence:   0,
         needEngineer: true,
         source:       'rag',
-        chunksFound:  chunks?.length ?? 0,
+        chunksFound:  0,
+      }
+    }
+
+    if (confidence < 0.7) {
+      // Có chunk nhưng không đủ tin → thử LLM với context hạn chế, kèm cảnh báo
+      const context = chunks.slice(0, 2).map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`).join('\n\n')
+      const messages = buildMessages(SYSTEM_PROMPT, context, question, history, true)
+      const response = await llm.invoke(messages)
+      return {
+        answer:       response.content,
+        confidence,
+        needEngineer: false,
+        source:       'rag_low_conf',
+        chunksFound:  chunks.length,
       }
     }
 
@@ -115,14 +130,9 @@ export async function askRAG(question, cropType = null) {
       .map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`)
       .join('\n\n')
 
-    // BƯỚC 5: Gọi Gemini sinh câu trả lời
-    const response = await llm.invoke([
-      { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `Thông tin tham khảo từ kho tài liệu:\n\n${context}\n\n---\nCâu hỏi của nông dân: ${question}\n\nHãy trả lời dựa vào tài liệu trên.`,
-      },
-    ])
+    // BƯỚC 5: Gọi Gemini sinh câu trả lời (kèm lịch sử hội thoại)
+    const messages = buildMessages(SYSTEM_PROMPT, context, question, history, false)
+    const response = await llm.invoke(messages)
 
     return {
       answer:       response.content,
@@ -136,6 +146,31 @@ export async function askRAG(question, cropType = null) {
     console.error('[RAG] pipeline error:', err)
     throw err
   }
+}
+
+// ─── buildMessages: tạo messages array với history ────────────────────────────
+function buildMessages(systemPrompt, context, question, history, lowConf) {
+  const messages = [{ role: 'system', content: systemPrompt }]
+
+  // Thêm lịch sử hội thoại (tối đa 5 lượt gần nhất)
+  const recentHistory = history.slice(-10) // 5 lượt = 10 messages
+  for (const msg of recentHistory) {
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      messages.push({ role: msg.role, content: msg.content })
+    }
+  }
+
+  // Câu hỏi hiện tại + context
+  const confNote = lowConf
+    ? '\n\n⚠️ Lưu ý: tài liệu tham khảo không hoàn toàn khớp câu hỏi. Hãy trả lời thận trọng và gợi ý hỏi thêm kỹ sư nếu cần.'
+    : ''
+
+  messages.push({
+    role: 'user',
+    content: `Thông tin tham khảo từ kho tài liệu:\n\n${context}\n\n---\nCâu hỏi của nông dân: ${question}\n\nHãy trả lời dựa vào tài liệu trên.${confNote}`,
+  })
+
+  return messages
 }
 
 // ─── embedAndStoreDoc: embed tài liệu khi kỹ sư nhấn "Duyệt" ─────────────────
@@ -159,21 +194,36 @@ export async function embedAndStoreDoc(docId) {
   const chunks = await splitter.splitText(doc.content)
   if (!chunks.length) throw new Error('Không tách được chunks từ nội dung tài liệu.')
 
-  // Embed tất cả chunks
   let vectors
   try {
     vectors = await embedTexts(chunks)
   } catch (embedErr) {
-    throw new Error(`Embedding thất bại (kiểm tra GOOGLE_API_KEY trên Railway): ${embedErr.message}`)
+    // Lưu lỗi vào DB để UI hiển thị
+    await supabase.from('knowledge_docs')
+      .update({
+        status:        'draft',
+        error_message: `Embedding thất bại: ${embedErr.message}`,
+        updated_at:    new Date().toISOString(),
+      })
+      .eq('id', docId)
+    throw new Error(`Embedding thất bại (kiểm tra GOOGLE_API_KEY): ${embedErr.message}`)
   }
 
   if (!vectors?.length || vectors.length !== chunks.length) {
-    throw new Error(`Embedding trả về ${vectors?.length ?? 0} vector cho ${chunks.length} chunks — kiểm tra GOOGLE_API_KEY.`)
+    const msg = `Embedding trả về ${vectors?.length ?? 0} vector cho ${chunks.length} chunks`
+    await supabase.from('knowledge_docs')
+      .update({ status: 'draft', error_message: msg, updated_at: new Date().toISOString() })
+      .eq('id', docId)
+    throw new Error(msg)
   }
 
   const invalidIdx = vectors.findIndex(v => !Array.isArray(v) || v.length === 0)
   if (invalidIdx !== -1) {
-    throw new Error(`Vector tại chunk ${invalidIdx} rỗng — GOOGLE_API_KEY có thể sai hoặc hết quota.`)
+    const msg = `Vector tại chunk ${invalidIdx} rỗng — GOOGLE_API_KEY có thể sai hoặc hết quota`
+    await supabase.from('knowledge_docs')
+      .update({ status: 'draft', error_message: msg, updated_at: new Date().toISOString() })
+      .eq('id', docId)
+    throw new Error(msg)
   }
 
   console.log(`[RAG] Embedded ${chunks.length} chunks, dim=${vectors[0].length}`)
@@ -193,7 +243,11 @@ export async function embedAndStoreDoc(docId) {
 
   await supabase
     .from('knowledge_docs')
-    .update({ status: 'approved', updated_at: new Date().toISOString() })
+    .update({
+      status:        'approved',
+      error_message: null,
+      updated_at:    new Date().toISOString(),
+    })
     .eq('id', docId)
 
   console.log(`[RAG] Embedded doc "${doc.title}" → ${chunks.length} chunks`)

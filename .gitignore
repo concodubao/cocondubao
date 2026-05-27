@@ -7,3 +7,4 @@ dist/
 *.log
 .vercel
 backend/.env
+.claude/settings.local.json

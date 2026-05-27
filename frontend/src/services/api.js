@@ -37,8 +37,9 @@ export const chatAPI = {
   askWithImage: formData  => api.post('/chat/ask-with-image', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getSessions: userId => api.get(`/chat/sessions/${userId}`),
-  reportError: data   => api.post('/chat/report-error', data),
+  getSessions:  userId     => api.get(`/chat/sessions/${userId}`),
+  getMessages:  sessionId  => api.get(`/chat/messages/${sessionId}`),
+  reportError:  data       => api.post('/chat/report-error', data),
 }
 
 export const pushAPI = {

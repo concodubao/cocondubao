@@ -1,60 +1,66 @@
-// frontend/src/App.jsx — FIX
-// Vấn đề cũ: ProtectedRoute dùng user thay vì token
-// → sau khi đăng nhập, token có trong store nhưng user chưa load → redirect về /login
-
+// frontend/src/App.jsx
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './stores/authStore'
 
-// Pages — chung
-import Splash    from './pages/Splash'
-import Login     from './pages/Login'
-import Home      from './pages/Home'
-import Profile   from './pages/Profile'
-
-// Pages — Nông dân
-import ChatMain     from './pages/farmer/ChatMain'
-import VoiceRecord  from './pages/farmer/VoiceRecord'
-import ImageUpload  from './pages/farmer/ImageUpload'
-import AIResult     from './pages/farmer/AIResult'
-import WaitEngineer from './pages/farmer/WaitEngineer'
-import NotifList    from './pages/farmer/NotifList'
-import NotifDetail  from './pages/farmer/NotifDetail'
+// ─── Pages tải ngay (nông dân, dùng nhiều nhất) ───────────────────────────────
+import Splash        from './pages/Splash'
+import Login         from './pages/Login'
+import Home          from './pages/Home'
+import Profile       from './pages/Profile'
+import ChatMain      from './pages/farmer/ChatMain'
+import VoiceRecord   from './pages/farmer/VoiceRecord'
+import ImageUpload   from './pages/farmer/ImageUpload'
+import AIResult      from './pages/farmer/AIResult'
+import WaitEngineer  from './pages/farmer/WaitEngineer'
+import NotifList     from './pages/farmer/NotifList'
+import NotifDetail   from './pages/farmer/NotifDetail'
 import NotifSettings from './pages/farmer/NotifSettings'
-
-// Pages — Kỹ sư
-import Queue     from './pages/engineer/Queue'
-import Answer    from './pages/engineer/Answer'
-import Knowledge from './pages/engineer/Knowledge'
-import TestAI    from './pages/engineer/TestAI'
-
-// Pages — Admin
-import Dashboard from './pages/admin/Dashboard'
-import Users     from './pages/admin/Users'
-import SendNotif from './pages/admin/SendNotif'
-import AIErrors  from './pages/admin/AIErrors'
-
-import DesktopLayout from './components/DesktopLayout'
 import ToastContainer from './components/Toast'
+import DesktopLayout  from './components/DesktopLayout'
+
+// ─── Pages lazy (kỹ sư + admin, ít dùng hơn) ─────────────────────────────────
+const Queue     = lazy(() => import('./pages/engineer/Queue'))
+const Answer    = lazy(() => import('./pages/engineer/Answer'))
+const Knowledge = lazy(() => import('./pages/engineer/Knowledge'))
+const TestAI    = lazy(() => import('./pages/engineer/TestAI'))
+const Dashboard = lazy(() => import('./pages/admin/Dashboard'))
+const Users     = lazy(() => import('./pages/admin/Users'))
+const SendNotif = lazy(() => import('./pages/admin/SendNotif'))
+const AIErrors  = lazy(() => import('./pages/admin/AIErrors'))
+
+// ─── Fallback khi lazy page đang tải ─────────────────────────────────────────
+function PageLoader() {
+  return (
+    <div style={{
+      height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif",
+    }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'linear-gradient(135deg,#16a34a,#15803d)',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>Đang tải...</p>
+      </div>
+      <style>{`@keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }`}</style>
+    </div>
+  )
+}
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 1000 * 60 * 5 } },
 })
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
-// Dùng TOKEN (không phải user) để check — token được persist trong localStorage
-// user có thể chưa load khi component mount lần đầu
 function ProtectedRoute({ children, allowedRoles }) {
   const { token, user } = useAuthStore()
-
-  // Chưa đăng nhập
   if (!token) return <Navigate to="/login" replace />
-
-  // Đã đăng nhập nhưng không đúng role
   if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
     return <Navigate to="/home" replace />
   }
-
   return children
 }
 
@@ -79,24 +85,70 @@ export default function App() {
           <Route path="/chat/result"  element={<ProtectedRoute><AIResult /></ProtectedRoute>} />
           <Route path="/chat/waiting" element={<ProtectedRoute><WaitEngineer /></ProtectedRoute>} />
 
-          {/* Nông dân — Thông báo
-              LƯU Ý: /settings phải đứng TRƯỚC /:id
-              nếu không React Router match "settings" như một :id param */}
+          {/* Nông dân — Thông báo */}
           <Route path="/notifications"          element={<ProtectedRoute><NotifList /></ProtectedRoute>} />
           <Route path="/notifications/settings" element={<ProtectedRoute><NotifSettings /></ProtectedRoute>} />
           <Route path="/notifications/:id"      element={<ProtectedRoute><NotifDetail /></ProtectedRoute>} />
 
-          {/* Kỹ sư */}
-          <Route path="/engineer/queue"      element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><Queue /></DesktopLayout></ProtectedRoute>} />
-          <Route path="/engineer/answer/:id" element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><Answer /></DesktopLayout></ProtectedRoute>} />
-          <Route path="/engineer/knowledge"  element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><Knowledge /></DesktopLayout></ProtectedRoute>} />
-          <Route path="/engineer/test-ai"    element={<ProtectedRoute allowedRoles={['engineer','admin']}><DesktopLayout><TestAI /></DesktopLayout></ProtectedRoute>} />
+          {/* Kỹ sư — lazy loaded */}
+          <Route path="/engineer/queue" element={
+            <ProtectedRoute allowedRoles={['engineer','admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><Queue /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/engineer/answer/:id" element={
+            <ProtectedRoute allowedRoles={['engineer','admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><Answer /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/engineer/knowledge" element={
+            <ProtectedRoute allowedRoles={['engineer','admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><Knowledge /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/engineer/test-ai" element={
+            <ProtectedRoute allowedRoles={['engineer','admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><TestAI /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
 
-          {/* Admin */}
-          <Route path="/admin"                    element={<ProtectedRoute allowedRoles={['admin']}><DesktopLayout><Dashboard /></DesktopLayout></ProtectedRoute>} />
-          <Route path="/admin/users"              element={<ProtectedRoute allowedRoles={['admin']}><DesktopLayout><Users /></DesktopLayout></ProtectedRoute>} />
-          <Route path="/admin/notifications/send" element={<ProtectedRoute allowedRoles={['admin']}><DesktopLayout><SendNotif /></DesktopLayout></ProtectedRoute>} />
-          <Route path="/admin/ai-errors"          element={<ProtectedRoute allowedRoles={['admin']}><DesktopLayout><AIErrors /></DesktopLayout></ProtectedRoute>} />
+          {/* Admin — lazy loaded */}
+          <Route path="/admin" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><Dashboard /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/users" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><Users /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/notifications/send" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><SendNotif /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/ai-errors" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><AIErrors /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

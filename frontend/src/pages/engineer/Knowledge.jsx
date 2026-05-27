@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
-import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive, Trash2 } from 'lucide-react'
+import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive, Trash2, Search, AlertCircle } from 'lucide-react'
 
 const CROP_OPTIONS = [
   { id: 'rice',   label: 'Lúa' },
@@ -109,6 +109,15 @@ function DocCard({ doc, onApprove, onArchive, onDelete, approving, deleting }) {
         </div>
         <StatusBadge status={doc.status} />
       </div>
+
+      {/* Hiển thị lỗi embed nếu có */}
+      {doc.error_message && (
+        <div style={styles.errorBanner}>
+          <AlertCircle size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+          <span>{doc.error_message}</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {doc.crop_tags?.map(tag => {
           const c = CROP_OPTIONS.find(o => o.id === tag)
@@ -150,6 +159,7 @@ export default function Knowledge() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
   const [filter,     setFilter]     = useState('all')
+  const [search,     setSearch]     = useState('')
   const [approving,  setApproving]  = useState(null)
   const [deleting,   setDeleting]   = useState(null)
   const [showUpload, setShowUpload] = useState(false)
@@ -168,6 +178,17 @@ export default function Knowledge() {
   const approved = docs.filter(d => d.status === 'approved').length
   const draft    = docs.filter(d => d.status === 'draft').length
   const total    = docs.length
+
+  // Full-text search client-side
+  const filteredDocs = useMemo(() => {
+    if (!search.trim()) return docs
+    const q = search.toLowerCase().trim()
+    return docs.filter(d =>
+      d.title?.toLowerCase().includes(q) ||
+      d.source?.toLowerCase().includes(q) ||
+      d.crop_tags?.some(t => t.toLowerCase().includes(q))
+    )
+  }, [docs, search])
 
   async function handleApprove(id) {
     setApproving(id)
@@ -249,16 +270,36 @@ export default function Knowledge() {
         ))}
       </div>
 
+      {/* Search box */}
+      <div style={{ padding: '8px 14px 0' }}>
+        <div style={styles.searchBox}>
+          <Search size={15} color="#94a3b8" strokeWidth={2} />
+          <input
+            type="search"
+            placeholder="Tìm theo tên, nguồn, loại cây..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={styles.searchInput}
+            aria-label="Tìm kiếm tài liệu"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0 }} aria-label="Xóa tìm kiếm">✕</button>
+          )}
+        </div>
+      </div>
+
       <main style={styles.main} role="region" aria-label="Danh sách tài liệu" aria-live="polite">
         {isLoading ? (
           <p style={{ color: '#94a3b8', textAlign: 'center', padding: 24 }}>Đang tải...</p>
-        ) : docs.length === 0 ? (
+        ) : filteredDocs.length === 0 ? (
           <div style={styles.empty}>
             <FolderOpen size={40} color="#e2e8f0" strokeWidth={1} />
-            <p style={{ color: '#64748b', fontSize: 15, textAlign: 'center' }}>Chưa có tài liệu nào. Upload file đầu tiên ngay nhé!</p>
+            <p style={{ color: '#64748b', fontSize: 15, textAlign: 'center' }}>
+              {search ? `Không tìm thấy tài liệu nào cho "${search}"` : 'Chưa có tài liệu nào. Upload file đầu tiên ngay nhé!'}
+            </p>
           </div>
         ) : (
-          docs.map(doc => (
+          filteredDocs.map(doc => (
             <DocCard
               key={doc.id}
               doc={doc}
@@ -304,4 +345,7 @@ const styles = {
   btnApprove:     { padding: '8px 12px', fontSize: 13, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 },
   btnArchive:     { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
   btnDelete:      { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
+  searchBox:      { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '8px 12px', marginBottom: 2 },
+  searchInput:    { flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#0f172a', background: 'transparent', fontFamily: "'Noto Sans', sans-serif" },
+  errorBanner:    { display: 'flex', alignItems: 'flex-start', gap: 6, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px', color: '#dc2626', fontSize: 12, lineHeight: 1.5 },
 }

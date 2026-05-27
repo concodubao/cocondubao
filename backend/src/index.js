@@ -2,10 +2,11 @@
 
 import 'dotenv/config'
 
-import express   from 'express'
-import cors      from 'cors'
-import helmet    from 'helmet'
-import webpush   from 'web-push'
+import express        from 'express'
+import cors           from 'cors'
+import helmet         from 'helmet'
+import webpush        from 'web-push'
+import rateLimit      from 'express-rate-limit'
 
 import authRoutes     from './routes/auth.js'
 import chatRoutes     from './routes/chat.js'
@@ -14,6 +15,26 @@ import engineerRoutes from './routes/engineer.js'
 import adminRoutes    from './routes/admin.js'
 
 const app = express()
+
+// ─── Rate limiters ────────────────────────────────────────────────────────────
+// Chat: 15 req/phút/IP (tránh spam AI)
+const chatLimiter = rateLimit({
+  windowMs:         60 * 1000,
+  max:              15,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  keyGenerator:     (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.ip,
+  message:          { error: 'Bạn hỏi quá nhiều rồi, thử lại sau 1 phút nhé.' },
+})
+
+// Auth: 10 req/phút/IP (tránh brute-force OTP)
+const authLimiter = rateLimit({
+  windowMs:         60 * 1000,
+  max:              10,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  message:          { error: 'Thử lại sau 1 phút nhé.' },
+})
 
 // VAPID — cấu hình một lần duy nhất khi khởi động
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -32,8 +53,8 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-app.use('/api/v1/auth',          authRoutes)
-app.use('/api/v1/chat',          chatRoutes)
+app.use('/api/v1/auth',          authLimiter, authRoutes)
+app.use('/api/v1/chat',          chatLimiter, chatRoutes)
 app.use('/api/v1/push',          pushRoutes)
 app.use('/api/v1/notifications', pushRoutes)
 app.use('/api/v1/engineer',      engineerRoutes)

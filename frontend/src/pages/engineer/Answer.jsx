@@ -1,8 +1,31 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { engineerAPI } from '../../services/api'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, X, ZoomIn } from 'lucide-react'
 
+// ─── Image Lightbox ───────────────────────────────────────────────────────────
+function ImageLightbox({ src, alt, onClose }) {
+  return (
+    <div
+      style={lb.overlay}
+      role="dialog" aria-modal="true" aria-label="Phóng to ảnh"
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <button onClick={onClose} style={lb.closeBtn} aria-label="Đóng">
+        <X size={22} color="#fff" />
+      </button>
+      <img src={src} alt={alt} style={lb.img} />
+    </div>
+  )
+}
+
+const lb = {
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  closeBtn:{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 44, height: 44, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  img:     { maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain' },
+}
+
+// ─── Answer page ──────────────────────────────────────────────────────────────
 export default function Answer() {
   const navigate = useNavigate()
   const { id }   = useParams()
@@ -15,6 +38,7 @@ export default function Answer() {
   const [addToKnowledge, setAddToKnowledge] = useState(false)
   const [loading,        setLoading]        = useState(false)
   const [error,          setError]          = useState('')
+  const [lightbox,       setLightbox]       = useState(false)
 
   const msg  = item?.messages
   const user = msg?.chat_sessions?.users
@@ -56,9 +80,20 @@ export default function Answer() {
           <div style={styles.questionBox}>
             <p style={styles.questionText}>{msg?.content}</p>
             {msg?.image_url && (
-              <a href={msg.image_url} target="_blank" rel="noreferrer">
-                <img src={msg.image_url} alt="Ảnh sâu bệnh" style={styles.questionImg} />
-              </a>
+              <div style={{ position: 'relative', marginTop: 10 }}>
+                <img
+                  src={msg.image_url} alt="Ảnh sâu bệnh"
+                  style={{ ...styles.questionImg, cursor: 'zoom-in' }}
+                  onClick={() => setLightbox(true)}
+                />
+                <button
+                  onClick={() => setLightbox(true)}
+                  style={styles.zoomBtn}
+                  aria-label="Phóng to ảnh"
+                >
+                  <ZoomIn size={14} color="#fff" />
+                </button>
+              </div>
             )}
           </div>
         </section>
@@ -105,6 +140,11 @@ export default function Answer() {
         </button>
         <p style={styles.hint}>Nông dân sẽ nhận thông báo ngay sau khi bạn gửi.</p>
       </main>
+
+      {/* Image lightbox */}
+      {lightbox && msg?.image_url && (
+        <ImageLightbox src={msg.image_url} alt="Ảnh sâu bệnh" onClose={() => setLightbox(false)} />
+      )}
     </div>
   )
 }
@@ -119,7 +159,8 @@ const styles = {
   sLabel:       { fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 },
   questionBox:  { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 14px' },
   questionText: { fontSize: 16, color: '#0f172a', margin: 0, lineHeight: 1.7 },
-  questionImg:  { width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8, marginTop: 10, border: '1px solid #e2e8f0' },
+  questionImg:  { width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0', display: 'block' },
+  zoomBtn:      { position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   templateRow:  { display: 'flex', gap: 8, flexWrap: 'wrap' },
   templateBtn:  { padding: '6px 12px', fontSize: 13, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 99, cursor: 'pointer', color: '#16a34a', fontWeight: 500 },
   textarea:     { width: '100%', padding: '12px 14px', fontSize: 16, borderRadius: 10, border: '1.5px solid #e2e8f0', resize: 'vertical', outline: 'none', lineHeight: 1.7, color: '#0f172a', background: '#fff', boxSizing: 'border-box', minHeight: 180 },

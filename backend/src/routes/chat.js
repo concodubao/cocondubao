@@ -31,6 +31,24 @@ async function getOrCreateSession(userId, cropType, sessionId) {
   return data.id
 }
 
+// ─── Helper: lấy lịch sử hội thoại gần nhất trong session ───────────────────
+async function getRecentHistory(sessionId, limit = 10) {
+  if (!sessionId) return []
+  const { data } = await supabase
+    .from('messages')
+    .select('role, content')
+    .eq('session_id', sessionId)
+    .in('role', ['user', 'assistant', 'engineer'])
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (!data?.length) return []
+  // Đảo ngược để đúng thứ tự thời gian, chuẩn hóa role 'engineer' → 'assistant'
+  return data.reverse().map(m => ({
+    role:    m.role === 'engineer' ? 'assistant' : m.role,
+    content: m.content,
+  }))
+}
+
 // ─── POST /chat/ask — hỏi bằng text ─────────────────────────────────────────
 router.post('/ask', verifyJWT, async (req, res) => {
   const { text, cropType, sessionId } = req.body
@@ -40,7 +58,9 @@ router.post('/ask', verifyJWT, async (req, res) => {
   if (text.length > 1000) return res.status(400).json({ error: 'Câu hỏi quá dài (tối đa 1000 ký tự).' })
 
   try {
-    const result = await askRAG(text.trim(), cropType)
+    // Lấy lịch sử để AI nhớ ngữ cảnh
+    const history = await getRecentHistory(sessionId)
+    const result = await askRAG(text.trim(), cropType, history)
 
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
@@ -93,17 +113,42 @@ router.post('/ask', verifyJWT, async (req, res) => {
   }
 })
 
+// ─── Helper: phân tích ảnh bằng Gemini Vision ───────────────────────────────
+async function analyzeImageWithGemini(imageBuffer, question) {
+  try {
+    const { GoogleGenerativeAI } = await import('@google/generative-ai')
+    const genAI  = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
+    const model  = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+
+    const base64Image = imageBuffer.toString('base64')
+    const result = await model.generateContent([
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: base64Image,
+        },
+      },
+      `Bạn là chuyên gia nông nghiệp. Hãy phân tích ảnh cây trồng này và trả lời câu hỏi sau bằng tiếng Việt miền Nam, ngắn gọn dễ hiểu:\n\n${question}\n\nNếu ảnh không liên quan đến cây trồng, hãy nói rõ.`,
+    ])
+    return result.response.text().trim()
+  } catch (err) {
+    console.warn('[VISION] Gemini Vision failed:', err.message)
+    return null
+  }
+}
+
 // ─── POST /chat/ask-with-image — hỏi kèm ảnh sâu bệnh ───────────────────────
 router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, res) => {
   const { text, cropType, sessionId } = req.body
   const userId = req.user.userId
 
   try {
-    let imageUrl = null
+    let imageUrl    = null
+    let imageBuffer = null
 
     if (req.file) {
       // Nén ảnh — 2 bước nếu vẫn còn lớn sau lần đầu
-      let imageBuffer = await sharp(req.file.buffer)
+      imageBuffer = await sharp(req.file.buffer)
         .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer()
@@ -127,11 +172,31 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
     }
 
     const question = text?.trim() || 'Cây bị bệnh gì vậy?'
-    const questionWithNote = imageUrl
-      ? `[Nông dân gửi ảnh sâu bệnh kèm theo] ${question}`
-      : question
 
-    const result = await askRAG(questionWithNote, cropType)
+    let result
+
+    // Nếu có ảnh → dùng Gemini Vision phân tích trực tiếp
+    if (imageBuffer) {
+      const visionAnswer = await analyzeImageWithGemini(imageBuffer, question)
+      if (visionAnswer) {
+        result = {
+          answer:       visionAnswer,
+          confidence:   0.9,
+          needEngineer: false,
+          source:       'vision',
+          chunksFound:  0,
+        }
+      }
+    }
+
+    // Fallback sang RAG nếu Vision thất bại hoặc không có ảnh
+    if (!result) {
+      const questionWithNote = imageUrl
+        ? `[Nông dân gửi ảnh sâu bệnh kèm theo] ${question}`
+        : question
+      const history = await getRecentHistory(sessionId)
+      result = await askRAG(questionWithNote, cropType, history)
+    }
 
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
