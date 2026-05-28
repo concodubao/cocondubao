@@ -23,6 +23,7 @@ import DesktopLayout  from './components/DesktopLayout'
 // ─── Pages lazy (kỹ sư + admin, ít dùng hơn) ─────────────────────────────────
 const Queue     = lazy(() => import('./pages/engineer/Queue'))
 const Answer    = lazy(() => import('./pages/engineer/Answer'))
+const History   = lazy(() => import('./pages/engineer/History'))
 const Knowledge = lazy(() => import('./pages/engineer/Knowledge'))
 const TestAI    = lazy(() => import('./pages/engineer/TestAI'))
 const Dashboard = lazy(() => import('./pages/admin/Dashboard'))
@@ -102,6 +103,13 @@ export default function App() {
             <ProtectedRoute allowedRoles={['engineer','admin']}>
               <DesktopLayout>
                 <Suspense fallback={<PageLoader />}><Answer /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/engineer/history" element={
+            <ProtectedRoute allowedRoles={['engineer','admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><History /></Suspense>
               </DesktopLayout>
             </ProtectedRoute>
           } />

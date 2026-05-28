@@ -98,11 +98,11 @@
   --text-body-bold--line-height: 28px;
   --text-body-bold--font-weight: 700;
 
-  --text-body-reading:       17px;
-  --text-body-reading--line-height: 30px;
+  --text-body-reading:       19px;
+  --text-body-reading--line-height: 34px;
   --text-body-reading--font-weight: 400;
 
-  --text-label-caps:         13px;
+  --text-label-caps:         14px;
   --text-label-caps--line-height: 18px;
   --text-label-caps--font-weight: 600;
   --text-label-caps--letter-spacing: 0.5px;

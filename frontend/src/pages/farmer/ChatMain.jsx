@@ -119,34 +119,43 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
 
       {/* AI action row */}
       {!isUser && !isSystem && (
-        <div className="flex items-center gap-1.5 pl-9">
+        <div className="flex flex-col gap-2 pl-9 max-w-[80%]">
+          {/* Large TTS button — Stitch spec */}
           <button
             onClick={() => onSpeak(msg.id, msg.content)}
             aria-label={isThisSpeaking ? 'Dừng đọc' : 'Nghe câu trả lời'}
-            className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#006b2c] font-semibold
-                       bg-white border border-[#e5eeff] rounded-lg"
+            className={`flex items-center justify-center gap-2 w-full h-[48px] rounded-2xl
+                        text-[15px] font-bold transition-all
+                        ${isThisSpeaking
+                          ? 'bg-[#fef2f2] border border-[#fecaca] text-[#ef4444]'
+                          : 'bg-white border-2 border-[#006b2c] text-[#006b2c]'
+                        }`}
           >
-            <span className="material-symbols-outlined text-[13px]">
-              {isThisSpeaking ? 'volume_off' : 'volume_up'}
+            <span className="material-symbols-outlined text-[20px] ms-fill">
+              {isThisSpeaking ? 'stop_circle' : 'volume_up'}
             </span>
-            {isThisSpeaking ? 'Dừng' : 'Nghe'}
+            {isThisSpeaking ? 'Dừng đọc' : '🔊 Nghe câu trả lời'}
           </button>
-          {msg.source === 'engineer' && (
-            <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#15803d] font-semibold
-                             bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg">
-              <span className="material-symbols-outlined text-[13px] ms-fill">check_circle</span>
-              Kỹ sư xác nhận
-            </span>
-          )}
-          <button
-            onClick={() => onReport(msg.id)}
-            aria-label="Báo câu trả lời sai"
-            className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#6e7b6c]
-                       bg-white border border-[#e5eeff] rounded-lg"
-          >
-            <span className="material-symbols-outlined text-[13px]">flag</span>
-            Báo lỗi
-          </button>
+
+          {/* Secondary badges */}
+          <div className="flex items-center gap-1.5">
+            {msg.source === 'engineer' && (
+              <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#15803d] font-semibold
+                               bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg">
+                <span className="material-symbols-outlined text-[13px] ms-fill">check_circle</span>
+                Kỹ sư xác nhận
+              </span>
+            )}
+            <button
+              onClick={() => onReport(msg.id)}
+              aria-label="Báo câu trả lời sai"
+              className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#6e7b6c]
+                         bg-white border border-[#e5eeff] rounded-lg"
+            >
+              <span className="material-symbols-outlined text-[13px]">flag</span>
+              Báo lỗi
+            </button>
+          </div>
         </div>
       )}
     </div>

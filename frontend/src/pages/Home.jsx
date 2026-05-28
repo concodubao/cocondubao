@@ -8,8 +8,9 @@ import BottomNav from '../components/BottomNav'
 
 const ENGINEER_LINKS = [
   { path: '/engineer/queue',     icon: 'assignment',  iconBg: 'bg-[#f0fdf4]', iconColor: 'text-[#006b2c]', title: 'Hàng đợi câu hỏi',   desc: 'Xem và trả lời câu hỏi từ nông dân' },
-  { path: '/engineer/knowledge', icon: 'menu_book',   iconBg: 'bg-[#e5eeff]', iconColor: 'text-[#00628d]', title: 'Kiến thức AI',        desc: 'Quản lý tài liệu và cơ sở kiến thức' },
-  { path: '/engineer/test-ai',   icon: 'science',     iconBg: 'bg-[#fffbeb]', iconColor: 'text-[#855300]', title: 'Kiểm thử AI',         desc: 'Thử câu hỏi trực tiếp với mô hình AI' },
+  { path: '/engineer/history',   icon: 'history',     iconBg: 'bg-[#e5eeff]', iconColor: 'text-[#00628d]', title: 'Lịch sử trả lời',     desc: 'Xem lại các câu hỏi đã trả lời' },
+  { path: '/engineer/knowledge', icon: 'menu_book',   iconBg: 'bg-[#fffbeb]', iconColor: 'text-[#855300]', title: 'Kiến thức AI',        desc: 'Quản lý tài liệu và cơ sở kiến thức' },
+  { path: '/engineer/test-ai',   icon: 'science',     iconBg: 'bg-[#f0fdf4]', iconColor: 'text-[#006b2c]', title: 'Kiểm thử AI',         desc: 'Thử câu hỏi trực tiếp với mô hình AI' },
 ]
 
 const ADMIN_LINKS = [
@@ -139,22 +140,6 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Bell chỉ hiện cho nông dân */}
-          {isFarmer && (
-            <button
-              onClick={() => navigate('/notifications')}
-              aria-label="Thông báo"
-              className="relative w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center"
-            >
-              <span className="material-symbols-outlined text-[22px] text-[#6e7b6c]">notifications</span>
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-[18px] h-[18px] bg-[#EF4444] rounded-full
-                                 flex items-center justify-center text-[9px] font-bold text-white">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </button>
-          )}
           <button
             onClick={() => navigate('/profile')}
             aria-label="Hồ sơ"
@@ -171,62 +156,95 @@ export default function Home() {
 
       {/* ── Main CTA for farmers ───────────────────────────────── */}
       {isFarmer && (
-        <main className="flex-1 flex flex-col items-center justify-center px-5 pb-8 gap-8">
-          {/* Hero ask button */}
-          <div className="flex flex-col items-center gap-4 w-full">
-            <p className="text-[15px] text-[#6e7b6c] font-semibold tracking-wide">
-              Hôm nay có điều gì cần hỏi?
-            </p>
+        <main className="flex-1 flex flex-col px-5 pb-8 gap-4 pt-2">
 
-            {/* Big mic / ask button */}
+          {/* ── 2 Hero tiles (equal width) ─────────────────────── */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Tile 1 — Hỏi Cò Con */}
             <button
               onClick={() => navigate('/chat')}
               aria-label="Hỏi Cò Con"
-              className="relative w-36 h-36 rounded-full bg-gradient-to-br from-[#00873a] to-[#006b2c]
-                         flex flex-col items-center justify-center gap-1.5
-                         shadow-[0_8px_32px_rgba(0,107,44,0.4)]
+              className="relative flex flex-col items-center justify-center gap-3 overflow-hidden
+                         bg-gradient-to-br from-[#00873a] to-[#006b2c]
+                         rounded-[24px] py-7 px-3
+                         shadow-[0_8px_24px_rgba(0,107,44,0.35)]
                          active:scale-95 transition-transform"
             >
               {/* Pulse ring */}
-              <span className="absolute inset-0 rounded-full bg-[#006b2c] opacity-30 mic-pulse" />
-              <span className="material-symbols-outlined text-white text-[44px] ms-fill">mic</span>
-              <span className="text-white text-[13px] font-bold tracking-wide">Hỏi Cò Con</span>
+              <span className="absolute w-28 h-28 rounded-full bg-white/10 mic-pulse pointer-events-none" />
+              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
+                <span className="material-symbols-outlined text-white text-[36px] ms-fill">mic</span>
+              </div>
+              <div className="text-center z-10">
+                <div className="text-white text-[16px] font-extrabold leading-tight">Hỏi Cò Con</div>
+                <div className="text-white/80 text-[12px] mt-0.5">Bấm để nói chuyện</div>
+              </div>
             </button>
 
-            <p className="text-[13px] text-[#6e7b6c] text-center max-w-[200px] leading-snug">
-              Hỏi về sâu bệnh, thời vụ và phân bón
-            </p>
+            {/* Tile 2 — Thông báo */}
+            <button
+              onClick={() => navigate('/notifications')}
+              aria-label="Thông báo"
+              className="relative flex flex-col items-center justify-center gap-3
+                         bg-white border border-[#e5eeff]
+                         rounded-[24px] py-7 px-3
+                         shadow-[0_4px_12px_rgba(0,0,0,0.05)]
+                         active:scale-95 transition-transform"
+            >
+              <div className="relative w-16 h-16 rounded-full bg-[#f0fdf4] flex items-center justify-center">
+                <span className="material-symbols-outlined text-[36px] text-[#006b2c] ms-fill">notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-[#EF4444] rounded-full
+                                   flex items-center justify-center text-[11px] font-extrabold text-white px-1">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </div>
+              <div className="text-center">
+                <div className="text-[#0b1c30] text-[16px] font-extrabold leading-tight">Thông báo</div>
+                <div className="text-[#6e7b6c] text-[12px] mt-0.5">
+                  {unreadCount > 0 ? `${unreadCount} tin chưa đọc` : 'Không có tin mới'}
+                </div>
+              </div>
+            </button>
           </div>
 
-          {/* Quick action cards */}
-          <div className="grid grid-cols-2 gap-3 w-full">
+          {/* ── Quick info cards ────────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-3">
             {/* Weather card */}
-            <button
-              className="flex flex-col items-start gap-2 bg-white rounded-3xl p-4 shadow-sm
-                         border border-[#e5eeff] active:scale-95 transition-transform text-left"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-[#fffbeb] flex items-center justify-center">
-                <span className="material-symbols-outlined text-[22px] text-[#855300]">wb_sunny</span>
+            <div className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-sm border border-[#e5eeff]">
+              <div className="w-11 h-11 rounded-2xl bg-[#fffbeb] flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-[22px] text-[#855300] ms-fill">wb_sunny</span>
               </div>
               <div>
                 <div className="text-[20px] font-extrabold text-[#0b1c30] leading-none">32°C</div>
-                <div className="text-[12px] text-[#6e7b6c] mt-1">Thời tiết hôm nay</div>
+                <div className="text-[12px] text-[#6e7b6c] mt-0.5">Nắng nhẹ</div>
               </div>
-            </button>
+            </div>
 
             {/* Rice price card */}
-            <button
-              className="flex flex-col items-start gap-2 bg-white rounded-3xl p-4 shadow-sm
-                         border border-[#e5eeff] active:scale-95 transition-transform text-left"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-[#f0fdf4] flex items-center justify-center">
-                <span className="material-symbols-outlined text-[22px] text-[#006b2c]">payments</span>
+            <div className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-sm border border-[#e5eeff]">
+              <div className="w-11 h-11 rounded-2xl bg-[#f0fdf4] flex items-center justify-center flex-shrink-0">
+                <span className="material-symbols-outlined text-[22px] text-[#006b2c] ms-fill">payments</span>
               </div>
               <div>
-                <div className="text-[20px] font-extrabold text-[#0b1c30] leading-none">9.500đ</div>
-                <div className="text-[12px] text-[#6e7b6c] mt-1">Giá lúa/kg hôm nay</div>
+                <div className="text-[18px] font-extrabold text-[#0b1c30] leading-none">9.500đ</div>
+                <div className="text-[12px] text-[#6e7b6c] mt-0.5">Giá lúa/kg</div>
               </div>
-            </button>
+            </div>
+          </div>
+
+          {/* ── Daily tip card ───────────────────────────────────── */}
+          <div className="flex items-start gap-3 bg-[#fffbeb] border border-[#fde68a] rounded-[20px] p-4">
+            <div className="w-11 h-11 rounded-2xl bg-[#fef3c7] flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="material-symbols-outlined text-[22px] text-[#92400e] ms-fill">lightbulb</span>
+            </div>
+            <div className="flex-1">
+              <div className="text-[13px] font-bold text-[#92400e] uppercase tracking-wide mb-1">Mẹo hôm nay</div>
+              <p className="text-[14px] text-[#78350f] leading-snug m-0">
+                Vụ hè thu nên bón phân đợt 2 sau khi cấy 20–25 ngày để lúa đẻ nhánh đều.
+              </p>
+            </div>
           </div>
         </main>
       )}

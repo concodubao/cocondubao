@@ -3,19 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { engineerAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../services/supabase'
-import { ChevronLeft, BookOpen, RefreshCw, CheckCircle, Clock, Trash2 } from 'lucide-react'
+
+const CROP_LABEL = { rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }
+const CROP_ICON  = { rice: 'grass', veggie: 'eco', fruit: 'forest', other: 'more_horiz' }
 
 function WaitBadge({ minutes }) {
   const urgent = minutes > 60
   const warn   = minutes > 30
   return (
-    <span style={{
-      fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 600,
-      background: urgent ? '#fef2f2' : warn ? '#fffbeb' : '#f0fdf4',
-      color:      urgent ? '#ef4444' : warn ? '#f59e0b' : '#16a34a',
-      display: 'flex', alignItems: 'center', gap: 4,
-    }}>
-      <Clock size={10} strokeWidth={2} />
+    <span className={`inline-flex items-center gap-1 text-[12px] font-semibold px-2.5 py-0.5 rounded-full
+      ${urgent ? 'bg-[#fef2f2] text-[#ef4444]' : warn ? 'bg-[#fffbeb] text-[#f59e0b]' : 'bg-[#f0fdf4] text-[#16a34a]'}`}>
+      <span className="material-symbols-outlined text-[13px]">schedule</span>
       {minutes < 60 ? `${minutes} phút` : `${Math.round(minutes / 60)} giờ`} chờ
     </span>
   )
@@ -30,42 +28,79 @@ function QueueCard({ item, onTake, onDelete, currentUserId, deleting }) {
   const isDeleting   = deleting === item.id
 
   return (
-    <div style={styles.card}>
-      <div style={styles.cardHead}>
-        <div>
-          <span style={styles.farmerName}>{user?.name || 'Nông dân'}</span>
-          {user?.village && <span style={styles.village}> · {user.village}</span>}
+    <div className="bg-white border border-[#e5eeff] rounded-[20px] p-4 flex flex-col gap-3
+                    shadow-[0_4px_12px_rgba(0,0,0,0.04)]">
+      {/* Card head */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-[#f0fdf4] flex items-center justify-center flex-shrink-0">
+            <span className="material-symbols-outlined text-[18px] text-[#006b2c] ms-fill">person</span>
+          </div>
+          <div>
+            <div className="text-[15px] font-bold text-[#0b1c30] leading-tight">
+              {user?.name || 'Nông dân'}
+            </div>
+            {user?.village && (
+              <div className="text-[12px] text-[#6e7b6c]">{user.village}</div>
+            )}
+          </div>
         </div>
         <WaitBadge minutes={item.waitMinutes} />
       </div>
-      <p style={styles.question}>{msg?.content}</p>
+
+      {/* Question */}
+      <p className="text-[16px] text-[#0b1c30] leading-relaxed m-0 line-clamp-3">{msg?.content}</p>
+
+      {/* Image thumbnail */}
       {msg?.image_url && (
-        <img src={msg.image_url} alt="Ảnh sâu bệnh" style={styles.thumb} />
+        <img src={msg.image_url} alt="Ảnh sâu bệnh"
+          className="w-full max-h-40 object-cover rounded-xl border border-[#e5eeff]" />
       )}
-      <div style={styles.cardMeta}>
-        {crop && <span style={styles.cropTag}>{crop === 'rice' ? 'Lúa' : crop}</span>}
+
+      {/* Meta tags */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {crop && (
+          <span className="inline-flex items-center gap-1 text-[12px] font-semibold
+                           bg-[#f0fdf4] text-[#16a34a] px-2.5 py-0.5 rounded-full">
+            <span className="material-symbols-outlined text-[13px] ms-fill">
+              {CROP_ICON[crop] || 'grass'}
+            </span>
+            {CROP_LABEL[crop] || crop}
+          </span>
+        )}
         {msg?.confidence != null && (
-          <span style={styles.confTag}>AI tin cậy {Math.round(msg.confidence * 100)}%</span>
+          <span className="text-[12px] bg-[#fffbeb] text-[#d97706] px-2.5 py-0.5 rounded-full font-semibold">
+            AI tin cậy {Math.round(msg.confidence * 100)}%
+          </span>
         )}
       </div>
-      <div style={styles.cardActions}>
+
+      {/* Actions */}
+      <div className="flex gap-2 items-center">
         {isOthersItem ? (
-          <div style={styles.processingNote}>Kỹ sư khác đang xử lý</div>
+          <div className="flex-1 h-[48px] bg-[#f8f9ff] text-[#6e7b6c] text-[14px] font-medium
+                          rounded-2xl flex items-center justify-center">
+            Kỹ sư khác đang xử lý
+          </div>
         ) : (
-          <button onClick={() => onTake(item)} style={styles.btnTake}>
+          <button
+            onClick={() => onTake(item)}
+            className="flex-1 h-[54px] bg-[#006b2c] text-white text-[16px] font-bold
+                       rounded-2xl active:scale-95 transition-transform"
+          >
             {isMyItem ? 'Tiếp tục trả lời →' : 'Nhận & Trả lời →'}
           </button>
         )}
-        {/* Admin xóa được tất cả; engineer chỉ xóa của mình hoặc pending */}
         {!isOthersItem && (
           <button
             onClick={() => onDelete(item.id)}
             disabled={isDeleting}
-            style={{ ...styles.btnDelete, opacity: isDeleting ? 0.6 : 1 }}
-            aria-label="Xóa câu hỏi này"
+            aria-label="Xóa câu hỏi"
+            className="w-[54px] h-[54px] flex items-center justify-center rounded-2xl
+                       border border-[#fecaca] text-[#ef4444] bg-white
+                       disabled:opacity-50 active:scale-95 transition-transform"
           >
-            <Trash2 size={14} strokeWidth={1.5} />
-            {isDeleting ? 'Đang xóa...' : 'Xóa'}
+            <span className="material-symbols-outlined text-[20px]">delete</span>
           </button>
         )}
       </div>
@@ -76,9 +111,9 @@ function QueueCard({ item, onTake, onDelete, currentUserId, deleting }) {
 export default function Queue() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const [queue,   setQueue]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [tab,     setTab]     = useState('pending')
+  const [queue,    setQueue]    = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [tab,      setTab]      = useState('pending')
   const [deleting, setDeleting] = useState(null)
 
   async function loadQueue() {
@@ -131,37 +166,63 @@ export default function Queue() {
 
   const TABS = [
     { key: 'pending',     label: 'Chờ trả lời' },
-    { key: 'in_progress', label: 'Đang xử lý' },
+    { key: 'in_progress', label: 'Đang xử lý'  },
   ]
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <button onClick={() => navigate('/home')} style={styles.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
+    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+
+      {/* Header */}
+      <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
+                         bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
+        <button onClick={() => navigate('/home')} aria-label="Quay lại"
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#6e7b6c]">
+          <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
-        <h1 style={styles.title}>Hàng đợi câu hỏi</h1>
-        <button onClick={() => navigate('/engineer/knowledge')} style={styles.iconBtn} aria-label="Kho tri thức">
-          <BookOpen size={20} />
+        <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">Hàng đợi câu hỏi</h1>
+        <button onClick={() => navigate('/engineer/history')} aria-label="Lịch sử"
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#6e7b6c]">
+          <span className="material-symbols-outlined text-[22px]">history</span>
+        </button>
+        <button onClick={loadQueue} aria-label="Tải lại"
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#6e7b6c]">
+          <span className="material-symbols-outlined text-[22px]">refresh</span>
         </button>
       </header>
 
-      <div style={styles.tabs} role="tablist">
+      {/* Tabs */}
+      <div className="flex gap-2 px-4 py-3 bg-white border-b border-[#f1f5f9]" role="tablist">
         {TABS.map(t => (
-          <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
-            style={{ ...styles.tab, background: tab === t.key ? '#16a34a' : 'transparent', color: tab === t.key ? '#fff' : '#64748b', fontWeight: tab === t.key ? 700 : 400 }}>
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 rounded-full text-[14px] font-bold transition-all
+              ${tab === t.key
+                ? 'bg-[#006b2c] text-white shadow-sm'
+                : 'bg-[#f0fdf4] text-[#6e7b6c]'
+              }`}
+          >
             {t.label}
           </button>
         ))}
       </div>
 
-      <main style={styles.main} role="region" aria-label="Danh sách câu hỏi" aria-live="polite">
+      {/* Content */}
+      <main className="flex-1 p-4 flex flex-col gap-3" aria-live="polite">
         {loading ? (
-          <div style={styles.empty}><p style={{ color: '#94a3b8' }}>Đang tải...</p></div>
+          <div className="flex-1 flex flex-col gap-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="skeleton h-40 rounded-[20px]" />
+            ))}
+          </div>
         ) : queue.length === 0 ? (
-          <div style={styles.empty}>
-            <CheckCircle size={48} color="#bbf7d0" strokeWidth={1} />
-            <p style={{ color: '#64748b', fontSize: 16, textAlign: 'center' }}>
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16">
+            <div className="w-20 h-20 rounded-[24px] bg-[#f0fdf4] flex items-center justify-center">
+              <span className="material-symbols-outlined text-[44px] text-[#bbf7d0] ms-fill">check_circle</span>
+            </div>
+            <p className="text-[16px] text-[#6e7b6c] text-center m-0">
               {tab === 'pending' ? 'Không có câu hỏi nào đang chờ.' : 'Không có câu hỏi đang xử lý.'}
             </p>
           </div>
@@ -178,37 +239,6 @@ export default function Queue() {
           ))
         )}
       </main>
-
-      <footer style={{ padding: '10px 16px', textAlign: 'center' }}>
-        <button onClick={loadQueue} style={styles.refreshBtn} aria-label="Tải lại">
-          <RefreshCw size={14} strokeWidth={2} /> Tải lại
-        </button>
-      </footer>
     </div>
   )
-}
-
-const styles = {
-  page:          { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
-  header:        { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
-  iconBtn:       { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  title:         { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
-  tabs:          { display: 'flex', padding: '8px 12px', gap: 8, background: '#fff', borderBottom: '1px solid #e2e8f0' },
-  tab:           { padding: '7px 14px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 14, transition: 'all 0.2s' },
-  main:          { flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 },
-  empty:         { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 40 },
-  card:          { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
-  cardHead:      { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  farmerName:    { fontSize: 14, fontWeight: 700, color: '#0f172a' },
-  village:       { fontSize: 13, color: '#94a3b8' },
-  question:      { fontSize: 16, color: '#0f172a', margin: 0, lineHeight: 1.6 },
-  thumb:         { width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0' },
-  cardMeta:      { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  cropTag:       { fontSize: 12, background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: 99 },
-  confTag:       { fontSize: 12, background: '#fffbeb', color: '#d97706', padding: '2px 8px', borderRadius: 99 },
-  cardActions:   { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  btnTake:       { flex: 1, padding: '11px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, minHeight: 44 },
-  btnDelete:     { padding: '10px 12px', background: 'transparent', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 10, cursor: 'pointer', fontSize: 13, minHeight: 44, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' },
-  processingNote:{ flex: 1, padding: '11px 14px', background: '#f1f5f9', color: '#94a3b8', borderRadius: 10, fontSize: 14, textAlign: 'center', fontWeight: 500 },
-  refreshBtn:    { background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 14, cursor: 'pointer', padding: '4px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 },
 }

@@ -285,6 +285,52 @@ router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (
   res.json({ success: true })
 })
 
+// GET /engineer/history — lịch sử câu hỏi đã trả lời của kỹ sư
+router.get('/history', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+  const { crop, limit = 20, offset = 0 } = req.query
+
+  let query = supabase
+    .from('engineer_queue')
+    .select(`
+      id,
+      status,
+      created_at,
+      resolved_at,
+      assigned_to,
+      answer,
+      add_to_knowledge,
+      messages (
+        id,
+        content,
+        image_url,
+        confidence,
+        created_at,
+        chat_sessions (
+          crop_type,
+          users ( name, village, phone )
+        )
+      )
+    `)
+    .eq('status', 'resolved')
+    .eq('assigned_to', req.user.userId)
+    .order('resolved_at', { ascending: false })
+    .range(Number(offset), Number(offset) + Number(limit) - 1)
+
+  const { data, error } = await query
+  if (error) return res.status(500).json({ error: error.message })
+
+  let history = data || []
+
+  // Filter crop nếu có (client-side vì nested join filter khó với supabase)
+  if (crop && crop !== 'all') {
+    history = history.filter(item =>
+      item.messages?.chat_sessions?.crop_type === crop
+    )
+  }
+
+  res.json({ history, total: history.length })
+})
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PHẦN 2 — KHO TRI THỨC RAG
 // ══════════════════════════════════════════════════════════════════════════════

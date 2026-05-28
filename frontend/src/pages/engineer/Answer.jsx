@@ -1,29 +1,34 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { engineerAPI } from '../../services/api'
-import { ChevronLeft, X, ZoomIn } from 'lucide-react'
 
 // ─── Image Lightbox ───────────────────────────────────────────────────────────
 function ImageLightbox({ src, alt, onClose }) {
   return (
     <div
-      style={lb.overlay}
+      className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
       role="dialog" aria-modal="true" aria-label="Phóng to ảnh"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <button onClick={onClose} style={lb.closeBtn} aria-label="Đóng">
-        <X size={22} color="#fff" />
+      <button
+        onClick={onClose} aria-label="Đóng"
+        className="absolute top-4 right-4 w-11 h-11 bg-white/15 rounded-full
+                   flex items-center justify-center"
+      >
+        <span className="material-symbols-outlined text-white text-[22px]">close</span>
       </button>
-      <img src={src} alt={alt} style={lb.img} />
+      <img src={src} alt={alt}
+        className="max-w-full max-h-[90vh] rounded-xl object-contain" />
     </div>
   )
 }
 
-const lb = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
-  closeBtn:{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: 44, height: 44, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  img:     { maxWidth: '100%', maxHeight: '90vh', borderRadius: 12, objectFit: 'contain' },
-}
+const TEMPLATES = [
+  { label: 'Sâu bệnh',  text: 'Cây bạn bị [tên bệnh]. Nguyên nhân là [lý do].\n\nCách xử lý:\n1. [Bước 1]\n2. [Bước 2]\n3. [Bước 3]\n\nLưu ý: [lưu ý quan trọng]' },
+  { label: 'Bón phân',  text: 'Đối với [loại cây], nên bón phân theo lịch sau:\n- Lần 1 (tuần X): [loại phân, liều lượng]\n- Lần 2 (tuần Y): [loại phân, liều lượng]\n\nLưu ý: Không bón khi [điều kiện].' },
+  { label: 'Phòng trị', text: 'Để phòng [tên dịch bệnh], bạn cần:\n1. [Biện pháp phòng]\n2. [Biện pháp phòng]\n\nNếu đã bị: Phun [tên thuốc] liều [X ml/8L nước], phun vào [thời điểm].' },
+  { label: 'Thời vụ',   text: 'Vụ [tên vụ] nên xuống giống vào tháng [X].\nThời gian sinh trưởng khoảng [N] ngày.\nThu hoạch khi [dấu hiệu].' },
+]
 
 // ─── Answer page ──────────────────────────────────────────────────────────────
 export default function Answer() {
@@ -43,15 +48,8 @@ export default function Answer() {
   const msg  = item?.messages
   const user = msg?.chat_sessions?.users
 
-  const TEMPLATES = [
-    { label: 'Sâu bệnh',  text: 'Cây bạn bị [tên bệnh]. Nguyên nhân là [lý do].\n\nCách xử lý:\n1. [Bước 1]\n2. [Bước 2]\n3. [Bước 3]\n\nLưu ý: [lưu ý quan trọng]' },
-    { label: 'Bón phân',  text: 'Đối với [loại cây], nên bón phân theo lịch sau:\n- Lần 1 (tuần X): [loại phân, liều lượng]\n- Lần 2 (tuần Y): [loại phân, liều lượng]\n\nLưu ý: Không bón khi [điều kiện].' },
-    { label: 'Phòng trị', text: 'Để phòng [tên dịch bệnh], bạn cần:\n1. [Biện pháp phòng]\n2. [Biện pháp phòng]\n\nNếu đã bị: Phun [tên thuốc] liều [X ml/8L nước], phun vào [thời điểm].' },
-    { label: 'Thời vụ',   text: 'Vụ [tên vụ] nên xuống giống vào tháng [X].\nThời gian sinh trưởng khoảng [N] ngày.\nThu hoạch khi [dấu hiệu].' },
-  ]
-
   async function handleSubmit() {
-    if (!answer.trim()) return setError('Vui lòng nhập câu trả lời.')
+    if (!answer.trim())             return setError('Vui lòng nhập câu trả lời.')
     if (answer.trim().length < 20) return setError('Câu trả lời quá ngắn (tối thiểu 20 ký tự).')
     setLoading(true)
     setError('')
@@ -66,108 +64,153 @@ export default function Answer() {
   }
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <button onClick={() => navigate('/engineer/queue')} style={styles.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
+    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+
+      {/* Header */}
+      <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
+                         bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
+        <button onClick={() => navigate('/engineer/queue')} aria-label="Quay lại"
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#6e7b6c]">
+          <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
-        <h1 style={styles.title}>Soạn câu trả lời</h1>
+        <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">Trả lời & Kiểm duyệt</h1>
       </header>
 
-      <main style={styles.main}>
-        <section style={styles.section} aria-label="Câu hỏi của nông dân">
-          <p style={styles.sLabel}>Câu hỏi từ {user?.name || 'nông dân'}{user?.village ? ` · ${user.village}` : ''}</p>
-          <div style={styles.questionBox}>
-            <p style={styles.questionText}>{msg?.content}</p>
+      <main className="flex-1 flex flex-col gap-4 p-4"
+            style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+
+        {/* Câu hỏi từ nông dân */}
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-[#f0fdf4] flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[16px] text-[#006b2c] ms-fill">person</span>
+            </div>
+            <span className="text-[13px] font-bold text-[#6e7b6c] uppercase tracking-wider">
+              CÂU HỎI TỪ NÔNG DÂN
+            </span>
+          </div>
+
+          <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-[20px] p-4 flex flex-col gap-3">
+            <div>
+              <div className="text-[15px] font-bold text-[#006b2c]">
+                {user?.name || 'Nông dân'}{user?.village ? ` · ${user.village}` : ''}
+              </div>
+              <p className="text-[16px] text-[#0b1c30] leading-relaxed mt-1 m-0">{msg?.content}</p>
+            </div>
             {msg?.image_url && (
-              <div style={{ position: 'relative', marginTop: 10 }}>
+              <div className="relative">
                 <img
                   src={msg.image_url} alt="Ảnh sâu bệnh"
-                  style={{ ...styles.questionImg, cursor: 'zoom-in' }}
+                  className="w-full max-h-56 object-cover rounded-xl border border-[#bbf7d0] cursor-zoom-in"
                   onClick={() => setLightbox(true)}
                 />
                 <button
-                  onClick={() => setLightbox(true)}
-                  style={styles.zoomBtn}
-                  aria-label="Phóng to ảnh"
+                  onClick={() => setLightbox(true)} aria-label="Phóng to ảnh"
+                  className="absolute bottom-2 right-2 w-8 h-8 bg-black/50 rounded-lg
+                             flex items-center justify-center"
                 >
-                  <ZoomIn size={14} color="#fff" />
+                  <span className="material-symbols-outlined text-white text-[16px]">zoom_in</span>
                 </button>
               </div>
             )}
           </div>
         </section>
 
-        <section style={styles.section}>
-          <p style={styles.sLabel}>Mẫu trả lời nhanh</p>
-          <div style={styles.templateRow}>
+        {/* Mẫu trả lời nhanh */}
+        <section className="flex flex-col gap-2">
+          <p className="text-[13px] font-bold text-[#6e7b6c] uppercase tracking-wider m-0">Mẫu nhanh</p>
+          <div className="flex gap-2 flex-wrap">
             {TEMPLATES.map(t => (
-              <button key={t.label} onClick={() => setAnswer(t.text)} style={styles.templateBtn}>{t.label}</button>
+              <button
+                key={t.label}
+                onClick={() => setAnswer(t.text)}
+                className="px-3 py-1.5 text-[13px] font-semibold bg-white border border-[#e5eeff]
+                           rounded-full text-[#006b2c] active:scale-95 transition-transform"
+              >
+                {t.label}
+              </button>
             ))}
           </div>
         </section>
 
-        <section style={styles.section}>
-          <label style={styles.sLabel} htmlFor="answer-textarea">
+        {/* Textarea trả lời */}
+        <section className="flex flex-col gap-2">
+          <label htmlFor="answer-textarea"
+            className="text-[13px] font-bold text-[#6e7b6c] uppercase tracking-wider">
             Câu trả lời
-            <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 400 }}> ({answer.trim().length} ký tự)</span>
+            <span className="normal-case font-normal text-[#bdcaba] ml-1">
+              ({answer.trim().length} ký tự)
+            </span>
           </label>
           <textarea
-            id="answer-textarea" value={answer} onChange={e => setAnswer(e.target.value)}
+            id="answer-textarea"
+            value={answer}
+            onChange={e => setAnswer(e.target.value)}
             placeholder="Soạn câu trả lời chi tiết, dễ hiểu cho nông dân..."
-            style={styles.textarea} rows={8} aria-required="true"
+            rows={8}
+            aria-required="true"
+            className="w-full px-4 py-3 text-[16px] text-[#0b1c30] bg-white
+                       border-2 border-[#e5eeff] rounded-[20px] resize-none leading-relaxed
+                       focus:border-[#006b2c] focus:ring-2 focus:ring-[#006b2c]/10 outline-none
+                       transition-colors min-h-[180px]"
           />
-          {error && <p style={styles.error} role="alert">{error}</p>}
-        </section>
-
-        <section style={styles.section}>
-          <label style={styles.trustRow} htmlFor="trust-toggle">
-            <input id="trust-toggle" type="checkbox" checked={addToKnowledge}
-              onChange={e => setAddToKnowledge(e.target.checked)}
-              style={{ width: 18, height: 18, cursor: 'pointer', accentColor: '#16a34a' }} />
-            <div>
-              <span style={styles.trustLabel}>Đánh dấu "Tin cậy" — thêm vào kho tri thức RAG</span>
-              <p style={styles.trustDesc}>
-                Câu trả lời sẽ được embed vào pgvector để AI dùng lần sau. Chỉ tích khi câu trả lời chính xác và dùng được nhiều lần.
-              </p>
+          {error && (
+            <div role="alert"
+              className="flex items-start gap-2 bg-[#fef2f2] border-l-4 border-[#EF4444]
+                         px-4 py-3 rounded-xl text-[#b91c1c] text-[14px]">
+              <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">error</span>
+              {error}
             </div>
-          </label>
+          )}
         </section>
 
-        <button onClick={handleSubmit} disabled={loading || !answer.trim()}
-          style={{ ...styles.btnSubmit, opacity: (loading || !answer.trim()) ? 0.5 : 1 }} aria-busy={loading}>
-          {loading ? 'Đang gửi...' : 'Gửi câu trả lời cho nông dân'}
+        {/* Thêm vào kho tri thức */}
+        <label htmlFor="trust-toggle"
+          className="flex items-start gap-3 bg-white border border-[#e5eeff] rounded-[20px] p-4 cursor-pointer">
+          <input
+            id="trust-toggle" type="checkbox"
+            checked={addToKnowledge}
+            onChange={e => setAddToKnowledge(e.target.checked)}
+            className="w-5 h-5 mt-0.5 cursor-pointer accent-[#006b2c] flex-shrink-0"
+          />
+          <div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="material-symbols-outlined text-[16px] text-[#006b2c] ms-fill">verified</span>
+              <span className="text-[15px] font-bold text-[#0b1c30]">
+                Đánh dấu "Tin cậy" — thêm vào kho tri thức RAG
+              </span>
+            </div>
+            <p className="text-[13px] text-[#6e7b6c] m-0 leading-snug">
+              Câu trả lời sẽ được embed vào pgvector để AI dùng lần sau. Chỉ tích khi câu trả lời chính xác và dùng được nhiều lần.
+            </p>
+          </div>
+        </label>
+
+        {/* Submit */}
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !answer.trim()}
+          aria-busy={loading}
+          className="w-full h-[54px] bg-[#006b2c] text-white text-[17px] font-bold rounded-2xl
+                     flex items-center justify-center gap-2
+                     shadow-[0_4px_12px_rgba(0,107,44,0.3)]
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     active:scale-95 transition-all"
+        >
+          {loading
+            ? <><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Đang gửi...</>
+            : <><span className="material-symbols-outlined text-[20px] ms-fill">send</span> Gửi câu trả lời cho nông dân</>
+          }
         </button>
-        <p style={styles.hint}>Nông dân sẽ nhận thông báo ngay sau khi bạn gửi.</p>
+        <p className="text-[13px] text-[#6e7b6c] text-center m-0">
+          Nông dân sẽ nhận thông báo ngay sau khi bạn gửi.
+        </p>
       </main>
 
-      {/* Image lightbox */}
+      {/* Lightbox */}
       {lightbox && msg?.image_url && (
         <ImageLightbox src={msg.image_url} alt="Ảnh sâu bệnh" onClose={() => setLightbox(false)} />
       )}
     </div>
   )
-}
-
-const styles = {
-  page:         { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
-  header:       { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
-  iconBtn:      { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  title:        { fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
-  main:         { flex: 1, padding: '14px', display: 'flex', flexDirection: 'column', gap: 14 },
-  section:      { display: 'flex', flexDirection: 'column', gap: 8 },
-  sLabel:       { fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0 },
-  questionBox:  { background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 14px' },
-  questionText: { fontSize: 16, color: '#0f172a', margin: 0, lineHeight: 1.7 },
-  questionImg:  { width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, border: '1px solid #e2e8f0', display: 'block' },
-  zoomBtn:      { position: 'absolute', bottom: 8, right: 8, background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: 6, width: 30, height: 30, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  templateRow:  { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  templateBtn:  { padding: '6px 12px', fontSize: 13, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 99, cursor: 'pointer', color: '#16a34a', fontWeight: 500 },
-  textarea:     { width: '100%', padding: '12px 14px', fontSize: 16, borderRadius: 10, border: '1.5px solid #e2e8f0', resize: 'vertical', outline: 'none', lineHeight: 1.7, color: '#0f172a', background: '#fff', boxSizing: 'border-box', minHeight: 180 },
-  error:        { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '8px 12px', borderRadius: 8, margin: 0 },
-  trustRow:     { display: 'flex', gap: 12, alignItems: 'flex-start', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 14px', cursor: 'pointer' },
-  trustLabel:   { fontSize: 15, fontWeight: 600, color: '#0f172a', display: 'block', marginBottom: 4 },
-  trustDesc:    { fontSize: 13, color: '#64748b', margin: 0, lineHeight: 1.6 },
-  btnSubmit:    { padding: '14px', fontSize: 17, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52 },
-  hint:         { fontSize: 13, color: '#94a3b8', textAlign: 'center', margin: 0 },
 }
