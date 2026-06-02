@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
 import { pushAPI } from '../services/api'
 import { usePush } from '../hooks/usePush'
+import { useWeather, getWMO } from '../hooks/useWeather'
 import BottomNav from '../components/BottomNav'
 
 const ENGINEER_LINKS = [
@@ -101,6 +102,9 @@ export default function Home() {
   useEffect(() => {
     if (permission === 'granted' && !isSubscribed && user?.id) subscribe()
   }, [permission, isSubscribed, user?.id])
+
+  const { today, currentTemp, loading: weatherLoading } = useWeather()
+  const wmo = getWMO(today?.weathercode)
 
   const { data } = useQuery({
     queryKey: ['notifications', user?.id],
@@ -211,16 +215,28 @@ export default function Home() {
 
           {/* ── Quick info cards ────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Weather card */}
-            <div className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-sm border border-[#e5eeff]">
+            {/* Weather card — real data từ Open-Meteo */}
+            <button
+              onClick={() => navigate('/weather')}
+              className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-sm border border-[#e5eeff]
+                         active:scale-95 transition-transform text-left w-full"
+            >
               <div className="w-11 h-11 rounded-2xl bg-[#fffbeb] flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-[22px] text-[#855300] ms-fill">wb_sunny</span>
+                <span className="material-symbols-outlined text-[22px] ms-fill"
+                      style={{ color: wmo.color }}>
+                  {weatherLoading ? 'wb_sunny' : wmo.icon}
+                </span>
               </div>
-              <div>
-                <div className="text-[20px] font-extrabold text-[#0b1c30] leading-none">32°C</div>
-                <div className="text-[12px] text-[#6e7b6c] mt-0.5">Nắng nhẹ</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[20px] font-extrabold text-[#0b1c30] leading-none">
+                  {weatherLoading ? '...' : `${currentTemp}°C`}
+                </div>
+                <div className="text-[12px] text-[#6e7b6c] mt-0.5 truncate">
+                  {weatherLoading ? 'Đang tải...' : wmo.label}
+                </div>
               </div>
-            </div>
+              <span className="material-symbols-outlined text-[16px] text-[#bdcaba]">chevron_right</span>
+            </button>
 
             {/* Rice price card */}
             <div className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-sm border border-[#e5eeff]">
