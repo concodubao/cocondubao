@@ -37,8 +37,11 @@ export default function ImageUpload() {
       const d   = res.data
       if (d.needEngineer) navigate('/chat/waiting', { state: { sessionId: d.sessionId, messageId: d.messageId } })
       else navigate('/chat', { state: { sessionId: d.sessionId, newAnswer: d.answer } })
-    } catch {
-      setError('Gửi ảnh thất bại. Kiểm tra mạng và thử lại.')
+    } catch (err) {
+      setError(err.response?.data?.error
+        || (err.code === 'ECONNABORTED'
+          ? 'Xử lý ảnh hơi lâu, thử lại sau chút nhé.'
+          : 'Gửi ảnh thất bại. Kiểm tra mạng và thử lại.'))
     } finally {
       setLoading(false)
     }

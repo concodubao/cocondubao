@@ -25,13 +25,18 @@ function ConfidenceBadge({ confidence }) {
 export default function TestAI() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const [messages,  setMessages]  = useState([])
+  const [messages,  setMessages]  = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('cocon-testai-msgs') || '[]') } catch { return [] }
+  })
   const [inputText, setInputText] = useState('')
-  const [sessionId, setSessionId] = useState(null)
+  const [sessionId, setSessionId] = useState(() => sessionStorage.getItem('cocon-testai-sid') || null)
   const [loading,   setLoading]   = useState(false)
   const bottomRef = useRef(null)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+  // Giữ lại đoạn test khi reload (F5/F12) thay vì mất sạch
+  useEffect(() => { sessionStorage.setItem('cocon-testai-msgs', JSON.stringify(messages)) }, [messages])
+  useEffect(() => { if (sessionId) sessionStorage.setItem('cocon-testai-sid', sessionId) }, [sessionId])
 
   async function handleSend(text = inputText) {
     const q = text.trim()
@@ -60,10 +65,14 @@ export default function TestAI() {
           source: res.data.source,
         }])
       }
-    } catch {
+    } catch (err) {
+      const msg = err.response?.data?.error
+        || (err.code === 'ECONNABORTED'
+          ? 'AI xử lý hơi lâu (có thể đang quá tải), thử lại sau chút nhé.'
+          : 'Lỗi kết nối. Thử lại sau.')
       setMessages(prev => [...prev, {
         id: Date.now() + 1, role: 'system',
-        content: 'Lỗi kết nối. Thử lại sau.',
+        content: msg,
       }])
     } finally {
       setLoading(false)

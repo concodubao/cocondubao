@@ -8,6 +8,13 @@ import { supabase }        from '../services/supabase.js'
 
 const router = express.Router()
 
+// Nhận diện lỗi do vượt rate-limit/quota của Gemini để trả thông báo đúng (429)
+function isRateLimit(err) {
+  const m = err?.message || ''
+  return m.includes('429') || m.includes('RESOURCE_EXHAUSTED') || m.toLowerCase().includes('quota')
+}
+const RATE_LIMIT_MSG = 'Cò Con đang có nhiều người hỏi cùng lúc, bạn chờ khoảng 1 phút rồi hỏi lại nhé.'
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 10 * 1024 * 1024 }, // 10MB max
@@ -109,6 +116,7 @@ router.post('/ask', verifyJWT, async (req, res) => {
 
   } catch (err) {
     console.error('[CHAT] /ask error:', err)
+    if (isRateLimit(err)) return res.status(429).json({ error: RATE_LIMIT_MSG })
     res.status(500).json({ error: 'Cò Con đang bận, bạn thử lại sau nhé.' })
   }
 })
@@ -244,6 +252,7 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
 
   } catch (err) {
     console.error('[CHAT] /ask-with-image error:', err)
+    if (isRateLimit(err)) return res.status(429).json({ error: RATE_LIMIT_MSG })
     res.status(500).json({ error: 'Không xử lý được ảnh. Thử lại sau nhé.' })
   }
 })

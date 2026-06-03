@@ -36,9 +36,11 @@ export const authAPI = {
 }
 
 export const chatAPI = {
-  ask:          data      => api.post('/chat/ask', data),
+  // Chat cần timeout dài hơn mặc định 15s: LLM có thể retry khi gặp 429 (chờ tới ~45s)
+  ask:          data      => api.post('/chat/ask', data, { timeout: 45000 }),
   askWithImage: formData  => api.post('/chat/ask-with-image', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000,
   }),
   getSessions:  userId     => api.get(`/chat/sessions/${userId}`),
   getMessages:  sessionId  => api.get(`/chat/messages/${sessionId}`),

@@ -304,10 +304,14 @@ export default function ChatMain() {
         source:     res.data.source,
         created_at: new Date().toISOString(),
       }])
-    } catch {
+    } catch (err) {
+      const msg = err.response?.data?.error
+        || (err.code === 'ECONNABORTED'
+          ? 'Cò Con xử lý hơi lâu, bạn thử gửi lại sau chút nhé.'
+          : 'Mạng đang yếu, bạn thử gửi lại nhé.')
       setMessages(prev => [...prev, {
         id: Date.now() + 1, role: 'system',
-        content: 'Mạng đang yếu, bạn thử gửi lại nhé.', created_at: new Date().toISOString(),
+        content: msg, created_at: new Date().toISOString(),
       }])
     } finally {
       setLoading(false)
