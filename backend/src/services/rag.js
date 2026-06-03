@@ -57,11 +57,13 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   return results
 }
 
-// ─── LLM: gemini-2.0-flash-lite ───────────────────────────────────────────────
-// flash-lite có giới hạn free tier cao hơn flash (giảm 429) và dùng quota riêng,
-// tách khỏi Gemini Vision (chat.js vẫn dùng gemini-2.0-flash cho phân tích ảnh).
+// ─── LLM: gemini-2.5-flash ────────────────────────────────────────────────────
+// Free tier tính quota RIÊNG theo từng model (~5 RPM / ~20 RPD/model cho nhóm
+// generate). gemini-2.0-flash & flash-lite cùng cạn nhanh; gemini-2.5-flash có
+// bucket quota riêng và chất lượng trả lời cao hơn. Vision (chat.js) vẫn dùng
+// gemini-2.0-flash → quota tách biệt. Hết 429 hẳn thì cần bật billing.
 const llm = new ChatGoogleGenerativeAI({
-  model:           'gemini-2.0-flash-lite',
+  model:           'gemini-2.5-flash',
   temperature:     0.2,
   maxOutputTokens: 500,
   apiKey:          process.env.GOOGLE_API_KEY,
