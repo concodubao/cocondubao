@@ -65,6 +65,7 @@ function CreateEngineerModal({ onClose, onCreated }) {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [name,     setName]     = useState('')
+  const [role,     setRole]     = useState('engineer')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
@@ -73,7 +74,7 @@ function CreateEngineerModal({ onClose, onCreated }) {
     if (password.length < 8)        return setError('Mật khẩu tối thiểu 8 ký tự.')
     setError(''); setLoading(true)
     try {
-      const res = await adminAPI.createEngineer({ email: email.trim(), password, name: name.trim() })
+      const res = await adminAPI.createEngineer({ email: email.trim(), password, name: name.trim(), role })
       onCreated(res.data.user)
       onClose()
     } catch (err) {
@@ -92,14 +93,34 @@ function CreateEngineerModal({ onClose, onCreated }) {
                     width: '100%', maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 99, margin: '0 auto 4px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 }}>Tạo tài khoản kỹ sư</h2>
+          <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 }}>Tạo tài khoản nhân sự</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
             <X size={20} />
           </button>
         </div>
+
+        {/* Role picker */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[
+            { value: 'engineer', label: 'Kỹ sư',          bg: '#eff6ff', color: '#1d4ed8', activeBg: '#1d4ed8' },
+            { value: 'admin',    label: 'Quản trị viên',   bg: '#f5f3ff', color: '#7c3aed', activeBg: '#7c3aed' },
+          ].map(r => (
+            <button key={r.value} onClick={() => setRole(r.value)}
+              style={{
+                flex: 1, padding: '10px 8px', borderRadius: 10, border: '2px solid',
+                borderColor: role === r.value ? r.activeBg : '#e2e8f0',
+                background:  role === r.value ? r.bg : '#fff',
+                color:       role === r.value ? r.activeBg : '#64748b',
+                fontWeight:  role === r.value ? 700 : 400, fontSize: 14, cursor: 'pointer',
+              }}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+
         {[
           { label: 'Họ tên (tuỳ chọn)', value: name,     set: setName,     type: 'text',     placeholder: 'Nguyễn Văn A' },
-          { label: 'Email *',           value: email,    set: setEmail,    type: 'email',    placeholder: 'engineer@example.com' },
+          { label: 'Email *',           value: email,    set: setEmail,    type: 'email',    placeholder: 'staff@example.com' },
           { label: 'Mật khẩu *',        value: password, set: setPassword, type: 'password', placeholder: 'Tối thiểu 8 ký tự' },
         ].map(f => (
           <div key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -119,7 +140,7 @@ function CreateEngineerModal({ onClose, onCreated }) {
           style={{ padding: '13px', fontSize: 15, fontWeight: 700, background: '#16a34a',
                    color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer',
                    opacity: loading ? 0.6 : 1 }}>
-          {loading ? 'Đang tạo...' : 'Tạo tài khoản kỹ sư'}
+          {loading ? 'Đang tạo...' : `Tạo tài khoản ${role === 'admin' ? 'quản trị' : 'kỹ sư'}`}
         </button>
       </div>
     </div>

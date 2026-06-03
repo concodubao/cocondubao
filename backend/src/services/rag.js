@@ -61,7 +61,7 @@ const llm = new ChatGoogleGenerativeAI({
   apiKey:          process.env.GOOGLE_API_KEY,
 })
 
-const SYSTEM_PROMPT = `Bạn là Cò Con, trợ lý nông nghiệp của nông dân xã Trường Khánh, Sóc Trăng.
+const SYSTEM_PROMPT = `Bạn là Cò Con, trợ lý nông nghiệp AI của nông dân xã Trường Khánh, Sóc Trăng.
 
 Nguyên tắc trả lời:
 - Dùng tiếng Việt miền Nam, gần gũi như người thân nói chuyện
@@ -70,7 +70,52 @@ Nguyên tắc trả lời:
 - Bắt đầu bằng câu trả lời thẳng vào vấn đề
 - Nếu có cách phòng trị cụ thể: nêu từng bước rõ ràng (1, 2, 3...)
 - Nếu không chắc chắn, nói thật: "Cò Con không chắc lắm, nên hỏi thêm kỹ sư cho chắc"
-- Không bịa thông tin khi không có trong tài liệu tham khảo`
+- Không bịa thông tin khi không có trong tài liệu tham khảo
+- Cuối câu trả lời kỹ thuật (sâu bệnh, phân bón, thuốc), thêm dòng: "_(⚠️ Thông tin mang tính tham khảo, nên xác nhận thêm với kỹ sư địa phương.)_"`
+
+// ─── FAQ — trả lời không cần RAG ────────────────────────────────────────────
+const FAQ = [
+  {
+    patterns: [/giới thiệu.*bản thân/i, /bạn là ai/i, /cò con là (gì|ai)/i, /em là ai/i, /mày là ai/i, /mi là ai/i],
+    answer: `Mình là Cò Con 🐦 — trợ lý nông nghiệp AI do nhóm kỹ sư nông nghiệp xây dựng, để giúp bà con xã Trường Khánh, Sóc Trăng.
+
+Mình được huấn luyện từ tài liệu kỹ thuật canh tác và kết nối với đội ngũ kỹ sư để hỗ trợ bà con 24/7. Cứ hỏi thoải mái nhé! 🌾`,
+  },
+  {
+    patterns: [/làm được gì/i, /giúp (được )?(gì|những gì)/i, /có tính năng gì/i, /chức năng gì/i, /hỗ trợ gì/i],
+    answer: `Cò Con có thể giúp bà con:
+
+1. **Hỏi về sâu bệnh** — nhận diện triệu chứng, cách phòng trị
+2. **Tư vấn phân bón** — loại phân, liều lượng, thời điểm bón
+3. **Kỹ thuật canh tác** — lịch thời vụ, chăm sóc từng giai đoạn
+4. **Gửi ảnh cây bệnh** — mình nhận dạng và tư vấn
+5. **Kết nối kỹ sư** — câu hỏi khó sẽ được chuyển cho kỹ sư trả lời
+
+Bà con hỏi gì về đồng ruộng cũng được nhé! 🌱`,
+  },
+  {
+    patterns: [/^(xin chào|chào|hi|hello|hey|alo)\b/i, /^(chào cò con|chào bạn)/i],
+    answer: `Chào bà con! 👋 Mình là Cò Con, trợ lý nông nghiệp đây. Hôm nay bà con cần hỏi gì về cây trồng không?`,
+  },
+  {
+    patterns: [/cảm ơn/i, /thanks/i, /thank you/i],
+    answer: `Không có gì bà con ơi! Bà con có thêm câu hỏi gì về cây trồng cứ hỏi tiếp nhé 😊`,
+  },
+  {
+    patterns: [/độ chính xác/i, /có đúng không/i, /tin được không/i, /có sai không/i],
+    answer: `Mình cố gắng trả lời chính xác dựa trên tài liệu kỹ thuật được kiểm duyệt. Tuy nhiên, thông tin mang tính tham khảo và có thể có sai sót.
+
+Với những quyết định quan trọng như phun thuốc liều cao hay xử lý bệnh nặng, bà con nên xác nhận thêm với kỹ sư địa phương để chắc chắn hơn nhé. 🙏`,
+  },
+]
+
+function checkFAQ(question) {
+  const q = question.trim()
+  for (const faq of FAQ) {
+    if (faq.patterns.some(p => p.test(q))) return faq.answer
+  }
+  return null
+}
 
 // ─── askRAG: hàm chính được gọi từ chat route ─────────────────────────────────
 // history: mảng { role: 'user'|'assistant', content: string } — 3-5 tin gần nhất
@@ -78,6 +123,12 @@ export async function askRAG(question, cropType = null, history = []) {
   const startTime = Date.now()
 
   try {
+    // BƯỚC 0: Kiểm tra FAQ trước — không cần embed/RAG
+    const faqAnswer = checkFAQ(question)
+    if (faqAnswer) {
+      return { answer: faqAnswer, confidence: 1.0, needEngineer: false, source: 'faq', chunksFound: 0 }
+    }
+
     // BƯỚC 1: Embed câu hỏi thành vector 1536 chiều
     const [queryEmbedding] = await embedTexts([question], 'RETRIEVAL_QUERY')
 

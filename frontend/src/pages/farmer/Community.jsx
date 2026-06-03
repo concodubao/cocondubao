@@ -147,14 +147,15 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
   )
 }
 
-// ─── Form đăng bài (bottom sheet) ─────────────────────────────────────────────
-function NewPostSheet({ onClose, onPosted }) {
-  const fileRef      = useRef()
-  const [content,    setContent]    = useState('')
-  const [image,      setImage]      = useState(null)
-  const [imagePreview, setPreview]  = useState(null)
-  const [crops,      setCrops]      = useState([])
-  const [loading,    setLoading]    = useState(false)
+// ─── Form đăng bài — fullscreen overlay, submit ở header ────────────────────
+function NewPostSheet({ onClose, onPosted, user }) {
+  const fileRef        = useRef()
+  const textareaRef    = useRef()
+  const [content,      setContent]    = useState('')
+  const [image,        setImage]      = useState(null)
+  const [imagePreview, setPreview]    = useState(null)
+  const [crops,        setCrops]      = useState([])
+  const [loading,      setLoading]    = useState(false)
 
   function handleImage(e) {
     const f = e.target.files[0]
@@ -168,7 +169,7 @@ function NewPostSheet({ onClose, onPosted }) {
   }
 
   async function handleSubmit() {
-    if (!content.trim()) return
+    if (!content.trim() || loading) return
     setLoading(true)
     try {
       const fd = new FormData()
@@ -186,82 +187,127 @@ function NewPostSheet({ onClose, onPosted }) {
   }
 
   const remaining = 1000 - content.length
+  const canPost   = content.trim().length > 0
+
+  // Avatar initials
+  const initials = (user?.name || 'N').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+  const avatarColor = ['#006b2c','#0369a1','#7c3aed','#b45309','#be123c']
+  const aColor = avatarColor[(user?.name?.charCodeAt(0) ?? 0) % avatarColor.length]
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end"
-         style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)' }}
-         onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-white rounded-t-[28px] p-5 flex flex-col gap-4 max-h-[90dvh] overflow-y-auto">
-        {/* Handle */}
-        <div className="w-10 h-1 bg-[#e2e8f0] rounded-full mx-auto" />
+    <div className="fixed inset-0 z-50 flex flex-col bg-white max-w-[480px] mx-auto"
+         style={{ animation: 'slideUp 0.22s cubic-bezier(0.32,0.72,0,1)' }}>
 
-        <div className="flex items-center justify-between">
-          <h2 className="text-[17px] font-extrabold text-[#0b1c30] m-0">Đăng bài mới</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-[#94a3b8]">
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
+      {/* ── Header — nút Hủy (trái) + tiêu đề (giữa) + nút Đăng (phải) ── */}
+      <header className="flex items-center justify-between px-4 py-3 border-b border-[#f1f5f9] flex-shrink-0">
+        <button onClick={onClose}
+          className="text-[15px] font-semibold text-[#6e7b6c] py-1 px-2 -ml-2">
+          Hủy
+        </button>
+        <span className="text-[16px] font-extrabold text-[#0b1c30]">Đăng bài mới</span>
+        <button
+          onClick={handleSubmit}
+          disabled={!canPost || loading}
+          className="h-9 px-5 rounded-full text-[14px] font-bold transition-all"
+          style={{
+            background: canPost && !loading ? '#006b2c' : '#e5eeff',
+            color:      canPost && !loading ? '#fff' : '#94a3b8',
+          }}>
+          {loading ? 'Đăng...' : 'Đăng'}
+        </button>
+      </header>
+
+      {/* ── Nội dung cuộn được ── */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Author row */}
+        <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+          <div className="w-11 h-11 rounded-[14px] flex items-center justify-center flex-shrink-0"
+               style={{ background: aColor }}>
+            <span className="text-white text-[16px] font-bold">{initials}</span>
+          </div>
+          <div>
+            <div className="text-[15px] font-bold text-[#0b1c30]">{user?.name || 'Bạn'}</div>
+            {user?.village && <div className="text-[12px] text-[#94a3b8]">{user.village}</div>}
+          </div>
         </div>
 
+        {/* Textarea — no border, feels native */}
         <textarea
+          ref={textareaRef}
           autoFocus
           value={content}
           onChange={e => setContent(e.target.value)}
           placeholder="Chia sẻ kinh nghiệm, câu hỏi, hoặc mẹo canh tác với bà con..."
           maxLength={1000}
-          rows={4}
-          className="w-full p-3 text-[15px] text-[#0b1c30] leading-relaxed border-[1.5px] border-[#e5eeff]
-                     rounded-2xl resize-none outline-none focus:border-[#006b2c]"
+          className="w-full px-4 py-2 text-[16px] text-[#0b1c30] leading-relaxed
+                     resize-none outline-none bg-white min-h-[140px]"
           style={{ fontFamily: "'Noto Sans', sans-serif" }}
         />
-        <div className="text-right text-[12px]"
-             style={{ color: remaining < 50 ? '#ef4444' : '#94a3b8' }}>
-          {remaining} ký tự còn lại
+
+        {/* Char count */}
+        <div className="px-4 pb-2 text-right">
+          <span className="text-[12px]" style={{ color: remaining < 50 ? '#ef4444' : '#c4cdc2' }}>
+            {remaining}
+          </span>
         </div>
 
         {/* Image preview */}
         {imagePreview && (
-          <div className="relative">
-            <img src={imagePreview} alt="Xem trước" className="w-full max-h-48 object-cover rounded-2xl" />
+          <div className="relative mx-4 mb-3">
+            <img src={imagePreview} alt="Ảnh xem trước"
+              className="w-full max-h-56 object-cover rounded-2xl border border-[#e5eeff]" />
             <button onClick={() => { setImage(null); setPreview(null) }}
-              className="absolute top-2 right-2 w-7 h-7 bg-black/50 rounded-full flex items-center justify-center">
-              <span className="material-symbols-outlined text-white text-[16px]">close</span>
+              className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full
+                         flex items-center justify-center backdrop-blur-sm">
+              <span className="material-symbols-outlined text-white text-[18px]">close</span>
             </button>
           </div>
         )}
 
+        {/* Divider */}
+        <div className="mx-4 border-t border-[#f1f5f9] my-2" />
+
         {/* Crop tags */}
-        <div>
-          <p className="text-[13px] text-[#6e7b6c] font-semibold mb-2">Liên quan đến cây trồng nào?</p>
+        <div className="px-4 pb-3">
+          <p className="text-[13px] font-bold text-[#6e7b6c] mb-2.5">Thẻ cây trồng</p>
           <div className="flex gap-2 flex-wrap">
-            {CROP_OPTIONS.map(c => (
-              <button key={c.id} onClick={() => toggleCrop(c.id)}
-                className="px-3 py-1.5 text-[13px] font-semibold rounded-full border-[1.5px] transition-all"
-                style={{
-                  background:   crops.includes(c.id) ? '#f0fdf4' : '#fff',
-                  borderColor:  crops.includes(c.id) ? '#16a34a' : '#e5eeff',
-                  color:        crops.includes(c.id) ? '#15803d' : '#6e7b6c',
-                }}>
-                {c.label}
-              </button>
-            ))}
+            {CROP_OPTIONS.map(c => {
+              const active = crops.includes(c.id)
+              return (
+                <button key={c.id} onClick={() => toggleCrop(c.id)}
+                  className="px-3 py-1.5 text-[13px] font-semibold rounded-full border-[1.5px] transition-all"
+                  style={{
+                    background:  active ? '#f0fdf4' : '#f8f9ff',
+                    borderColor: active ? '#16a34a' : '#e5eeff',
+                    color:       active ? '#15803d' : '#6e7b6c',
+                  }}>
+                  {active && '✓ '}{c.label}
+                </button>
+              )
+            })}
           </div>
         </div>
-
-        {/* Bottom actions */}
-        <div className="flex items-center gap-3">
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} className="hidden" />
-          <button onClick={() => fileRef.current?.click()}
-            className="w-11 h-11 rounded-2xl bg-[#f8f9ff] border border-[#e5eeff] flex items-center justify-center text-[#6e7b6c]">
-            <span className="material-symbols-outlined text-[22px]">photo_camera</span>
-          </button>
-          <button onClick={handleSubmit}
-            disabled={!content.trim() || loading}
-            className="flex-1 h-11 bg-[#006b2c] text-white text-[15px] font-bold rounded-2xl
-                       disabled:opacity-40 transition-opacity">
-            {loading ? 'Đang đăng...' : 'Đăng bài'}
-          </button>
-        </div>
       </div>
+
+      {/* ── Toolbar dưới cùng — không bị keyboard che vì ở đây không dùng fixed ── */}
+      <div className="border-t border-[#f1f5f9] px-4 py-3 flex items-center gap-3 flex-shrink-0"
+           style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} className="hidden" />
+        <button onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-1.5 text-[13px] font-semibold text-[#006b2c]
+                     px-3 py-2 rounded-xl bg-[#f0fdf4]">
+          <span className="material-symbols-outlined text-[18px]">photo_camera</span>
+          {image ? 'Đổi ảnh' : 'Thêm ảnh'}
+        </button>
+        {image && (
+          <button onClick={() => { setImage(null); setPreview(null) }}
+            className="text-[12px] text-[#94a3b8] underline">
+            Xóa ảnh
+          </button>
+        )}
+      </div>
+
+      <style>{`@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }`}</style>
     </div>
   )
 }
@@ -373,7 +419,7 @@ export default function Community() {
       </main>
 
       {showCompose && (
-        <NewPostSheet onClose={() => setShowCompose(false)} onPosted={handlePosted} />
+        <NewPostSheet onClose={() => setShowCompose(false)} onPosted={handlePosted} user={user} />
       )}
 
       <BottomNav />

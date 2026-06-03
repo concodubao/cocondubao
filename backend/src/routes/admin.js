@@ -13,9 +13,11 @@ import { supabase } from '../services/supabase.js'
 
 const router = express.Router()
 
-// ── POST /admin/engineers — admin tạo tài khoản kỹ sư ────────────────────────
+// ── POST /admin/engineers — admin tạo tài khoản kỹ sư hoặc admin ─────────────
 router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
-  const { email, password, name } = req.body
+  const { email, password, name, role: reqRole } = req.body
+  const role = ['engineer', 'admin'].includes(reqRole) ? reqRole : 'engineer'
+
   if (!email?.trim() || !password) {
     return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu.' })
   }
@@ -24,7 +26,7 @@ router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
   }
 
   const { data: existing } = await supabase
-    .from('users').select('id').eq('email', email.trim()).single()
+    .from('users').select('id').eq('email', email.trim().toLowerCase()).single()
   if (existing) return res.status(400).json({ error: 'Email này đã được sử dụng.' })
 
   try {
@@ -34,7 +36,7 @@ router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
       .insert({
         email:         email.trim().toLowerCase(),
         password_hash,
-        role:          'engineer',
+        role,
         is_active:     true,
         name:          name?.trim() || null,
       })
