@@ -130,8 +130,8 @@ export default function Home() {
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 pt-5 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white border border-[#f0e0d0]
-                          flex items-center justify-center shadow-[0_4px_12px_rgba(75,35,10,0.15)]
+          <div className="w-12 h-12 rounded-2xl bg-[#4B230A]
+                          flex items-center justify-center shadow-[0_4px_12px_rgba(75,35,10,0.3)]
                           flex-shrink-0 overflow-hidden">
             <img src="/cocon-icon.png" alt="Cò Con" className="w-10 h-10 object-contain" />
           </div>
