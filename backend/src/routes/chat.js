@@ -8,10 +8,11 @@ import { supabase }        from '../services/supabase.js'
 
 const router = express.Router()
 
-// Nhận diện lỗi do vượt rate-limit/quota của Gemini để trả thông báo đúng (429)
+// Nhận diện lỗi quá tải của Gemini (429 quota HOẶC 503 high-demand) để trả 429
 function isRateLimit(err) {
-  const m = err?.message || ''
-  return m.includes('429') || m.includes('RESOURCE_EXHAUSTED') || m.toLowerCase().includes('quota')
+  const m = (err?.message || '').toLowerCase()
+  return m.includes('429') || m.includes('resource_exhausted') || m.includes('quota')
+    || m.includes('503') || m.includes('unavailable') || m.includes('overloaded') || m.includes('high demand')
 }
 const RATE_LIMIT_MSG = 'Cò Con đang có nhiều người hỏi cùng lúc, bạn chờ khoảng 1 phút rồi hỏi lại nhé.'
 
@@ -273,7 +274,9 @@ router.post('/stt-fallback', verifyJWT, upload.single('audio'), async (req, res)
       displayName: 'voice-query',
     })
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    // gemini-1.5-flash đã bị Google gỡ (404) → dùng 2.5-flash-lite (nhận audio,
+    // không thinking, bucket quota riêng với LLM trả lời).
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
     const result = await model.generateContent([
       { fileData: { mimeType: uploadResult.file.mimeType, fileUri: uploadResult.file.uri } },
       'Hãy chuyển nội dung giọng nói trong file audio này thành văn bản tiếng Việt. Chỉ trả về văn bản, không giải thích thêm.',

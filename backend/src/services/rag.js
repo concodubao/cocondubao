@@ -124,16 +124,20 @@ async function invokeLLM(messages, attempt = 0) {
   try {
     return await llm.invoke(messages)
   } catch (err) {
-    const is429 = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')
-    if (is429 && attempt < 4) {
-      // Đọc retry-after từ message Gemini nếu có ("retry in 27.15s")
-      const retryMatch = err.message?.match(/retry in (\d+\.?\d*)s/)
+    const msg = err.message || ''
+    // Retry khi 429 (quota) HOẶC 503 (high demand/overloaded — quá tải tạm thời phía Google)
+    const retryable = msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')
+      || msg.includes('503') || msg.includes('UNAVAILABLE')
+      || msg.toLowerCase().includes('overloaded') || msg.toLowerCase().includes('high demand')
+    if (retryable && attempt < 4) {
+      // Đọc retry-after từ message Gemini nếu có ("retry in 27.15s"); 503 không có → backoff
+      const retryMatch = msg.match(/retry in (\d+\.?\d*)s/)
       const base = retryMatch
         ? Math.ceil(parseFloat(retryMatch[1])) * 1000 + 500
         : Math.min(32000, 2000 * (2 ** attempt))
       // Thêm jitter để tránh thundering herd khi nhiều user cùng retry
       const wait = base + Math.random() * 1000
-      console.warn(`[RAG] LLM 429 — chờ ${Math.round(wait / 1000)}s (attempt ${attempt + 1}/4)`)
+      console.warn(`[RAG] LLM 429/503 — chờ ${Math.round(wait / 1000)}s (attempt ${attempt + 1}/4)`)
       await new Promise(r => setTimeout(r, wait))
       return invokeLLM(messages, attempt + 1)
     }
