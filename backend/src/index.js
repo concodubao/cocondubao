@@ -8,11 +8,12 @@ import helmet         from 'helmet'
 import webpush        from 'web-push'
 import rateLimit      from 'express-rate-limit'
 
-import authRoutes     from './routes/auth.js'
-import chatRoutes     from './routes/chat.js'
-import pushRoutes     from './routes/push.js'
-import engineerRoutes from './routes/engineer.js'
-import adminRoutes    from './routes/admin.js'
+import authRoutes      from './routes/auth.js'
+import chatRoutes      from './routes/chat.js'
+import pushRoutes      from './routes/push.js'
+import engineerRoutes  from './routes/engineer.js'
+import adminRoutes     from './routes/admin.js'
+import communityRoutes from './routes/community.js'
 
 const app = express()
 
@@ -60,6 +61,7 @@ app.use('/api/v1/notifications', pushRoutes)
 app.use('/api/v1/engineer',      engineerRoutes)
 app.use('/api/v1/knowledge',     engineerRoutes)
 app.use('/api/v1/admin',         adminRoutes)
+app.use('/api/v1/community',    communityRoutes)
 
 app.get('/health', (_, res) => res.json({
   status:    'ok',

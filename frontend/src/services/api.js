@@ -69,6 +69,18 @@ export const engineerAPI = {
   deleteDoc:  (id)       => api.delete(`/knowledge/${id}`),
 }
 
+export const communityAPI = {
+  getFeed:        (params = {})  => api.get('/community/feed', { params }),
+  createPost:     (formData)     => api.post('/community/posts', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  deletePost:     (id)           => api.delete(`/community/posts/${id}`),
+  toggleLike:     (id)           => api.post(`/community/posts/${id}/like`),
+  getComments:    (id)           => api.get(`/community/posts/${id}/comments`),
+  addComment:     (id, content)  => api.post(`/community/posts/${id}/comments`, { content }),
+  deleteComment:  (id)           => api.delete(`/community/comments/${id}`),
+}
+
 export const adminAPI = {
   getStats:    ()                => api.get('/admin/stats'),
   getUsers:    (params = {})    => api.get('/admin/users', { params }),

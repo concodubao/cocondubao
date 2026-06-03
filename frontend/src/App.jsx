@@ -15,6 +15,8 @@ import ImageUpload   from './pages/farmer/ImageUpload'
 import AIResult      from './pages/farmer/AIResult'
 import WaitEngineer  from './pages/farmer/WaitEngineer'
 import Weather       from './pages/farmer/Weather'
+import Community     from './pages/farmer/Community'
+import PostDetail    from './pages/farmer/PostDetail'
 import NotifList     from './pages/farmer/NotifList'
 import NotifDetail   from './pages/farmer/NotifDetail'
 import NotifSettings from './pages/farmer/NotifSettings'
@@ -86,7 +88,9 @@ export default function App() {
           <Route path="/chat/image"   element={<ProtectedRoute><ImageUpload /></ProtectedRoute>} />
           <Route path="/chat/result"  element={<ProtectedRoute><AIResult /></ProtectedRoute>} />
           <Route path="/chat/waiting" element={<ProtectedRoute><WaitEngineer /></ProtectedRoute>} />
-          <Route path="/weather"      element={<ProtectedRoute><Weather /></ProtectedRoute>} />
+          <Route path="/weather"          element={<ProtectedRoute><Weather /></ProtectedRoute>} />
+          <Route path="/community"        element={<ProtectedRoute><Community /></ProtectedRoute>} />
+          <Route path="/community/:id"    element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
 
           {/* Nông dân — Thông báo */}
           <Route path="/notifications"          element={<ProtectedRoute><NotifList /></ProtectedRoute>} />
