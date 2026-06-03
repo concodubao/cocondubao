@@ -1,15 +1,52 @@
 // backend/src/routes/admin.js
-// GET  /api/v1/admin/stats          — Dashboard stats
-// GET  /api/v1/admin/users          — Danh sách user
-// PATCH /api/v1/admin/users/:id     — Cập nhật user (approve kỹ sư, khóa/mở)
-// GET  /api/v1/admin/ai-errors      — Danh sách báo lỗi AI
-// PATCH /api/v1/admin/ai-errors/:id — Review báo lỗi
+// POST /api/v1/admin/engineers       — Tạo tài khoản kỹ sư mới
+// GET  /api/v1/admin/stats           — Dashboard stats
+// GET  /api/v1/admin/users           — Danh sách user
+// PATCH /api/v1/admin/users/:id      — Cập nhật user (approve kỹ sư, khóa/mở)
+// GET  /api/v1/admin/ai-errors       — Danh sách báo lỗi AI
+// PATCH /api/v1/admin/ai-errors/:id  — Review báo lỗi
 
 import express from 'express'
+import bcrypt  from 'bcrypt'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
 
 const router = express.Router()
+
+// ── POST /admin/engineers — admin tạo tài khoản kỹ sư ────────────────────────
+router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
+  const { email, password, name } = req.body
+  if (!email?.trim() || !password) {
+    return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu.' })
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Mật khẩu tối thiểu 8 ký tự.' })
+  }
+
+  const { data: existing } = await supabase
+    .from('users').select('id').eq('email', email.trim()).single()
+  if (existing) return res.status(400).json({ error: 'Email này đã được sử dụng.' })
+
+  try {
+    const password_hash = await bcrypt.hash(password, 10)
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert({
+        email:         email.trim().toLowerCase(),
+        password_hash,
+        role:          'engineer',
+        is_active:     true,
+        name:          name?.trim() || null,
+      })
+      .select('id, email, name, role, is_active, created_at')
+      .single()
+
+    if (error) throw error
+    res.json({ success: true, user })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // ── GET /admin/stats ─────────────────────────────────────────────────────────
 router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {

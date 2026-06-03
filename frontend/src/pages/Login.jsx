@@ -5,9 +5,8 @@ import { useAuthStore } from '../stores/authStore'
 
 // ─── Role cards data ────────────────────────────────────────
 const ROLES = [
-  { id: 'farmer',   label: 'Nông dân',        icon: 'agriculture',        desc: 'Tôi cần tư vấn canh tác',    iconBg: '#F0FDF4', iconColor: '#006b2c' },
-  { id: 'engineer', label: 'Kỹ sư',           icon: 'engineering',        desc: 'Tôi là chuyên gia kỹ thuật', iconBg: '#E0F2FE', iconColor: '#00628d' },
-  { id: 'admin',    label: 'Quản trị viên',   icon: 'admin_panel_settings',desc: 'Quản lý hệ thống',           iconBg: '#FEF3C7', iconColor: '#855300' },
+  { id: 'farmer',   label: 'Nông dân',      icon: 'agriculture', desc: 'Tôi cần tư vấn canh tác',                    iconBg: '#F0FDF4', iconColor: '#006b2c' },
+  { id: 'engineer', label: 'Kỹ sư / Admin', icon: 'engineering', desc: 'Đăng nhập bằng email do admin cấp', iconBg: '#E0F2FE', iconColor: '#00628d' },
 ]
 
 // ─── Step dots ──────────────────────────────────────────────
@@ -228,14 +227,12 @@ function StepOTP({ phone, role, onResend }) {
   )
 }
 
-// ─── Step: Email/Password (kỹ sư & admin) ────────────────
-function StepEmailPassword({ role }) {
-  const [mode,     setMode]     = useState('login')
+// ─── Step: Email/Password — login only (kỹ sư & admin) ──────────────────────
+function StepEmailPassword() {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
-  const [success,  setSuccess]  = useState('')
   const { setUser, setToken }   = useAuthStore()
 
   async function handleLogin() {
@@ -252,58 +249,37 @@ function StepEmailPassword({ role }) {
     }
   }
 
-  async function handleRegister() {
-    if (!email || !password) return setError('Vui lòng nhập đầy đủ.')
-    if (password.length < 8) return setError('Mật khẩu tối thiểu 8 ký tự.')
-    setError(''); setLoading(true)
-    try {
-      const res = await authAPI.registerEmail(email, password, role)
-      setSuccess(res.data.pending ? 'Tài khoản đã tạo! Chờ admin phê duyệt.' : 'Đăng ký thành công! Đăng nhập để tiếp tục.')
-      setMode('login')
-    } catch (err) {
-      setError(err.response?.data?.error || 'Đăng ký thất bại.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="flex flex-col gap-4 fade-up">
-      {/* Toggle */}
-      <div className="flex gap-1 bg-[#f8f9ff] p-1 rounded-xl border border-[#e5eeff]">
-        {['login', 'register'].map(m => (
-          <button key={m} onClick={() => { setMode(m); setError(''); setSuccess('') }}
-            className={`flex-1 py-2.5 rounded-lg text-[16px] font-bold transition-all
-              ${mode === m ? 'bg-white text-[#006b2c] shadow-sm' : 'text-[#6e7b6c]'}`}>
-            {m === 'login' ? 'Đăng nhập' : 'Đăng ký'}
-          </button>
-        ))}
+      {/* Info banner */}
+      <div className="flex items-start gap-2.5 bg-[#fffbeb] border border-[#fde68a] rounded-2xl px-4 py-3">
+        <span className="material-symbols-outlined text-[18px] text-[#92400e] mt-0.5 flex-shrink-0">info</span>
+        <p className="text-[13px] text-[#78350f] m-0 leading-snug">
+          Tài khoản kỹ sư do quản trị viên tạo. Nếu chưa có tài khoản, vui lòng liên hệ admin.
+        </p>
       </div>
       <div className="space-y-1">
         <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="email">Email</label>
         <input id="email" type="email" autoComplete="email" placeholder="email@example.com"
           value={email} onChange={e => setEmail(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleRegister())}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
           className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" autoFocus />
       </div>
       <div className="space-y-1">
         <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="password">Mật khẩu</label>
-        <input id="password" type="password"
-          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          placeholder={mode === 'login' ? '••••••••' : 'Tối thiểu 8 ký tự'}
+        <input id="password" type="password" autoComplete="current-password" placeholder="••••••••"
           value={password} onChange={e => setPassword(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && (mode === 'login' ? handleLogin() : handleRegister())}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
           className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" />
       </div>
-      {error   && <ErrorBox msg={error} />}
-      {success && <div className="text-[#006b2c] text-[15px] bg-[#F0FDF4] px-4 py-3 rounded-xl">{success}</div>}
-      <button onClick={mode === 'login' ? handleLogin : handleRegister} disabled={loading}
+      {error && <ErrorBox msg={error} />}
+      <button onClick={handleLogin} disabled={loading}
         className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[20px] font-bold
                    flex items-center justify-center gap-2 shadow-lg active:scale-95
                    disabled:opacity-60 disabled:cursor-not-allowed transition-all">
-        {loading ? <><Spinner /> Đang xử lý...</>
-          : <><span>{mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}</span>
-              <span className="material-symbols-outlined">arrow_forward</span></>}
+        {loading
+          ? <><Spinner /> Đang đăng nhập...</>
+          : <><span>Đăng nhập</span><span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
     </div>
   )
@@ -334,7 +310,7 @@ export default function Login() {
     role:  { title: 'Đăng nhập',       sub: 'Chào mừng bà con đến với Cò Con!' },
     phone: { title: 'Đăng nhập',       sub: 'Nhập số điện thoại để nhận OTP' },
     otp:   { title: 'Nhập mã OTP',     sub: `Đã gửi mã đến ${phone || '...'}` },
-    email: { title: role === 'engineer' ? 'Kỹ Sư' : 'Quản Trị', sub: 'Đăng nhập hoặc tạo tài khoản' },
+    email: { title: 'Kỹ Sư & Admin', sub: 'Đăng nhập bằng email được cấp' },
   }[step]
 
   function handleBack() {
@@ -380,7 +356,7 @@ export default function Login() {
         {step === 'role'  && <StepRole  onNext={handleRoleNext} />}
         {step === 'phone' && <StepPhone onNext={handlePhoneNext} />}
         {step === 'otp'   && <StepOTP  phone={phone} role={role} onResend={() => authAPI.requestOTP(phone)} />}
-        {step === 'email' && <StepEmailPassword role={role} />}
+        {step === 'email' && <StepEmailPassword />}
 
         <p className="text-center text-[#6e7b6c] text-[13px] mt-8">
           Bằng cách tiếp tục, bạn đồng ý với Điều khoản của Cò Con

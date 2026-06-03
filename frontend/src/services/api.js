@@ -82,9 +82,10 @@ export const communityAPI = {
 }
 
 export const adminAPI = {
-  getStats:    ()                => api.get('/admin/stats'),
-  getUsers:    (params = {})    => api.get('/admin/users', { params }),
-  updateUser:  (id, updates)    => api.patch(`/admin/users/${id}`, updates),
+  createEngineer: (data)         => api.post('/admin/engineers', data),
+  getStats:       ()             => api.get('/admin/stats'),
+  getUsers:       (params = {}) => api.get('/admin/users', { params }),
+  updateUser:     (id, updates) => api.patch(`/admin/users/${id}`, updates),
   getAIErrors: (reviewed)       => api.get('/admin/ai-errors', {
     params: reviewed !== undefined ? { reviewed } : {}
   }),

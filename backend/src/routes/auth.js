@@ -110,8 +110,8 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
   }
 })
 
-// ─── POST /auth/register-email ────────────────────────────────────────────────
-router.post('/register-email', async (req, res) => {
+// ─── POST /auth/register-email — chỉ admin gọi được (deprecated public path) ──
+router.post('/register-email', verifyJWT, requireRole('admin'), async (req, res) => {
   const { email, password, role } = req.body
   if (!email || !password) return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu.' })
   if (!['engineer', 'admin'].includes(role)) return res.status(400).json({ error: 'Vai trò không hợp lệ.' })

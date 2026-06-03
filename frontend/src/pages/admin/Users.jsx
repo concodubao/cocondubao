@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminAPI } from '../../services/api'
-import { ChevronLeft, MapPin, Lock, Unlock, UserCheck } from 'lucide-react'
+import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X } from 'lucide-react'
 
 const ROLE_MAP = {
   farmer:   { label: 'Nông dân',  color: '#16a34a', bg: '#f0fdf4' },
@@ -61,11 +61,77 @@ function UserCard({ user, onToggle, onApprove, onChangeRole }) {
   )
 }
 
+function CreateEngineerModal({ onClose, onCreated }) {
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [name,     setName]     = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
+
+  async function handleSubmit() {
+    if (!email.trim() || !password) return setError('Vui lòng nhập đầy đủ email và mật khẩu.')
+    if (password.length < 8)        return setError('Mật khẩu tối thiểu 8 ký tự.')
+    setError(''); setLoading(true)
+    try {
+      const res = await adminAPI.createEngineer({ email: email.trim(), password, name: name.trim() })
+      onCreated(res.data.user)
+      onClose()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Tạo tài khoản thất bại.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'flex-end', zIndex: 100, backdropFilter: 'blur(2px)',
+    }} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: '#fff', borderRadius: '24px 24px 0 0', padding: '16px 20px 36px',
+                    width: '100%', maxWidth: 520, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 99, margin: '0 auto 4px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 }}>Tạo tài khoản kỹ sư</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+            <X size={20} />
+          </button>
+        </div>
+        {[
+          { label: 'Họ tên (tuỳ chọn)', value: name,     set: setName,     type: 'text',     placeholder: 'Nguyễn Văn A' },
+          { label: 'Email *',           value: email,    set: setEmail,    type: 'email',    placeholder: 'engineer@example.com' },
+          { label: 'Mật khẩu *',        value: password, set: setPassword, type: 'password', placeholder: 'Tối thiểu 8 ký tự' },
+        ].map(f => (
+          <div key={f.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>{f.label}</label>
+            <input type={f.type} placeholder={f.placeholder} value={f.value}
+              onChange={e => f.set(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              style={{ padding: '10px 12px', fontSize: 15, borderRadius: 10,
+                       border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a' }} />
+          </div>
+        ))}
+        {error && (
+          <p style={{ color: '#ef4444', fontSize: 13, background: '#fef2f2',
+                      padding: '8px 12px', borderRadius: 8, margin: 0 }}>{error}</p>
+        )}
+        <button onClick={handleSubmit} disabled={loading}
+          style={{ padding: '13px', fontSize: 15, fontWeight: 700, background: '#16a34a',
+                   color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer',
+                   opacity: loading ? 0.6 : 1 }}>
+          {loading ? 'Đang tạo...' : 'Tạo tài khoản kỹ sư'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Users() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
-  const [tab,    setTab]    = useState('farmer')
-  const [search, setSearch] = useState('')
+  const [tab,         setTab]         = useState('farmer')
+  const [search,      setSearch]      = useState('')
+  const [showCreate,  setShowCreate]  = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-users', tab, search],
@@ -95,6 +161,12 @@ export default function Users() {
           <ChevronLeft size={22} />
         </button>
         <h1 style={s.title}>Quản lý người dùng</h1>
+        <button onClick={() => setShowCreate(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px',
+                   background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10,
+                   cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+          <UserPlus size={15} strokeWidth={2} /> Tạo kỹ sư
+        </button>
       </header>
 
       <div style={{ padding: '10px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -128,6 +200,16 @@ export default function Users() {
           ))
         )}
       </main>
+
+      {showCreate && (
+        <CreateEngineerModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] })
+            setTab('engineer')
+          }}
+        />
+      )}
     </div>
   )
 }
