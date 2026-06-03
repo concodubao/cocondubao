@@ -73,6 +73,57 @@ Nguyên tắc trả lời:
 - Không bịa thông tin khi không có trong tài liệu tham khảo
 - Cuối câu trả lời kỹ thuật (sâu bệnh, phân bón, thuốc), thêm dòng: "_(⚠️ Thông tin mang tính tham khảo, nên xác nhận thêm với kỹ sư địa phương.)_"`
 
+// ─── Answer cache (in-memory, TTL 1h, max 200 entries) ──────────────────────
+// Giảm số lần gọi Gemini cho câu hỏi lặp lại (nông dân hay hỏi cùng câu)
+const CACHE_TTL = 60 * 60 * 1000 // 1 giờ
+const CACHE_MAX = 200
+const _answerCache = new Map()
+
+function _cacheKey(question, cropType) {
+  const q = question.toLowerCase().replace(/\s+/g, ' ').trim()
+  return `${cropType || '*'}::${q}`
+}
+
+function getAnswerCache(question, cropType) {
+  const entry = _answerCache.get(_cacheKey(question, cropType))
+  if (!entry) return null
+  if (Date.now() > entry.expiresAt) { _answerCache.delete(_cacheKey(question, cropType)); return null }
+  return entry.result
+}
+
+function setAnswerCache(question, cropType, result) {
+  if (_answerCache.size >= CACHE_MAX) {
+    // Xóa entry cũ nhất (insertion order)
+    _answerCache.delete(_answerCache.keys().next().value)
+  }
+  _answerCache.set(_cacheKey(question, cropType), {
+    result,
+    expiresAt: Date.now() + CACHE_TTL,
+  })
+}
+
+// ─── LLM invoke với retry khi gặp 429 ────────────────────────────────────────
+async function invokeLLM(messages, attempt = 0) {
+  try {
+    return await llm.invoke(messages)
+  } catch (err) {
+    const is429 = err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')
+    if (is429 && attempt < 4) {
+      // Đọc retry-after từ message Gemini nếu có ("retry in 27.15s")
+      const retryMatch = err.message?.match(/retry in (\d+\.?\d*)s/)
+      const base = retryMatch
+        ? Math.ceil(parseFloat(retryMatch[1])) * 1000 + 500
+        : Math.min(32000, 2000 * (2 ** attempt))
+      // Thêm jitter để tránh thundering herd khi nhiều user cùng retry
+      const wait = base + Math.random() * 1000
+      console.warn(`[RAG] LLM 429 — chờ ${Math.round(wait / 1000)}s (attempt ${attempt + 1}/4)`)
+      await new Promise(r => setTimeout(r, wait))
+      return invokeLLM(messages, attempt + 1)
+    }
+    throw err
+  }
+}
+
 // ─── FAQ — trả lời không cần RAG ────────────────────────────────────────────
 const FAQ = [
   {
@@ -123,10 +174,17 @@ export async function askRAG(question, cropType = null, history = []) {
   const startTime = Date.now()
 
   try {
-    // BƯỚC 0: Kiểm tra FAQ trước — không cần embed/RAG
+    // BƯỚC 0A: Kiểm tra FAQ trước — không cần embed/RAG
     const faqAnswer = checkFAQ(question)
     if (faqAnswer) {
       return { answer: faqAnswer, confidence: 1.0, needEngineer: false, source: 'faq', chunksFound: 0 }
+    }
+
+    // BƯỚC 0B: Kiểm tra cache — tránh gọi Gemini cho câu hỏi lặp lại
+    const cached = getAnswerCache(question, cropType)
+    if (cached) {
+      console.log(`[RAG] cache hit for "${question.slice(0, 50)}..."`)
+      return { ...cached, source: cached.source + '_cached' }
     }
 
     // BƯỚC 1: Embed câu hỏi thành vector 1536 chiều
@@ -164,9 +222,10 @@ export async function askRAG(question, cropType = null, history = []) {
 
     if (confidence < 0.7) {
       // Có chunk nhưng không đủ tin → thử LLM với context hạn chế, kèm cảnh báo
-      const context = chunks.slice(0, 2).map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`).join('\n\n')
+      const context  = chunks.slice(0, 2).map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`).join('\n\n')
       const messages = buildMessages(SYSTEM_PROMPT, context, question, history, true)
-      const response = await llm.invoke(messages)
+      const response = await invokeLLM(messages)
+      // Không cache low-confidence answers
       return {
         answer:       response.content,
         confidence,
@@ -181,17 +240,22 @@ export async function askRAG(question, cropType = null, history = []) {
       .map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`)
       .join('\n\n')
 
-    // BƯỚC 5: Gọi Gemini sinh câu trả lời (kèm lịch sử hội thoại)
+    // BƯỚC 5: Gọi Gemini sinh câu trả lời (với retry tự động nếu 429)
     const messages = buildMessages(SYSTEM_PROMPT, context, question, history, false)
-    const response = await llm.invoke(messages)
+    const response = await invokeLLM(messages)
 
-    return {
+    const result = {
       answer:       response.content,
       confidence,
       needEngineer: false,
       source:       'rag',
       chunksFound:  chunks.length,
     }
+
+    // Cache câu trả lời tin cậy cao (confidence ≥ 0.7) để tái sử dụng
+    setAnswerCache(question, cropType, result)
+
+    return result
 
   } catch (err) {
     console.error('[RAG] pipeline error:', err)
