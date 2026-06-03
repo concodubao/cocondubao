@@ -308,13 +308,39 @@ router.get('/sessions/:userId', verifyJWT, async (req, res) => {
 
   const { data, error } = await supabase
     .from('chat_sessions')
-    .select('*, messages(count)')
+    .select('id, crop_type, status, created_at, messages(count)')
     .eq('user_id', targetId)
     .order('created_at', { ascending: false })
-    .limit(20)
+    .limit(30)
 
   if (error) return res.status(500).json({ error: error.message })
-  res.json({ sessions: data })
+
+  // Lấy câu hỏi đầu tiên của mỗi session làm preview
+  const sessionIds = (data || []).map(s => s.id)
+  let previews = {}
+  if (sessionIds.length > 0) {
+    const { data: msgs } = await supabase
+      .from('messages')
+      .select('session_id, content')
+      .in('session_id', sessionIds)
+      .eq('role', 'user')
+      .order('created_at', { ascending: true })
+
+    for (const m of msgs || []) {
+      if (!previews[m.session_id]) previews[m.session_id] = m.content
+    }
+  }
+
+  const sessions = (data || []).map(s => ({
+    id:           s.id,
+    crop_type:    s.crop_type,
+    status:       s.status,
+    created_at:   s.created_at,
+    messageCount: s.messages?.[0]?.count ?? 0,
+    preview:      previews[s.id] || null,
+  }))
+
+  res.json({ sessions })
 })
 
 // ─── GET /chat/messages/:sessionId — tin nhắn trong 1 session ─────────────────

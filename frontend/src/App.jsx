@@ -14,6 +14,7 @@ import VoiceRecord   from './pages/farmer/VoiceRecord'
 import ImageUpload   from './pages/farmer/ImageUpload'
 import AIResult      from './pages/farmer/AIResult'
 import WaitEngineer  from './pages/farmer/WaitEngineer'
+import ChatHistory   from './pages/farmer/ChatHistory'
 import Weather       from './pages/farmer/Weather'
 import Community     from './pages/farmer/Community'
 import PostDetail    from './pages/farmer/PostDetail'
@@ -88,6 +89,7 @@ export default function App() {
           <Route path="/chat/image"   element={<ProtectedRoute><ImageUpload /></ProtectedRoute>} />
           <Route path="/chat/result"  element={<ProtectedRoute><AIResult /></ProtectedRoute>} />
           <Route path="/chat/waiting" element={<ProtectedRoute><WaitEngineer /></ProtectedRoute>} />
+          <Route path="/chat/history" element={<ProtectedRoute><ChatHistory /></ProtectedRoute>} />
           <Route path="/weather"          element={<ProtectedRoute><Weather /></ProtectedRoute>} />
           <Route path="/community"        element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/community/:id"    element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />

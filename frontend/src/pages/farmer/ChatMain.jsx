@@ -355,6 +355,13 @@ export default function ChatMain() {
         )}
 
         <button
+          onClick={() => navigate('/chat/history')}
+          aria-label="Lịch sử chat"
+          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#6e7b6c] flex-shrink-0"
+        >
+          <span className="material-symbols-outlined text-[22px]">history</span>
+        </button>
+        <button
           onClick={() => navigate('/chat/image')}
           aria-label="Gửi ảnh sâu bệnh"
           className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#6e7b6c] flex-shrink-0"
