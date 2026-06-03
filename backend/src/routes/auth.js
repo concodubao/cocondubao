@@ -4,7 +4,7 @@ import bcrypt      from 'bcrypt'
 import rateLimit   from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
 import { supabase }     from '../services/supabase.js'
-import { verifyJWT }    from '../middleware/auth.js'
+import { verifyJWT, requireRole } from '../middleware/auth.js'
 
 const router = express.Router()
 
