@@ -61,7 +61,7 @@ function StepRole({ onNext }) {
 }
 
 // ─── Step: số điện thoại ──────────────────────────────────
-function StepPhone({ onNext }) {
+function StepPhone({ onNext, onSwitchPassword }) {
   const [phone,   setPhone]   = useState('')
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState('')
@@ -109,6 +109,10 @@ function StepPhone({ onNext }) {
         {loading
           ? <><Spinner /> Đang gửi...</>
           : <><span>Nhận mã OTP</span><span className="material-symbols-outlined">arrow_forward</span></>}
+      </button>
+      <button type="button" onClick={() => onSwitchPassword?.()}
+        className="text-center text-[14px] text-[#006b2c] font-semibold py-1">
+        Đã có mật khẩu? Đăng nhập bằng mật khẩu
       </button>
     </div>
   )
@@ -227,6 +231,66 @@ function StepOTP({ phone, role, onResend }) {
   )
 }
 
+// ─── Step: SĐT + Mật khẩu — farmer đã đặt mật khẩu ─────────────────────────
+function StepPhonePassword({ onSwitchOTP }) {
+  const [phone,    setPhone]    = useState('')
+  const [password, setPassword] = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
+  const { setUser, setToken }   = useAuthStore()
+  const inputRef = useRef(null)
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  async function handleLogin() {
+    if (!phone || !password) return setError('Vui lòng nhập đầy đủ.')
+    setError(''); setLoading(true)
+    try {
+      const res = await authAPI.loginPhone(phone.trim(), password)
+      const { token, user, isNewUser } = res.data
+      setToken(token); setUser(user)
+      window.location.href = isNewUser ? '/profile?onboard=true' : '/home'
+    } catch (err) {
+      setError(err.response?.data?.error || 'Đăng nhập thất bại.')
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4 fade-up">
+      <div className="space-y-1">
+        <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="pw-phone">Số điện thoại</label>
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#6e7b6c]">call</span>
+          <input
+            ref={inputRef} id="pw-phone" type="tel" inputMode="numeric" autoComplete="tel"
+            placeholder="Nhập số điện thoại"
+            value={phone} onChange={e => setPhone(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()}
+            className="w-full h-[54px] pl-12 pr-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px] font-bold placeholder:font-normal"
+          />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="pw-pass">Mật khẩu</label>
+        <input id="pw-pass" type="password" autoComplete="current-password" placeholder="••••••••"
+          value={password} onChange={e => setPassword(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" />
+      </div>
+      {error && <ErrorBox msg={error} />}
+      <button onClick={handleLogin} disabled={loading}
+        className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[20px] font-bold
+                   flex items-center justify-center gap-2 shadow-lg active:scale-95
+                   disabled:opacity-60 disabled:cursor-not-allowed transition-all">
+        {loading ? <><Spinner /> Đang đăng nhập...</> : <><span>Đăng nhập</span><span className="material-symbols-outlined">arrow_forward</span></>}
+      </button>
+      <button onClick={onSwitchOTP} className="text-center text-[14px] text-[#006b2c] font-semibold py-1">
+        Đăng nhập bằng OTP thay thế
+      </button>
+    </div>
+  )
+}
+
 // ─── Step: Email/Password — login only (kỹ sư & admin) ──────────────────────
 function StepEmailPassword() {
   const [email,    setEmail]    = useState('')
@@ -307,15 +371,16 @@ export default function Login() {
   if (token) return <Navigate to="/home" replace />
 
   const HERO = {
-    role:  { title: 'Đăng nhập',       sub: 'Chào mừng bà con đến với Cò Con!' },
-    phone: { title: 'Đăng nhập',       sub: 'Nhập số điện thoại để nhận OTP' },
-    otp:   { title: 'Nhập mã OTP',     sub: `Đã gửi mã đến ${phone || '...'}` },
-    email: { title: 'Kỹ Sư & Admin', sub: 'Đăng nhập bằng email được cấp' },
+    role:           { title: 'Đăng nhập',    sub: 'Chào mừng bà con đến với Cò Con!' },
+    phone:          { title: 'Đăng nhập',    sub: 'Nhập số điện thoại để nhận OTP' },
+    otp:            { title: 'Nhập mã OTP',  sub: `Đã gửi mã đến ${phone || '...'}` },
+    email:          { title: 'Kỹ Sư & Admin', sub: 'Đăng nhập bằng email được cấp' },
+    'phone-password': { title: 'Đăng nhập', sub: 'Số điện thoại & mật khẩu' },
   }[step]
 
   function handleBack() {
-    if      (step === 'phone' || step === 'email') setStep('role')
-    else if (step === 'otp')                       setStep('phone')
+    if      (step === 'phone' || step === 'email' || step === 'phone-password') setStep('role')
+    else if (step === 'otp') setStep('phone')
   }
 
   function handleRoleNext(r) { setRole(r); setStep(r === 'farmer' ? 'phone' : 'email') }
@@ -353,10 +418,11 @@ export default function Login() {
             Quay lại
           </button>
         )}
-        {step === 'role'  && <StepRole  onNext={handleRoleNext} />}
-        {step === 'phone' && <StepPhone onNext={handlePhoneNext} />}
-        {step === 'otp'   && <StepOTP  phone={phone} role={role} onResend={() => authAPI.requestOTP(phone)} />}
-        {step === 'email' && <StepEmailPassword />}
+        {step === 'role'           && <StepRole  onNext={handleRoleNext} />}
+        {step === 'phone'          && <StepPhone onNext={handlePhoneNext} onSwitchPassword={() => setStep('phone-password')} />}
+        {step === 'otp'            && <StepOTP  phone={phone} role={role} onResend={() => authAPI.requestOTP(phone)} />}
+        {step === 'email'          && <StepEmailPassword />}
+        {step === 'phone-password' && <StepPhonePassword onSwitchOTP={() => setStep('phone')} />}
 
         <p className="text-center text-[#6e7b6c] text-[13px] mt-8">
           Bằng cách tiếp tục, bạn đồng ý với Điều khoản của Cò Con

@@ -4,6 +4,92 @@ import { useAuthStore } from '../stores/authStore'
 import { authAPI } from '../services/api'
 import BottomNav from '../components/BottomNav'
 
+// ─── Modal đặt / đổi mật khẩu ────────────────────────────────────────────────
+function PasswordModal({ mode, onClose, onSuccess }) {
+  const [current,  setCurrent]  = useState('')
+  const [newPw,    setNewPw]    = useState('')
+  const [confirm,  setConfirm]  = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
+
+  const isSet = mode === 'set'
+
+  async function handleSubmit() {
+    if (!newPw || newPw.length < 6) return setError('Mật khẩu cần ít nhất 6 ký tự.')
+    if (newPw !== confirm) return setError('Mật khẩu xác nhận không khớp.')
+    if (!isSet && !current) return setError('Vui lòng nhập mật khẩu hiện tại.')
+    setError(''); setLoading(true)
+    try {
+      if (isSet) {
+        await authAPI.setPassword(newPw)
+      } else {
+        await authAPI.changePassword(current, newPw)
+      }
+      onSuccess()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Không thực hiện được. Thử lại nhé.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+         onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-[480px] bg-white rounded-t-[28px] px-5 pt-5 pb-8 flex flex-col gap-4"
+           style={{ paddingBottom: 'max(32px, env(safe-area-inset-bottom))' }}>
+
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-[18px] font-extrabold text-[#0b1c30]">
+            {isSet ? 'Đặt mật khẩu' : 'Đổi mật khẩu'}
+          </h2>
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#f1f5f9] flex items-center justify-center">
+            <span className="material-symbols-outlined text-[20px] text-[#6e7b6c]">close</span>
+          </button>
+        </div>
+
+        {!isSet && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[14px] font-semibold text-[#0b1c30]">Mật khẩu hiện tại</label>
+            <input type="password" autoComplete="current-password" placeholder="••••••••"
+              value={current} onChange={e => setCurrent(e.target.value)}
+              className="w-full h-[50px] px-4 bg-[#f8f9ff] border-[1.5px] border-[#e5eeff] rounded-2xl text-[16px]" />
+          </div>
+        )}
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[14px] font-semibold text-[#0b1c30]">
+            {isSet ? 'Mật khẩu mới' : 'Mật khẩu mới'}
+          </label>
+          <input type="password" autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
+            value={newPw} onChange={e => setNewPw(e.target.value)}
+            className="w-full h-[50px] px-4 bg-[#f8f9ff] border-[1.5px] border-[#e5eeff] rounded-2xl text-[16px]" />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[14px] font-semibold text-[#0b1c30]">Xác nhận mật khẩu</label>
+          <input type="password" autoComplete="new-password" placeholder="Nhập lại mật khẩu mới"
+            value={confirm} onChange={e => setConfirm(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+            className="w-full h-[50px] px-4 bg-[#f8f9ff] border-[1.5px] border-[#e5eeff] rounded-2xl text-[16px]" />
+        </div>
+
+        {error && (
+          <p className="text-[13px] text-[#ba1a1a] bg-[#ffdad6] px-4 py-3 rounded-2xl m-0">{error}</p>
+        )}
+
+        <button onClick={handleSubmit} disabled={loading}
+          className="w-full h-[56px] rounded-full bg-[#006b2c] text-white text-[16px] font-bold
+                     flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-60 transition-all">
+          {loading
+            ? <><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Đang lưu...</>
+            : isSet ? 'Đặt mật khẩu' : 'Đổi mật khẩu'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const CROP_OPTIONS = [
   { id: 'rice',   label: 'Lúa',          icon: 'grass' },
   { id: 'veggie', label: 'Rau màu',      icon: 'eco' },
@@ -25,11 +111,13 @@ export default function Profile() {
 
   const isFarmer = user?.role === 'farmer'
 
-  const [name,    setName]    = useState(user?.name    || '')
-  const [village, setVillage] = useState(user?.village || '')
-  const [crops,   setCrops]   = useState(user?.crops   || [])
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
+  const [name,         setName]         = useState(user?.name    || '')
+  const [village,      setVillage]      = useState(user?.village || '')
+  const [crops,        setCrops]        = useState(user?.crops   || [])
+  const [loading,      setLoading]      = useState(false)
+  const [error,        setError]        = useState('')
+  const [passwordModal, setPasswordModal] = useState(null) // 'set' | 'change' | null
+  const [pwSuccess,    setPwSuccess]    = useState(false)
 
   if (isOnboard && user?.name) return <Navigate to="/home" replace />
 
@@ -198,6 +286,34 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Bảo mật */}
+        {!isOnboard && (
+          <div className="bg-white rounded-3xl border border-[#e5eeff] shadow-sm">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#f1f5f9]">
+              <span className="material-symbols-outlined text-[20px] text-[#006b2c]">lock</span>
+              <span className="text-[14px] font-semibold text-[#0b1c30] flex-1">Bảo mật</span>
+            </div>
+            <button
+              onClick={() => { setPwSuccess(false); setPasswordModal(user?.hasPassword ? 'change' : 'set') }}
+              className="w-full flex items-center justify-between px-5 py-4 active:bg-[#f8f9ff] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px] text-[#6e7b6c]">key</span>
+                <span className="text-[14px] text-[#0b1c30]">
+                  {user?.hasPassword ? 'Đổi mật khẩu' : 'Đặt mật khẩu'}
+                </span>
+              </div>
+              <span className="material-symbols-outlined text-[18px] text-[#c4cdc2]">chevron_right</span>
+            </button>
+          </div>
+        )}
+
+        {pwSuccess && (
+          <p className="text-[13px] text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-3 rounded-2xl text-center">
+            ✓ {passwordModal === 'set' || !user?.hasPassword ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
+          </p>
+        )}
+
         {/* Logout row */}
         {!isOnboard && (
           <button
@@ -213,6 +329,18 @@ export default function Profile() {
       {/* ── Bottom Nav (farmers, non-onboard) ─────────────────── */}
       {isFarmer && !isOnboard && <BottomNav />}
       {isFarmer && !isOnboard && <div className="h-20" aria-hidden="true" />}
+
+      {passwordModal && (
+        <PasswordModal
+          mode={passwordModal}
+          onClose={() => setPasswordModal(null)}
+          onSuccess={() => {
+            setPasswordModal(null)
+            setPwSuccess(true)
+            setUser({ ...user, hasPassword: true })
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -101,7 +101,7 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
     res.json({
       success: true,
       token,
-      user: { id: user.id, phone: user.phone, role: user.role, name: user.name, village: user.village, crops: user.crops },
+      user: { id: user.id, phone: user.phone, role: user.role, name: user.name, village: user.village, crops: user.crops, hasPassword: !!user.password_hash },
       isNewUser: !user.name,
     })
   } catch (err) {
@@ -151,9 +151,79 @@ router.post('/login-email', async (req, res) => {
     )
     res.json({
       success: true, token,
-      user: { id: user.id, email: user.email, phone: user.phone, role: user.role, name: user.name },
+      user: { id: user.id, email: user.email, phone: user.phone, role: user.role, name: user.name, hasPassword: !!user.password_hash },
       isNewUser: !user.name,
     })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── POST /auth/login-phone — farmer đăng nhập bằng SĐT + mật khẩu ─────────
+router.post('/login-phone', async (req, res) => {
+  const { phone, password } = req.body
+  if (!phone || !password) return res.status(400).json({ error: 'Vui lòng nhập đầy đủ.' })
+
+  const normalized = normalizePhone(phone)
+  if (!isValidPhone(normalized)) return res.status(400).json({ error: 'Số điện thoại không hợp lệ.' })
+
+  try {
+    const { data: user } = await supabase.from('users').select('*').eq('phone', normalized).single()
+    if (!user) return res.status(401).json({ error: 'Số điện thoại chưa đăng ký.' })
+    if (!user.password_hash) return res.status(401).json({ error: 'Tài khoản này chưa đặt mật khẩu. Vui lòng đăng nhập bằng OTP.' })
+
+    const valid = await bcrypt.compare(password, user.password_hash)
+    if (!valid) return res.status(401).json({ error: 'Mật khẩu không đúng.' })
+    if (!user.is_active) return res.status(403).json({ error: 'Tài khoản đã bị khoá.' })
+
+    const token = jwt.sign(
+      { userId: user.id, phone: user.phone, role: user.role, name: user.name },
+      process.env.JWT_SECRET, { expiresIn: '30d' }
+    )
+    res.json({
+      success: true, token,
+      user: { id: user.id, phone: user.phone, role: user.role, name: user.name, village: user.village, crops: user.crops, hasPassword: true },
+      isNewUser: !user.name,
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── PATCH /auth/set-password — đặt mật khẩu lần đầu (chưa có password) ─────
+router.patch('/set-password', verifyJWT, async (req, res) => {
+  const { password } = req.body
+  if (!password || password.length < 6) return res.status(400).json({ error: 'Mật khẩu cần ít nhất 6 ký tự.' })
+
+  try {
+    const { data: existing } = await supabase.from('users').select('password_hash').eq('id', req.user.userId).single()
+    if (existing?.password_hash) return res.status(400).json({ error: 'Tài khoản đã có mật khẩu. Dùng đổi mật khẩu thay thế.' })
+
+    const hash = await bcrypt.hash(password, 12)
+    await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── PATCH /auth/change-password — đổi mật khẩu (tất cả role) ───────────────
+router.patch('/change-password', verifyJWT, async (req, res) => {
+  const { currentPassword, newPassword } = req.body
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Thiếu thông tin.' })
+  if (newPassword.length < 6) return res.status(400).json({ error: 'Mật khẩu mới cần ít nhất 6 ký tự.' })
+  if (currentPassword === newPassword) return res.status(400).json({ error: 'Mật khẩu mới phải khác mật khẩu cũ.' })
+
+  try {
+    const { data: user } = await supabase.from('users').select('password_hash').eq('id', req.user.userId).single()
+    if (!user?.password_hash) return res.status(400).json({ error: 'Tài khoản chưa có mật khẩu.' })
+
+    const valid = await bcrypt.compare(currentPassword, user.password_hash)
+    if (!valid) return res.status(401).json({ error: 'Mật khẩu hiện tại không đúng.' })
+
+    const hash = await bcrypt.hash(newPassword, 12)
+    await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
@@ -164,11 +234,12 @@ router.get('/me', verifyJWT, async (req, res) => {
   try {
     const { data: user } = await supabase
       .from('users')
-      .select('id, phone, email, role, name, village, crops, is_active, created_at')
+      .select('id, phone, email, role, name, village, crops, is_active, created_at, password_hash')
       .eq('id', req.user.userId)
       .single()
     if (!user) return res.status(404).json({ error: 'Không tìm thấy.' })
-    res.json({ user })
+    const { password_hash, ...safeUser } = user
+    res.json({ user: { ...safeUser, hasPassword: !!password_hash } })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
