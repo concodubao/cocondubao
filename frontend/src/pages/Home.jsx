@@ -213,42 +213,33 @@ export default function Home() {
             </button>
           </div>
 
-          {/* ── Quick info cards ────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Weather card — real data từ Open-Meteo */}
-            <button
-              onClick={() => navigate('/weather')}
-              className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-sm border border-[#e5eeff]
-                         active:scale-95 transition-transform text-left w-full"
-            >
-              <div className="w-11 h-11 rounded-2xl bg-[#fffbeb] flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-[22px] ms-fill"
-                      style={{ color: wmo.color }}>
-                  {weatherLoading ? 'wb_sunny' : wmo.icon}
-                </span>
+          {/* ── Weather card — full width ────────────────────────── */}
+          <button
+            onClick={() => navigate('/weather')}
+            className="flex items-center gap-4 bg-white rounded-[20px] px-5 py-4 shadow-sm border border-[#e5eeff]
+                       active:scale-95 transition-transform text-left w-full"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-[#fffbeb] flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[26px] ms-fill"
+                    style={{ color: wmo.color }}>
+                {weatherLoading ? 'wb_sunny' : wmo.icon}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[22px] font-extrabold text-[#0b1c30] leading-none">
+                {weatherLoading ? '...' : `${currentTemp}°C`}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[20px] font-extrabold text-[#0b1c30] leading-none">
-                  {weatherLoading ? '...' : `${currentTemp}°C`}
-                </div>
-                <div className="text-[12px] text-[#6e7b6c] mt-0.5 truncate">
-                  {weatherLoading ? 'Đang tải...' : wmo.label}
-                </div>
-              </div>
-              <span className="material-symbols-outlined text-[16px] text-[#bdcaba]">chevron_right</span>
-            </button>
-
-            {/* Rice price card */}
-            <div className="flex items-center gap-3 bg-white rounded-[20px] p-4 shadow-sm border border-[#e5eeff]">
-              <div className="w-11 h-11 rounded-2xl bg-[#f0fdf4] flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-[22px] text-[#006b2c] ms-fill">payments</span>
-              </div>
-              <div>
-                <div className="text-[18px] font-extrabold text-[#0b1c30] leading-none">9.500đ</div>
-                <div className="text-[12px] text-[#6e7b6c] mt-0.5">Giá lúa/kg</div>
+              <div className="text-[13px] text-[#6e7b6c] mt-0.5 truncate">
+                {weatherLoading ? 'Đang tải...' : wmo.label}
+                {!weatherLoading && today && (
+                  <span className="ml-2 text-[#3b82f6]">
+                    💧 {today.rainProb}%
+                  </span>
+                )}
               </div>
             </div>
-          </div>
+            <span className="material-symbols-outlined text-[18px] text-[#bdcaba]">chevron_right</span>
+          </button>
 
           {/* ── Daily tip card ───────────────────────────────────── */}
           <div className="flex items-start gap-3 bg-[#fffbeb] border border-[#fde68a] rounded-[20px] p-4">
