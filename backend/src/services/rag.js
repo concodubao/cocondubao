@@ -65,7 +65,11 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
 const llm = new ChatGoogleGenerativeAI({
   model:           'gemini-2.5-flash',
   temperature:     0.2,
-  maxOutputTokens: 500,
+  // 2.5-flash là model "thinking": token suy nghĩ nội bộ TÍNH VÀO maxOutputTokens.
+  // Để 500 thì thinking ăn hết → câu trả lời bị cắt cụt. Nâng lên 2048 để chừa đủ
+  // chỗ cho cả thinking + câu trả lời (system prompt đã giới hạn ≤200 từ).
+  // (langchain 0.1.3 quá cũ, chưa hỗ trợ thinkingConfig để tắt hẳn thinking.)
+  maxOutputTokens: 2048,
   apiKey:          process.env.GOOGLE_API_KEY,
 })
 
