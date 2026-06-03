@@ -288,6 +288,12 @@ router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (
 // GET /engineer/history — lịch sử câu hỏi đã trả lời của kỹ sư
 router.get('/history', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { crop, limit = 20, offset = 0 } = req.query
+  const filterCrop = crop && crop !== 'all'
+
+  // Khi lọc theo cây trồng → dùng inner join để lọc NGAY Ở DB. Trước đây lọc
+  // client-side sau .range() nên phân trang sai và total chỉ là số của 1 trang.
+  const messagesJoin = filterCrop ? 'messages!inner' : 'messages'
+  const sessionsJoin = filterCrop ? 'chat_sessions!inner' : 'chat_sessions'
 
   let query = supabase
     .from('engineer_queue')
@@ -299,36 +305,30 @@ router.get('/history', verifyJWT, requireRole('engineer', 'admin'), async (req, 
       assigned_to,
       answer,
       add_to_knowledge,
-      messages (
+      ${messagesJoin} (
         id,
         content,
         image_url,
         confidence,
         created_at,
-        chat_sessions (
+        ${sessionsJoin} (
           crop_type,
           users ( name, village, phone )
         )
       )
-    `)
+    `, { count: 'exact' })
     .eq('status', 'resolved')
     .eq('assigned_to', req.user.userId)
     .order('resolved_at', { ascending: false })
-    .range(Number(offset), Number(offset) + Number(limit) - 1)
 
-  const { data, error } = await query
+  if (filterCrop) query = query.eq('messages.chat_sessions.crop_type', crop)
+
+  query = query.range(Number(offset), Number(offset) + Number(limit) - 1)
+
+  const { data, error, count } = await query
   if (error) return res.status(500).json({ error: error.message })
 
-  let history = data || []
-
-  // Filter crop nếu có (client-side vì nested join filter khó với supabase)
-  if (crop && crop !== 'all') {
-    history = history.filter(item =>
-      item.messages?.chat_sessions?.crop_type === crop
-    )
-  }
-
-  res.json({ history, total: history.length })
+  res.json({ history: data || [], total: count ?? (data?.length || 0) })
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -464,7 +464,7 @@ router.patch('/:id/archive', verifyJWT, requireRole('engineer', 'admin'), async 
   const { error } = await supabase
     .from('knowledge_docs')
     .update({ status: 'archived', updated_at: new Date().toISOString() })
-    .eq(req.params.id ? 'id' : 'id', req.params.id)
+    .eq('id', req.params.id)
 
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
