@@ -40,12 +40,12 @@ function PageLoader() {
   return (
     <div style={{
       height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif",
+      background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif",
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg,#16a34a,#15803d)',
+          background: 'linear-gradient(135deg,#7a3b10,#5a2a0a)',
           animation: 'spin 0.8s linear infinite',
         }} />
         <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>Đang tải...</p>
