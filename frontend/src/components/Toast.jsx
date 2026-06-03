@@ -20,7 +20,7 @@ export const toast = {
 
 // ─── Config ───────────────────────────────────────────────
 const CONFIG = {
-  success: { bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', dot: '#16a34a' },
+  success: { bg: '#fdf6f0', border: '#f5d5b0', color: '#5a2a0a', dot: '#7a3b10' },
   error:   { bg: '#fef2f2', border: '#fecaca', color: '#b91c1c', dot: '#ef4444' },
   info:    { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8', dot: '#3b82f6' },
   warning: { bg: '#fffbeb', border: '#fde68a', color: '#92400e', dot: '#f59e0b' },

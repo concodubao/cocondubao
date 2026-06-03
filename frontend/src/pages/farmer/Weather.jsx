@@ -16,7 +16,7 @@ function TipBanner({ tip }) {
     danger:  { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c', icon: 'warning',      iconColor: '#ef4444' },
     warning: { bg: '#fffbeb', border: '#fde68a', text: '#92400e', icon: 'info',          iconColor: '#f59e0b' },
     info:    { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af', icon: 'info',          iconColor: '#3b82f6' },
-    success: { bg: '#f0fdf4', border: '#bbf7d0', text: '#15803d', icon: 'check_circle',  iconColor: '#16a34a' },
+    success: { bg: '#fdf6f0', border: '#f5d5b0', text: '#5a2a0a', icon: 'check_circle',  iconColor: '#7a3b10' },
   }
   const c = cfg[tip.type] || cfg.info
   return (
@@ -35,10 +35,10 @@ function DayCard({ day, index }) {
 
   return (
     <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 border
-                     ${isToday ? 'bg-[#006b2c] border-[#005a24]' : 'bg-white border-[#e5eeff]'}
+                     ${isToday ? 'bg-[#4B230A] border-[#005a24]' : 'bg-white border-[#f0e0d0]'}
                      shadow-sm`}>
       {/* Ngày */}
-      <div className={`w-16 flex-shrink-0 text-[13px] font-bold ${isToday ? 'text-white/90' : 'text-[#6e7b6c]'}`}>
+      <div className={`w-16 flex-shrink-0 text-[13px] font-bold ${isToday ? 'text-white/90' : 'text-[#7a6358]'}`}>
         {formatDate(day.date, index)}
       </div>
 
@@ -54,7 +54,7 @@ function DayCard({ day, index }) {
           {wmo.label}
         </div>
         {/* Xác suất mưa */}
-        <div className={`text-[12px] mt-0.5 flex items-center gap-1 ${isToday ? 'text-white/80' : 'text-[#6e7b6c]'}`}>
+        <div className={`text-[12px] mt-0.5 flex items-center gap-1 ${isToday ? 'text-white/80' : 'text-[#7a6358]'}`}>
           <span className="material-symbols-outlined text-[13px]">water_drop</span>
           {day.rainProb}%
           {day.rain > 0 && <span className="ml-1">· {day.rain}mm</span>}
@@ -82,13 +82,13 @@ export default function Weather() {
   const tip = farmingTip(today)
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
         <button onClick={() => navigate('/home')} aria-label="Quay lại"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#6e7b6c]">
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
           <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
         <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">Dự báo thời tiết</h1>
@@ -107,7 +107,7 @@ export default function Weather() {
           <div className="flex flex-col items-center gap-3 pt-16 text-center">
             <span className="material-symbols-outlined text-[48px] text-[#ef4444]">cloud_off</span>
             <p className="text-[15px] text-[#0b1c30] font-semibold">Không lấy được thời tiết</p>
-            <p className="text-[13px] text-[#6e7b6c]">{error}</p>
+            <p className="text-[13px] text-[#7a6358]">{error}</p>
           </div>
         )}
 
@@ -115,7 +115,7 @@ export default function Weather() {
           <>
             {/* Hero card hôm nay */}
             <div className="rounded-3xl px-6 py-6 text-white shadow-lg"
-                 style={{ background: 'linear-gradient(135deg, #00873a, #006b2c)' }}>
+                 style={{ background: 'linear-gradient(135deg, #6b3410, #4B230A)' }}>
               {/* Vị trí */}
               <div className="flex items-center gap-1.5 text-white/80 text-[13px] mb-4">
                 <span className="material-symbols-outlined text-[15px]">location_on</span>
@@ -150,7 +150,7 @@ export default function Weather() {
 
             {/* Dự báo 7 ngày */}
             <div>
-              <p className="text-[12px] font-bold text-[#6e7b6c] uppercase tracking-wider mb-2 px-1">
+              <p className="text-[12px] font-bold text-[#7a6358] uppercase tracking-wider mb-2 px-1">
                 Dự báo 7 ngày
               </p>
               <div className="flex flex-col gap-2">

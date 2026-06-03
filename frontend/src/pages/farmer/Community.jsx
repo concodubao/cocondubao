@@ -14,7 +14,7 @@ const CROP_OPTIONS = [
 ]
 
 const ROLE_BADGE = {
-  engineer: { label: 'Kỹ sư', bg: '#f0fdf4', color: '#15803d' },
+  engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#5a2a0a' },
   admin:    { label: 'Admin', bg: '#eff6ff', color: '#1d4ed8' },
 }
 
@@ -33,7 +33,7 @@ function timeAgo(dateStr) {
 function Avatar({ name, role, size = 40 }) {
   const initials = (name || 'N')
     .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const colors = ['#006b2c', '#0369a1', '#7c3aed', '#b45309', '#be123c']
+  const colors = ['#4B230A', '#0369a1', '#7c3aed', '#b45309', '#be123c']
   const color  = colors[(name?.charCodeAt(0) ?? 0) % colors.length]
   return (
     <div style={{ width: size, height: size, borderRadius: size * 0.28,
@@ -60,7 +60,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
   }
 
   return (
-    <div className="bg-white border border-[#e5eeff] rounded-[20px] p-4 flex flex-col gap-3
+    <div className="bg-white border border-[#f0e0d0] rounded-[20px] p-4 flex flex-col gap-3
                     shadow-[0_2px_8px_rgba(0,0,0,0.04)] active:scale-[0.99] transition-transform cursor-pointer"
          onClick={() => navigate(`/community/${post.id}`)}>
 
@@ -101,7 +101,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
       {/* Image */}
       {post.image_url && (
         <img src={post.image_url} alt="Ảnh bài đăng"
-          className="w-full max-h-64 object-cover rounded-2xl border border-[#e5eeff]" />
+          className="w-full max-h-64 object-cover rounded-2xl border border-[#f0e0d0]" />
       )}
 
       {/* Crop tags */}
@@ -111,7 +111,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
             const c = CROP_OPTIONS.find(o => o.id === tag)
             return (
               <span key={tag} className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full
-                                         bg-[#f0fdf4] text-[#15803d]">
+                                         bg-[#fdf6f0] text-[#5a2a0a]">
                 #{c?.label || tag}
               </span>
             )
@@ -191,7 +191,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
 
   // Avatar initials
   const initials = (user?.name || 'N').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const avatarColor = ['#006b2c','#0369a1','#7c3aed','#b45309','#be123c']
+  const avatarColor = ['#4B230A','#0369a1','#7c3aed','#b45309','#be123c']
   const aColor = avatarColor[(user?.name?.charCodeAt(0) ?? 0) % avatarColor.length]
 
   return (
@@ -201,7 +201,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
       {/* ── Header — nút Hủy (trái) + tiêu đề (giữa) + nút Đăng (phải) ── */}
       <header className="flex items-center justify-between px-4 py-3 border-b border-[#f1f5f9] flex-shrink-0">
         <button onClick={onClose}
-          className="text-[15px] font-semibold text-[#6e7b6c] py-1 px-2 -ml-2">
+          className="text-[15px] font-semibold text-[#7a6358] py-1 px-2 -ml-2">
           Hủy
         </button>
         <span className="text-[16px] font-extrabold text-[#0b1c30]">Đăng bài mới</span>
@@ -210,7 +210,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
           disabled={!canPost || loading}
           className="h-9 px-5 rounded-full text-[14px] font-bold transition-all"
           style={{
-            background: canPost && !loading ? '#006b2c' : '#e5eeff',
+            background: canPost && !loading ? '#4B230A' : '#f0e0d0',
             color:      canPost && !loading ? '#fff' : '#94a3b8',
           }}>
           {loading ? 'Đăng...' : 'Đăng'}
@@ -246,7 +246,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
 
         {/* Char count */}
         <div className="px-4 pb-2 text-right">
-          <span className="text-[12px]" style={{ color: remaining < 50 ? '#ef4444' : '#c4cdc2' }}>
+          <span className="text-[12px]" style={{ color: remaining < 50 ? '#ef4444' : '#c4a898' }}>
             {remaining}
           </span>
         </div>
@@ -255,7 +255,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
         {imagePreview && (
           <div className="relative mx-4 mb-3">
             <img src={imagePreview} alt="Ảnh xem trước"
-              className="w-full max-h-56 object-cover rounded-2xl border border-[#e5eeff]" />
+              className="w-full max-h-56 object-cover rounded-2xl border border-[#f0e0d0]" />
             <button onClick={() => { setImage(null); setPreview(null) }}
               className="absolute top-2 right-2 w-8 h-8 bg-black/60 rounded-full
                          flex items-center justify-center backdrop-blur-sm">
@@ -269,7 +269,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
 
         {/* Crop tags */}
         <div className="px-4 pb-3">
-          <p className="text-[13px] font-bold text-[#6e7b6c] mb-2.5">Thẻ cây trồng</p>
+          <p className="text-[13px] font-bold text-[#7a6358] mb-2.5">Thẻ cây trồng</p>
           <div className="flex gap-2 flex-wrap">
             {CROP_OPTIONS.map(c => {
               const active = crops.includes(c.id)
@@ -277,9 +277,9 @@ function NewPostSheet({ onClose, onPosted, user }) {
                 <button key={c.id} onClick={() => toggleCrop(c.id)}
                   className="px-3 py-1.5 text-[13px] font-semibold rounded-full border-[1.5px] transition-all"
                   style={{
-                    background:  active ? '#f0fdf4' : '#f8f9ff',
-                    borderColor: active ? '#16a34a' : '#e5eeff',
-                    color:       active ? '#15803d' : '#6e7b6c',
+                    background:  active ? '#fdf6f0' : '#fdf8f5',
+                    borderColor: active ? '#7a3b10' : '#f0e0d0',
+                    color:       active ? '#5a2a0a' : '#7a6358',
                   }}>
                   {active && '✓ '}{c.label}
                 </button>
@@ -294,8 +294,8 @@ function NewPostSheet({ onClose, onPosted, user }) {
            style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} className="hidden" />
         <button onClick={() => fileRef.current?.click()}
-          className="flex items-center gap-1.5 text-[13px] font-semibold text-[#006b2c]
-                     px-3 py-2 rounded-xl bg-[#f0fdf4]">
+          className="flex items-center gap-1.5 text-[13px] font-semibold text-[#4B230A]
+                     px-3 py-2 rounded-xl bg-[#fdf6f0]">
           <span className="material-symbols-outlined text-[18px]">photo_camera</span>
           {image ? 'Đổi ảnh' : 'Thêm ảnh'}
         </button>
@@ -357,7 +357,7 @@ export default function Community() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3
@@ -365,7 +365,7 @@ export default function Community() {
         <h1 className="text-[18px] font-extrabold text-[#0b1c30] m-0">Cộng đồng</h1>
         <button
           onClick={() => setShowCompose(true)}
-          className="flex items-center gap-2 h-9 px-4 bg-[#006b2c] text-white text-[13px] font-bold
+          className="flex items-center gap-2 h-9 px-4 bg-[#4B230A] text-white text-[13px] font-bold
                      rounded-full active:scale-95 transition-transform"
         >
           <span className="material-symbols-outlined text-[16px]">edit</span>
@@ -387,10 +387,10 @@ export default function Community() {
             <span className="material-symbols-outlined text-[56px] text-[#e2e8f0]">groups</span>
             <div>
               <p className="text-[16px] font-bold text-[#0b1c30]">Chưa có bài đăng nào</p>
-              <p className="text-[13px] text-[#6e7b6c] mt-1">Hãy là người đầu tiên chia sẻ!</p>
+              <p className="text-[13px] text-[#7a6358] mt-1">Hãy là người đầu tiên chia sẻ!</p>
             </div>
             <button onClick={() => setShowCompose(true)}
-              className="px-6 py-2.5 bg-[#006b2c] text-white text-[14px] font-bold rounded-full">
+              className="px-6 py-2.5 bg-[#4B230A] text-white text-[14px] font-bold rounded-full">
               Đăng bài ngay
             </button>
           </div>
@@ -410,8 +410,8 @@ export default function Community() {
           <button
             onClick={() => fetchNextPage()}
             disabled={isFetchingNextPage}
-            className="w-full py-3 text-[14px] font-semibold text-[#006b2c] bg-white
-                       border border-[#e5eeff] rounded-2xl disabled:opacity-60"
+            className="w-full py-3 text-[14px] font-semibold text-[#4B230A] bg-white
+                       border border-[#f0e0d0] rounded-2xl disabled:opacity-60"
           >
             {isFetchingNextPage ? 'Đang tải...' : 'Xem thêm bài viết'}
           </button>

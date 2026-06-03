@@ -34,8 +34,8 @@ export default function BottomNav({ unreadCount = 0 }) {
             onClick={() => navigate(tab.path)}
             className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-all
               ${active
-                ? 'bg-[#f0fdf4] text-[#006b2c]'
-                : 'text-[#6e7b6c] hover:bg-[#f8f9ff]'
+                ? 'bg-[#fdf6f0] text-[#4B230A]'
+                : 'text-[#7a6358] hover:bg-[#fdf8f5]'
               }`}
             style={{ minWidth: 56 }}
             aria-label={tab.label}

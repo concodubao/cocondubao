@@ -44,7 +44,7 @@ function PasswordModal({ mode, onClose, onSuccess }) {
             {isSet ? 'Đặt mật khẩu' : 'Đổi mật khẩu'}
           </h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#f1f5f9] flex items-center justify-center">
-            <span className="material-symbols-outlined text-[20px] text-[#6e7b6c]">close</span>
+            <span className="material-symbols-outlined text-[20px] text-[#7a6358]">close</span>
           </button>
         </div>
 
@@ -53,7 +53,7 @@ function PasswordModal({ mode, onClose, onSuccess }) {
             <label className="text-[14px] font-semibold text-[#0b1c30]">Mật khẩu hiện tại</label>
             <input type="password" autoComplete="current-password" placeholder="••••••••"
               value={current} onChange={e => setCurrent(e.target.value)}
-              className="w-full h-[50px] px-4 bg-[#f8f9ff] border-[1.5px] border-[#e5eeff] rounded-2xl text-[16px]" />
+              className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
           </div>
         )}
 
@@ -63,7 +63,7 @@ function PasswordModal({ mode, onClose, onSuccess }) {
           </label>
           <input type="password" autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
             value={newPw} onChange={e => setNewPw(e.target.value)}
-            className="w-full h-[50px] px-4 bg-[#f8f9ff] border-[1.5px] border-[#e5eeff] rounded-2xl text-[16px]" />
+            className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
         </div>
 
         <div className="flex flex-col gap-1.5">
@@ -71,7 +71,7 @@ function PasswordModal({ mode, onClose, onSuccess }) {
           <input type="password" autoComplete="new-password" placeholder="Nhập lại mật khẩu mới"
             value={confirm} onChange={e => setConfirm(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            className="w-full h-[50px] px-4 bg-[#f8f9ff] border-[1.5px] border-[#e5eeff] rounded-2xl text-[16px]" />
+            className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
         </div>
 
         {error && (
@@ -79,7 +79,7 @@ function PasswordModal({ mode, onClose, onSuccess }) {
         )}
 
         <button onClick={handleSubmit} disabled={loading}
-          className="w-full h-[56px] rounded-full bg-[#006b2c] text-white text-[16px] font-bold
+          className="w-full h-[56px] rounded-full bg-[#4B230A] text-white text-[16px] font-bold
                      flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-60 transition-all">
           {loading
             ? <><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Đang lưu...</>
@@ -145,7 +145,7 @@ export default function Profile() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* ── Header ─────────────────────────────────────────────── */}
       {!isOnboard ? (
@@ -155,20 +155,20 @@ export default function Profile() {
             aria-label="Quay lại"
             className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center flex-shrink-0"
           >
-            <span className="material-symbols-outlined text-[22px] text-[#006b2c]">arrow_back</span>
+            <span className="material-symbols-outlined text-[22px] text-[#4B230A]">arrow_back</span>
           </button>
           <h1 className="text-[20px] font-extrabold text-[#0b1c30] flex-1">Hồ sơ cá nhân</h1>
         </header>
       ) : (
         /* Onboarding hero */
         <div className="flex flex-col items-center gap-4 px-5 pt-10 pb-6 text-center fade-up">
-          <div className="w-20 h-20 rounded-[28px] bg-gradient-to-br from-[#00873a] to-[#006b2c]
-                          flex items-center justify-center shadow-[0_8px_24px_rgba(0,107,44,0.35)]">
-            <span className="material-symbols-outlined text-white text-[40px] ms-fill">eco</span>
+          <div className="w-20 h-20 rounded-[28px] bg-white border border-[#f0e0d0]
+                          flex items-center justify-center shadow-[0_8px_24px_rgba(75,35,10,0.2)]">
+            <img src="/cocon-icon.png" alt="Cò Con" className="w-16 h-16 object-contain" />
           </div>
           <div>
             <h1 className="text-[24px] font-extrabold text-[#0b1c30] leading-tight">Chào mừng!</h1>
-            <p className="text-[15px] text-[#6e7b6c] mt-1 max-w-[280px]">
+            <p className="text-[15px] text-[#7a6358] mt-1 max-w-[280px]">
               Cho Cò Con biết thêm một chút để hỗ trợ bạn tốt hơn nhé.
             </p>
           </div>
@@ -179,7 +179,7 @@ export default function Profile() {
       <main className="flex-1 flex flex-col gap-5 px-5 pb-8">
 
         {/* Identity card */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#e5eeff] flex flex-col gap-5">
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#f0e0d0] flex flex-col gap-5">
 
           <div className="flex flex-col gap-2">
             <label htmlFor="name" className="text-[15px] font-semibold text-[#0b1c30]">
@@ -193,8 +193,8 @@ export default function Profile() {
               value={name}
               onChange={e => setName(e.target.value)}
               aria-required="true"
-              className="w-full px-4 py-3.5 text-[17px] text-[#0b1c30] bg-[#f8f9ff]
-                         border-[1.5px] border-[#e5eeff] rounded-2xl placeholder-[#bdcaba]"
+              className="w-full px-4 py-3.5 text-[17px] text-[#0b1c30] bg-[#fdf8f5]
+                         border-[1.5px] border-[#f0e0d0] rounded-2xl placeholder-[#d4b8a8]"
             />
           </div>
 
@@ -209,8 +209,8 @@ export default function Profile() {
               placeholder="Ví dụ: Ấp Trường Thọ, xã Trường Khánh"
               value={village}
               onChange={e => setVillage(e.target.value)}
-              className="w-full px-4 py-3.5 text-[17px] text-[#0b1c30] bg-[#f8f9ff]
-                         border-[1.5px] border-[#e5eeff] rounded-2xl placeholder-[#bdcaba]"
+              className="w-full px-4 py-3.5 text-[17px] text-[#0b1c30] bg-[#fdf8f5]
+                         border-[1.5px] border-[#f0e0d0] rounded-2xl placeholder-[#d4b8a8]"
             />
           </div>
         </div>
@@ -220,7 +220,7 @@ export default function Profile() {
           <div className="flex flex-col gap-3">
             <div className="text-[15px] font-semibold text-[#0b1c30]">
               Cây trồng{' '}
-              <span className="text-[#6e7b6c] font-normal">(tuỳ chọn)</span>
+              <span className="text-[#7a6358] font-normal">(tuỳ chọn)</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {CROP_OPTIONS.map(c => {
@@ -233,8 +233,8 @@ export default function Profile() {
                     className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[15px] font-semibold
                                 transition-all border-[1.5px]
                                 ${active
-                                  ? 'bg-[#f0fdf4] border-[#006b2c] text-[#006b2c]'
-                                  : 'bg-white border-[#e5eeff] text-[#6e7b6c]'
+                                  ? 'bg-[#fdf6f0] border-[#4B230A] text-[#4B230A]'
+                                  : 'bg-white border-[#f0e0d0] text-[#7a6358]'
                                 }`}
                   >
                     <span className={`material-symbols-outlined text-[16px] ${active ? 'ms-fill' : ''}`}>
@@ -260,25 +260,25 @@ export default function Profile() {
           onClick={handleSave}
           disabled={loading}
           aria-busy={loading}
-          className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[17px] font-bold
-                     shadow-[0_4px_16px_rgba(0,107,44,0.3)] disabled:opacity-60 transition-opacity"
+          className="w-full h-[60px] rounded-full bg-[#4B230A] text-white text-[17px] font-bold
+                     shadow-[0_4px_16px_rgba(75,35,10,0.3)] disabled:opacity-60 transition-opacity"
         >
           {loading ? 'Đang lưu...' : isOnboard ? 'Bắt đầu dùng Cò Con →' : 'Lưu hồ sơ'}
         </button>
 
         {/* Info rows */}
-        <div className="bg-white rounded-3xl border border-[#e5eeff] shadow-sm divide-y divide-[#e5eeff]">
+        <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm divide-y divide-[#f0e0d0]">
           <div className="flex items-center justify-between px-5 py-4">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[20px] text-[#006b2c]">phone</span>
-              <span className="text-[14px] text-[#6e7b6c]">Số điện thoại</span>
+              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">phone</span>
+              <span className="text-[14px] text-[#7a6358]">Số điện thoại</span>
             </div>
             <span className="text-[15px] font-semibold text-[#0b1c30]">{user?.phone || '—'}</span>
           </div>
           <div className="flex items-center justify-between px-5 py-4">
             <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[20px] text-[#006b2c]">badge</span>
-              <span className="text-[14px] text-[#6e7b6c]">Vai trò</span>
+              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">badge</span>
+              <span className="text-[14px] text-[#7a6358]">Vai trò</span>
             </div>
             <span className="text-[15px] font-semibold text-[#0b1c30]">
               {ROLE_LABELS[user?.role] || user?.role}
@@ -288,28 +288,28 @@ export default function Profile() {
 
         {/* Bảo mật */}
         {!isOnboard && (
-          <div className="bg-white rounded-3xl border border-[#e5eeff] shadow-sm">
+          <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm">
             <div className="flex items-center gap-3 px-5 py-4 border-b border-[#f1f5f9]">
-              <span className="material-symbols-outlined text-[20px] text-[#006b2c]">lock</span>
+              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">lock</span>
               <span className="text-[14px] font-semibold text-[#0b1c30] flex-1">Bảo mật</span>
             </div>
             <button
               onClick={() => { setPwSuccess(false); setPasswordModal(user?.hasPassword ? 'change' : 'set') }}
-              className="w-full flex items-center justify-between px-5 py-4 active:bg-[#f8f9ff] transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 active:bg-[#fdf8f5] transition-colors"
             >
               <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px] text-[#6e7b6c]">key</span>
+                <span className="material-symbols-outlined text-[20px] text-[#7a6358]">key</span>
                 <span className="text-[14px] text-[#0b1c30]">
                   {user?.hasPassword ? 'Đổi mật khẩu' : 'Đặt mật khẩu'}
                 </span>
               </div>
-              <span className="material-symbols-outlined text-[18px] text-[#c4cdc2]">chevron_right</span>
+              <span className="material-symbols-outlined text-[18px] text-[#c4a898]">chevron_right</span>
             </button>
           </div>
         )}
 
         {pwSuccess && (
-          <p className="text-[13px] text-[#15803d] bg-[#f0fdf4] border border-[#bbf7d0] px-4 py-3 rounded-2xl text-center">
+          <p className="text-[13px] text-[#5a2a0a] bg-[#fdf6f0] border border-[#f5d5b0] px-4 py-3 rounded-2xl text-center">
             ✓ {passwordModal === 'set' || !user?.hasPassword ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
           </p>
         )}
@@ -318,7 +318,7 @@ export default function Profile() {
         {!isOnboard && (
           <button
             onClick={logout}
-            className="flex items-center justify-center gap-2 text-[14px] text-[#6e7b6c] font-semibold py-2 mx-auto"
+            className="flex items-center justify-center gap-2 text-[14px] text-[#7a6358] font-semibold py-2 mx-auto"
           >
             <span className="material-symbols-outlined text-[18px]">logout</span>
             Đăng xuất

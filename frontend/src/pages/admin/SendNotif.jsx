@@ -78,10 +78,10 @@ export default function SendNotif() {
     return (
       <div style={{ ...s.page, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
         <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: result.scheduled ? '#fffbeb' : '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: result.scheduled ? '#fffbeb' : '#fdf6f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {result.scheduled
               ? <Clock size={32} color="#f59e0b" strokeWidth={1.5} />
-              : <CheckCircle size={32} color="#16a34a" strokeWidth={1.5} />}
+              : <CheckCircle size={32} color="#7a3b10" strokeWidth={1.5} />}
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: 0 }}>
             {result.scheduled ? 'Đã lên lịch gửi!' : 'Gửi thành công!'}
@@ -186,7 +186,7 @@ export default function SendNotif() {
 }
 
 const s = {
-  page:        { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
+  page:        { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
   header:      { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:     { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   title:       { fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
@@ -197,6 +197,6 @@ const s = {
   typeOption:  { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1.5px solid', transition: 'all 0.15s' },
   input:       { padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', width: '100%', boxSizing: 'border-box' },
   error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 10, margin: 0 },
-  btnPrimary:  { padding: '14px', fontSize: 16, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52 },
-  btnSecondary:{ padding: '11px 20px', fontSize: 14, background: 'transparent', color: '#16a34a', border: '1.5px solid #bbf7d0', borderRadius: 10, cursor: 'pointer' },
+  btnPrimary:  { padding: '14px', fontSize: 16, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', minHeight: 52 },
+  btnSecondary:{ padding: '11px 20px', fontSize: 14, background: 'transparent', color: '#7a3b10', border: '1.5px solid #f5d5b0', borderRadius: 10, cursor: 'pointer' },
 }

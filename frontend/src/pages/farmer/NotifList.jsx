@@ -39,7 +39,7 @@ function NotifCard({ notif, onRead, onPress }) {
         animation: 'fadeUp 0.25s ease both',
       }}>
       <div style={styles.cardHead}>
-        <div style={{ ...styles.typeIconWrap, background: notif.is_read ? '#f8fafc' : '#fff' }}>
+        <div style={{ ...styles.typeIconWrap, background: notif.is_read ? '#fdf8f5' : '#fff' }}>
           <cfg.Icon size={17} color={cfg.color} strokeWidth={2} />
         </div>
 
@@ -126,7 +126,7 @@ export default function NotifList() {
       {permission !== 'granted' && !isSubscribed && (
         <div style={styles.pushBanner} className="fade-up">
           <div style={styles.pushIconWrap}>
-            <Bell size={18} color="#16a34a" strokeWidth={2} />
+            <Bell size={18} color="#7a3b10" strokeWidth={2} />
           </div>
           <div style={{ flex: 1 }}>
             <p style={styles.pushBannerTitle}>Bật thông báo để nhận cảnh báo sâu bệnh</p>
@@ -143,7 +143,7 @@ export default function NotifList() {
             onClick={() => setFilter(f.key)}
             style={{
               ...styles.filterBtn,
-              background: filter === f.key ? '#16a34a' : 'transparent',
+              background: filter === f.key ? '#7a3b10' : 'transparent',
               color:      filter === f.key ? '#fff' : '#64748b',
               fontWeight: filter === f.key ? 700 : 400,
               boxShadow:  filter === f.key ? '0 2px 6px rgba(22,163,74,0.25)' : 'none',
@@ -191,16 +191,16 @@ export default function NotifList() {
 }
 
 const styles = {
-  page:           { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
+  page:           { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
   header:         { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #f1f5f9', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' },
   iconBtn:        { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   title:          { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 },
   badge:          { background: '#ef4444', color: '#fff', borderRadius: 99, fontSize: 11, fontWeight: 700, padding: '2px 7px' },
-  pushBanner:     { margin: '10px 14px 0', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 14, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'center' },
+  pushBanner:     { margin: '10px 14px 0', background: '#fdf6f0', border: '1px solid #f5d5b0', borderRadius: 14, padding: '12px 14px', display: 'flex', gap: 10, alignItems: 'center' },
   pushIconWrap:   { width: 36, height: 36, borderRadius: 10, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   pushBannerTitle:{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0 },
   pushBannerSub:  { fontSize: 12, color: '#64748b', margin: '2px 0 0', lineHeight: 1.4 },
-  pushBannerBtn:  { padding: '7px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 2px 6px rgba(22,163,74,0.3)' },
+  pushBannerBtn:  { padding: '7px 14px', background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 2px 6px rgba(22,163,74,0.3)' },
   filterRow:      { display: 'flex', padding: '10px 12px', gap: 6, background: '#fff', borderBottom: '1px solid #f1f5f9', overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
   filterBtn:      { padding: '6px 14px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: "'Noto Sans', sans-serif", transition: 'background 0.15s, color 0.15s, box-shadow 0.15s' },
   main:           { flex: 1, padding: '10px 14px', paddingBottom: 'max(24px, calc(24px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 8 },

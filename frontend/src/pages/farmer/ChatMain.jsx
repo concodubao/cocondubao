@@ -25,17 +25,17 @@ const SUGGESTIONS = {
 function TypingIndicator() {
   return (
     <div className="flex items-end gap-2 mb-4" aria-label="Cò Con đang trả lời">
-      <div className="w-7 h-7 rounded-xl bg-[#f0fdf4] border-[1.5px] border-[#bbf7d0]
-                      flex items-center justify-center flex-shrink-0">
-        <span className="material-symbols-outlined text-[14px] text-[#006b2c] ms-fill">eco</span>
+      <div className="w-7 h-7 rounded-xl bg-white border-[1.5px] border-[#f0e0d0]
+                      flex items-center justify-center flex-shrink-0 overflow-hidden">
+        <img src="/cocon-icon.png" alt="Cò Con" className="w-6 h-6 object-contain" />
       </div>
       <div className="flex items-center gap-1.5 px-4 py-3 bg-white
                       rounded-[4px_18px_18px_18px] border border-[#f1f5f9] shadow-sm">
-        <span className="w-2 h-2 rounded-full bg-[#006b2c] inline-block"
+        <span className="w-2 h-2 rounded-full bg-[#4B230A] inline-block"
               style={{ animation: 'blink 1.4s ease infinite' }} />
-        <span className="w-2 h-2 rounded-full bg-[#006b2c] inline-block"
+        <span className="w-2 h-2 rounded-full bg-[#4B230A] inline-block"
               style={{ animation: 'blink 1.4s ease infinite', animationDelay: '0.2s' }} />
-        <span className="w-2 h-2 rounded-full bg-[#006b2c] inline-block"
+        <span className="w-2 h-2 rounded-full bg-[#4B230A] inline-block"
               style={{ animation: 'blink 1.4s ease infinite', animationDelay: '0.4s' }} />
       </div>
     </div>
@@ -70,14 +70,14 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
       {/* AI bubble */}
       {!isUser && !isSystem && (
         <div className="flex items-end gap-2">
-          <div className="w-7 h-7 rounded-xl bg-[#f0fdf4] border-[1.5px] border-[#bbf7d0]
+          <div className="w-7 h-7 rounded-xl bg-[#fdf6f0] border-[1.5px] border-[#f5d5b0]
                           flex items-center justify-center flex-shrink-0 mb-0.5">
-            <span className="material-symbols-outlined text-[14px] text-[#006b2c] ms-fill">eco</span>
+            <span className="material-symbols-outlined text-[14px] text-[#4B230A] ms-fill">eco</span>
           </div>
           <div>
             {msg.image_url && (
               <img src={msg.image_url} alt="Ảnh sâu bệnh"
-                className="max-w-[200px] rounded-xl border border-[#e5eeff] mb-1 block" />
+                className="max-w-[200px] rounded-xl border border-[#f0e0d0] mb-1 block" />
             )}
             <div className="max-w-[80%] px-4 py-3 text-[15px] leading-relaxed text-[#0b1c30]
                             bg-white border border-[#f1f5f9] shadow-sm
@@ -110,7 +110,7 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
               className="max-w-[200px] rounded-xl mb-1 block" />
           )}
           <div className="max-w-[80%] px-4 py-3 text-[15px] leading-relaxed text-white
-                          bg-gradient-to-br from-[#00873a] to-[#006b2c]
+                          bg-gradient-to-br from-[#6b3410] to-[#4B230A]
                           rounded-[18px_18px_4px_18px]">
             {msg.content}
           </div>
@@ -128,7 +128,7 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
                         text-[15px] font-bold transition-all
                         ${isThisSpeaking
                           ? 'bg-[#fef2f2] border border-[#fecaca] text-[#ef4444]'
-                          : 'bg-white border-2 border-[#006b2c] text-[#006b2c]'
+                          : 'bg-white border-2 border-[#4B230A] text-[#4B230A]'
                         }`}
           >
             <span className="material-symbols-outlined text-[20px] ms-fill">
@@ -140,8 +140,8 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
           {/* Secondary badges */}
           <div className="flex items-center gap-1.5">
             {msg.source === 'engineer' && (
-              <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#15803d] font-semibold
-                               bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg">
+              <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#5a2a0a] font-semibold
+                               bg-[#fdf6f0] border border-[#f5d5b0] rounded-lg">
                 <span className="material-symbols-outlined text-[13px] ms-fill">check_circle</span>
                 Kỹ sư xác nhận
               </span>
@@ -149,8 +149,8 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
             <button
               onClick={() => onReport(msg.id)}
               aria-label="Báo câu trả lời sai"
-              className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#6e7b6c]
-                         bg-white border border-[#e5eeff] rounded-lg"
+              className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#7a6358]
+                         bg-white border border-[#f0e0d0] rounded-lg"
             >
               <span className="material-symbols-outlined text-[13px]">flag</span>
               Báo lỗi
@@ -172,8 +172,8 @@ function CropSelector({ crops, activeCrop, onChange }) {
       <button
         onClick={() => setOpen(v => !v)}
         aria-haspopup="listbox"
-        className="flex items-center gap-1 px-3 py-1.5 border-[1.5px] border-[#bbf7d0]
-                   rounded-full bg-[#f0fdf4] text-[13px] text-[#006b2c] font-semibold"
+        className="flex items-center gap-1 px-3 py-1.5 border-[1.5px] border-[#f5d5b0]
+                   rounded-full bg-[#fdf6f0] text-[13px] text-[#4B230A] font-semibold"
       >
         <span className="material-symbols-outlined text-[15px] ms-fill">eco</span>
         {label}
@@ -182,7 +182,7 @@ function CropSelector({ crops, activeCrop, onChange }) {
       {open && (
         <div
           role="listbox"
-          className="absolute top-[110%] right-0 bg-white border border-[#e5eeff]
+          className="absolute top-[110%] right-0 bg-white border border-[#f0e0d0]
                      rounded-2xl shadow-lg z-50 min-w-[130px] overflow-hidden"
         >
           {crops.map(id => {
@@ -196,11 +196,11 @@ function CropSelector({ crops, activeCrop, onChange }) {
                 onClick={() => { onChange(id); setOpen(false) }}
                 className={`flex items-center gap-2 w-full px-4 py-3 text-[14px] text-left
                             ${id === activeCrop
-                              ? 'bg-[#f0fdf4] text-[#006b2c] font-semibold'
+                              ? 'bg-[#fdf6f0] text-[#4B230A] font-semibold'
                               : 'text-[#0b1c30]'
                             }`}
               >
-                <span className={`material-symbols-outlined text-[16px] ${id === activeCrop ? 'ms-fill text-[#006b2c]' : 'text-[#6e7b6c]'}`}>
+                <span className={`material-symbols-outlined text-[16px] ${id === activeCrop ? 'ms-fill text-[#4B230A]' : 'text-[#7a6358]'}`}>
                   {opt.icon}
                 </span>
                 {opt.label}
@@ -325,7 +325,7 @@ export default function ChatMain() {
   }
 
   return (
-    <div className="h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+    <div className="h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="flex items-center gap-2 px-3 py-2.5 bg-white
@@ -334,19 +334,19 @@ export default function ChatMain() {
         <button
           onClick={() => navigate('/home')}
           aria-label="Quay lại"
-          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#6e7b6c] flex-shrink-0"
+          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#7a6358] flex-shrink-0"
         >
           <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
 
         <div className="flex-1 flex items-center gap-2.5 justify-center">
-          <div className="w-9 h-9 rounded-[12px] bg-gradient-to-br from-[#00873a] to-[#006b2c]
-                          flex items-center justify-center flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[18px] ms-fill">eco</span>
+          <div className="w-9 h-9 rounded-[12px] bg-white border border-[#f0e0d0]
+                          flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <img src="/cocon-icon.png" alt="Cò Con" className="w-8 h-8 object-contain" />
           </div>
           <div>
             <div className="text-[15px] font-bold text-[#0b1c30] leading-tight">Cò Con</div>
-            <div className="text-[11px] text-[#6e7b6c]">Trợ lý nông nghiệp AI</div>
+            <div className="text-[11px] text-[#7a6358]">Trợ lý nông nghiệp AI</div>
           </div>
         </div>
 
@@ -357,14 +357,14 @@ export default function ChatMain() {
         <button
           onClick={() => navigate('/chat/history')}
           aria-label="Lịch sử chat"
-          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#6e7b6c] flex-shrink-0"
+          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#7a6358] flex-shrink-0"
         >
           <span className="material-symbols-outlined text-[22px]">history</span>
         </button>
         <button
           onClick={() => navigate('/chat/image')}
           aria-label="Gửi ảnh sâu bệnh"
-          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#6e7b6c] flex-shrink-0"
+          className="w-10 h-10 flex items-center justify-center rounded-2xl text-[#7a6358] flex-shrink-0"
         >
           <span className="material-symbols-outlined text-[22px]">photo_camera</span>
         </button>
@@ -375,18 +375,18 @@ export default function ChatMain() {
             role="log" aria-live="polite" aria-label="Lịch sử chat">
 
         {loadingHist && (
-          <p className="text-center text-[13px] text-[#6e7b6c] py-4">
+          <p className="text-center text-[13px] text-[#7a6358] py-4">
             Đang tải lịch sử chat...
           </p>
         )}
 
         {messages.length === 0 && !loadingHist && (
           <div className="flex flex-col items-center gap-4 pt-8">
-            <div className="w-18 h-18 rounded-[22px] bg-[#f0fdf4] border-2 border-[#bbf7d0]
-                            flex items-center justify-center" style={{ width: 72, height: 72 }}>
-              <span className="material-symbols-outlined text-[36px] text-[#006b2c] ms-fill">eco</span>
+            <div className="rounded-[22px] bg-white border-2 border-[#f0e0d0]
+                            flex items-center justify-center overflow-hidden" style={{ width: 72, height: 72 }}>
+              <img src="/cocon-icon.png" alt="Cò Con" className="w-16 h-16 object-contain" />
             </div>
-            <p className="text-[15px] text-[#6e7b6c] text-center m-0">
+            <p className="text-[15px] text-[#7a6358] text-center m-0">
               Xin chào! Bạn cần hỏi gì về cây trồng không?
             </p>
             <div className="w-full flex flex-col gap-2 mt-1">
@@ -394,7 +394,7 @@ export default function ChatMain() {
                 <button
                   key={sg}
                   onClick={() => handleSend(sg)}
-                  className="w-full px-4 py-3 bg-white border border-[#e5eeff] rounded-2xl
+                  className="w-full px-4 py-3 bg-white border border-[#f0e0d0] rounded-2xl
                              text-[14px] text-[#0b1c30] text-left leading-snug"
                 >
                   {sg}
@@ -439,9 +439,9 @@ export default function ChatMain() {
             placeholder="Nhập câu hỏi hoặc nhấn mic..."
             rows={1}
             aria-label="Nhập câu hỏi"
-            className="flex-1 px-4 py-3 text-[15px] text-[#0b1c30] bg-[#f8f9ff]
-                       border-[1.5px] border-[#e5eeff] rounded-2xl resize-none
-                       leading-snug overflow-y-auto placeholder-[#bdcaba]"
+            className="flex-1 px-4 py-3 text-[15px] text-[#0b1c30] bg-[#fdf8f5]
+                       border-[1.5px] border-[#f0e0d0] rounded-2xl resize-none
+                       leading-snug overflow-y-auto placeholder-[#d4b8a8]"
             style={{ maxHeight: 120 }}
           />
           <button
@@ -452,22 +452,22 @@ export default function ChatMain() {
                         flex-shrink-0 transition-all
                         ${isListening
                           ? 'bg-[#EF4444] shadow-[0_2px_8px_rgba(239,68,68,0.4)]'
-                          : 'bg-[#e5eeff]'
+                          : 'bg-[#f0e0d0]'
                         }`}
             style={isListening ? { animation: 'pulse 1s infinite' } : {}}
           >
             {isListening
               ? <VolumeWave volume={volume} />
-              : <span className="material-symbols-outlined text-[20px] text-[#6e7b6c]">mic</span>
+              : <span className="material-symbols-outlined text-[20px] text-[#7a6358]">mic</span>
             }
           </button>
           <button
             onClick={() => handleSend()}
             disabled={!inputText.trim() || loading}
             aria-label="Gửi câu hỏi"
-            className="w-11 h-11 rounded-full bg-gradient-to-br from-[#00873a] to-[#006b2c]
+            className="w-11 h-11 rounded-full bg-gradient-to-br from-[#6b3410] to-[#4B230A]
                        flex items-center justify-center flex-shrink-0
-                       shadow-[0_2px_8px_rgba(0,107,44,0.3)]
+                       shadow-[0_2px_8px_rgba(75,35,10,0.3)]
                        disabled:opacity-40 transition-opacity"
           >
             <span className="material-symbols-outlined text-[20px] text-white ms-fill">send</span>
@@ -484,7 +484,7 @@ export default function ChatMain() {
           onClick={e => e.target === e.currentTarget && setShowReport(null)}
         >
           <div className="bg-white rounded-t-[28px] px-5 pt-3 pb-10 w-full flex flex-col gap-2 slide-up">
-            <div className="w-10 h-1 bg-[#e5eeff] rounded-full mx-auto mb-3" />
+            <div className="w-10 h-1 bg-[#f0e0d0] rounded-full mx-auto mb-3" />
             <h2 className="text-[17px] font-bold text-[#0b1c30] mb-2">Câu trả lời bị lỗi?</h2>
             {[
               { type: 'wrong_info',         label: 'Thông tin sai' },
@@ -495,14 +495,14 @@ export default function ChatMain() {
                 key={type}
                 onClick={() => handleReport(showReport, type)}
                 className="w-full px-4 py-4 text-[15px] text-[#0b1c30] text-left
-                           bg-[#f8f9ff] border border-[#e5eeff] rounded-2xl"
+                           bg-[#fdf8f5] border border-[#f0e0d0] rounded-2xl"
               >
                 {label}
               </button>
             ))}
             <button
               onClick={() => setShowReport(null)}
-              className="py-3 text-[15px] text-[#6e7b6c] text-center"
+              className="py-3 text-[15px] text-[#7a6358] text-center"
             >
               Bỏ qua
             </button>

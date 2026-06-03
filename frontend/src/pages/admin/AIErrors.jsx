@@ -118,7 +118,7 @@ export default function AIErrors() {
         {FILTERS.map(f => (
           <button key={f.key} role="tab" aria-selected={filter === f.key}
             onClick={() => setFilter(f.key)}
-            style={{ ...s.tab, background: filter === f.key ? '#16a34a' : 'transparent', color: filter === f.key ? '#fff' : '#64748b', fontWeight: filter === f.key ? 700 : 400 }}>
+            style={{ ...s.tab, background: filter === f.key ? '#7a3b10' : 'transparent', color: filter === f.key ? '#fff' : '#64748b', fontWeight: filter === f.key ? 700 : 400 }}>
             {f.label}
           </button>
         ))}
@@ -129,7 +129,7 @@ export default function AIErrors() {
           <p style={{ textAlign: 'center', color: '#94a3b8', padding: 24 }}>Đang tải...</p>
         ) : errors.length === 0 ? (
           <div style={s.empty}>
-            <CheckCircle size={48} color="#bbf7d0" strokeWidth={1} />
+            <CheckCircle size={48} color="#f5d5b0" strokeWidth={1} />
             <p style={{ color: '#64748b', textAlign: 'center' }}>
               {filter === 'unreviewed' ? 'Không có báo lỗi nào chưa xem.' : 'Chưa có báo lỗi nào.'}
             </p>
@@ -145,7 +145,7 @@ export default function AIErrors() {
 }
 
 const s = {
-  page:          { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
+  page:          { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
   header:        { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:       { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   title:         { fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
@@ -159,8 +159,8 @@ const s = {
   cardHead:      { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
   typeBadge:     { fontSize: 12, padding: '3px 10px', borderRadius: 99, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 },
   date:          { fontSize: 12, color: '#94a3b8', marginLeft: 'auto' },
-  reviewedBadge: { fontSize: 11, background: '#f0fdf4', color: '#16a34a', padding: '2px 8px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 3 },
-  aiAnswer:      { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
+  reviewedBadge: { fontSize: 11, background: '#fdf6f0', color: '#7a3b10', padding: '2px 8px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 3 },
+  aiAnswer:      { background: '#fdf8f5', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
   aiLabel:       { fontSize: 12, color: '#94a3b8', margin: 0, fontWeight: 600 },
   aiText:        { fontSize: 14, color: '#0f172a', margin: 0, lineHeight: 1.6 },
   confTag:       { fontSize: 11, background: '#fffbeb', color: '#f59e0b', padding: '2px 8px', borderRadius: 99, alignSelf: 'flex-start' },
@@ -168,5 +168,5 @@ const s = {
   noteLabel:     { fontSize: 12, color: '#f59e0b', margin: '0 0 4px', fontWeight: 600 },
   noteText:      { fontSize: 14, color: '#78350f', margin: 0, lineHeight: 1.5 },
   farmerInfo:    { fontSize: 12, color: '#94a3b8', margin: 0 },
-  btnReview:     { padding: '9px 12px', fontSize: 13, fontWeight: 600, background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
+  btnReview:     { padding: '9px 12px', fontSize: 13, fontWeight: 600, background: '#fdf6f0', color: '#7a3b10', border: '1px solid #f5d5b0', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
 }

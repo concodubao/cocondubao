@@ -61,10 +61,10 @@ export default function ImageUpload() {
           <div style={styles.pickArea} onClick={() => fileRef.current?.click()} role="button" tabIndex={0}
             aria-label="Nhấn để chọn ảnh">
             <div style={styles.pickIconWrap}>
-              <Camera size={40} color="#16a34a" strokeWidth={1.5} />
+              <Camera size={40} color="#7a3b10" strokeWidth={1.5} />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ ...styles.pickText, fontWeight: 600, color: '#15803d', marginBottom: 4 }}>Nhấn để chụp ảnh</p>
+              <p style={{ ...styles.pickText, fontWeight: 600, color: '#5a2a0a', marginBottom: 4 }}>Nhấn để chụp ảnh</p>
               <p style={{ ...styles.pickText, fontSize: 14, color: '#94a3b8' }}>hoặc chọn từ thư viện ảnh</p>
             </div>
           </div>
@@ -97,13 +97,13 @@ export default function ImageUpload() {
 }
 
 const styles = {
-  page:        { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
+  page:        { height: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
   header:      { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0' },
   iconBtn:     { width: 44, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   headerTitle: { fontSize: 17, fontWeight: 700, color: '#0f172a' },
   main:        { flex: 1, padding: '16px', display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 'max(24px, env(safe-area-inset-bottom))' },
-  pickArea:    { border: '2px dashed #bbf7d0', borderRadius: 20, padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, cursor: 'pointer', background: '#f0fdf4', flex: 1, minHeight: 200 },
-  pickIconWrap:{ width: 80, height: 80, borderRadius: 22, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #bbf7d0', boxShadow: '0 2px 12px rgba(22,163,74,0.10)' },
+  pickArea:    { border: '2px dashed #f5d5b0', borderRadius: 20, padding: '32px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, cursor: 'pointer', background: '#fdf6f0', flex: 1, minHeight: 200 },
+  pickIconWrap:{ width: 80, height: 80, borderRadius: 22, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #f5d5b0', boxShadow: '0 2px 12px rgba(22,163,74,0.10)' },
   pickText:    { fontSize: 16, color: '#64748b', textAlign: 'center', margin: 0, lineHeight: 1.6 },
   preview:     { width: '100%', borderRadius: 16, objectFit: 'cover', flex: 1, minHeight: 200, maxHeight: 360, border: '1px solid #e2e8f0' },
   removeBtn:   { position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: '50%', width: 38, height: 38, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
@@ -111,5 +111,5 @@ const styles = {
   label:       { fontSize: 15, fontWeight: 600, color: '#0f172a' },
   textarea:    { width: '100%', padding: '13px 14px', fontSize: 16, borderRadius: 12, border: '1.5px solid #e2e8f0', resize: 'none', outline: 'none', color: '#0f172a', background: '#fff', lineHeight: 1.6, textAlign: 'left', boxSizing: 'border-box' },
   error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 10, margin: 0 },
-  btnSend:     { padding: '15px', fontSize: 18, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 54 },
+  btnSend:     { padding: '15px', fontSize: 18, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 54 },
 }

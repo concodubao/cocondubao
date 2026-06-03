@@ -64,13 +64,13 @@ export default function Answer() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
         <button onClick={() => navigate('/engineer/queue')} aria-label="Quay lại"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#6e7b6c]">
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
           <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
         <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">Trả lời & Kiểm duyệt</h1>
@@ -82,17 +82,17 @@ export default function Answer() {
         {/* Câu hỏi từ nông dân */}
         <section className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-[#f0fdf4] flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-[16px] text-[#006b2c] ms-fill">person</span>
+            <div className="w-8 h-8 rounded-xl bg-[#fdf6f0] flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[16px] text-[#4B230A] ms-fill">person</span>
             </div>
-            <span className="text-[13px] font-bold text-[#6e7b6c] uppercase tracking-wider">
+            <span className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider">
               CÂU HỎI TỪ NÔNG DÂN
             </span>
           </div>
 
-          <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-[20px] p-4 flex flex-col gap-3">
+          <div className="bg-[#fdf6f0] border border-[#f5d5b0] rounded-[20px] p-4 flex flex-col gap-3">
             <div>
-              <div className="text-[15px] font-bold text-[#006b2c]">
+              <div className="text-[15px] font-bold text-[#4B230A]">
                 {user?.name || 'Nông dân'}{user?.village ? ` · ${user.village}` : ''}
               </div>
               <p className="text-[16px] text-[#0b1c30] leading-relaxed mt-1 m-0">{msg?.content}</p>
@@ -101,7 +101,7 @@ export default function Answer() {
               <div className="relative">
                 <img
                   src={msg.image_url} alt="Ảnh sâu bệnh"
-                  className="w-full max-h-56 object-cover rounded-xl border border-[#bbf7d0] cursor-zoom-in"
+                  className="w-full max-h-56 object-cover rounded-xl border border-[#f5d5b0] cursor-zoom-in"
                   onClick={() => setLightbox(true)}
                 />
                 <button
@@ -118,14 +118,14 @@ export default function Answer() {
 
         {/* Mẫu trả lời nhanh */}
         <section className="flex flex-col gap-2">
-          <p className="text-[13px] font-bold text-[#6e7b6c] uppercase tracking-wider m-0">Mẫu nhanh</p>
+          <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider m-0">Mẫu nhanh</p>
           <div className="flex gap-2 flex-wrap">
             {TEMPLATES.map(t => (
               <button
                 key={t.label}
                 onClick={() => setAnswer(t.text)}
-                className="px-3 py-1.5 text-[13px] font-semibold bg-white border border-[#e5eeff]
-                           rounded-full text-[#006b2c] active:scale-95 transition-transform"
+                className="px-3 py-1.5 text-[13px] font-semibold bg-white border border-[#f0e0d0]
+                           rounded-full text-[#4B230A] active:scale-95 transition-transform"
               >
                 {t.label}
               </button>
@@ -136,9 +136,9 @@ export default function Answer() {
         {/* Textarea trả lời */}
         <section className="flex flex-col gap-2">
           <label htmlFor="answer-textarea"
-            className="text-[13px] font-bold text-[#6e7b6c] uppercase tracking-wider">
+            className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider">
             Câu trả lời
-            <span className="normal-case font-normal text-[#bdcaba] ml-1">
+            <span className="normal-case font-normal text-[#d4b8a8] ml-1">
               ({answer.trim().length} ký tự)
             </span>
           </label>
@@ -150,8 +150,8 @@ export default function Answer() {
             rows={8}
             aria-required="true"
             className="w-full px-4 py-3 text-[16px] text-[#0b1c30] bg-white
-                       border-2 border-[#e5eeff] rounded-[20px] resize-none leading-relaxed
-                       focus:border-[#006b2c] focus:ring-2 focus:ring-[#006b2c]/10 outline-none
+                       border-2 border-[#f0e0d0] rounded-[20px] resize-none leading-relaxed
+                       focus:border-[#4B230A] focus:ring-2 focus:ring-[#4B230A]/10 outline-none
                        transition-colors min-h-[180px]"
           />
           {error && (
@@ -166,21 +166,21 @@ export default function Answer() {
 
         {/* Thêm vào kho tri thức */}
         <label htmlFor="trust-toggle"
-          className="flex items-start gap-3 bg-white border border-[#e5eeff] rounded-[20px] p-4 cursor-pointer">
+          className="flex items-start gap-3 bg-white border border-[#f0e0d0] rounded-[20px] p-4 cursor-pointer">
           <input
             id="trust-toggle" type="checkbox"
             checked={addToKnowledge}
             onChange={e => setAddToKnowledge(e.target.checked)}
-            className="w-5 h-5 mt-0.5 cursor-pointer accent-[#006b2c] flex-shrink-0"
+            className="w-5 h-5 mt-0.5 cursor-pointer accent-[#4B230A] flex-shrink-0"
           />
           <div>
             <div className="flex items-center gap-1.5 mb-1">
-              <span className="material-symbols-outlined text-[16px] text-[#006b2c] ms-fill">verified</span>
+              <span className="material-symbols-outlined text-[16px] text-[#4B230A] ms-fill">verified</span>
               <span className="text-[15px] font-bold text-[#0b1c30]">
                 Đánh dấu "Tin cậy" — thêm vào kho tri thức RAG
               </span>
             </div>
-            <p className="text-[13px] text-[#6e7b6c] m-0 leading-snug">
+            <p className="text-[13px] text-[#7a6358] m-0 leading-snug">
               Câu trả lời sẽ được embed vào pgvector để AI dùng lần sau. Chỉ tích khi câu trả lời chính xác và dùng được nhiều lần.
             </p>
           </div>
@@ -191,9 +191,9 @@ export default function Answer() {
           onClick={handleSubmit}
           disabled={loading || !answer.trim()}
           aria-busy={loading}
-          className="w-full h-[54px] bg-[#006b2c] text-white text-[17px] font-bold rounded-2xl
+          className="w-full h-[54px] bg-[#4B230A] text-white text-[17px] font-bold rounded-2xl
                      flex items-center justify-center gap-2
-                     shadow-[0_4px_12px_rgba(0,107,44,0.3)]
+                     shadow-[0_4px_12px_rgba(75,35,10,0.3)]
                      disabled:opacity-50 disabled:cursor-not-allowed
                      active:scale-95 transition-all"
         >
@@ -202,7 +202,7 @@ export default function Answer() {
             : <><span className="material-symbols-outlined text-[20px] ms-fill">send</span> Gửi câu trả lời cho nông dân</>
           }
         </button>
-        <p className="text-[13px] text-[#6e7b6c] text-center m-0">
+        <p className="text-[13px] text-[#7a6358] text-center m-0">
           Nông dân sẽ nhận thông báo ngay sau khi bạn gửi.
         </p>
       </main>

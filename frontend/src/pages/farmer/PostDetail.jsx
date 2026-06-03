@@ -6,7 +6,7 @@ import { communityAPI } from '../../services/api'
 import { toast } from '../../components/Toast'
 
 const ROLE_BADGE = {
-  engineer: { label: 'Kỹ sư', bg: '#f0fdf4', color: '#15803d' },
+  engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#5a2a0a' },
   admin:    { label: 'Admin', bg: '#eff6ff', color: '#1d4ed8' },
 }
 
@@ -24,7 +24,7 @@ function timeAgo(dateStr) {
 
 function Avatar({ name, size = 40 }) {
   const initials = (name || 'N').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  const colors   = ['#006b2c', '#0369a1', '#7c3aed', '#b45309', '#be123c']
+  const colors   = ['#4B230A', '#0369a1', '#7c3aed', '#b45309', '#be123c']
   const color    = colors[(name?.charCodeAt(0) ?? 0) % colors.length]
   return (
     <div style={{ width: size, height: size, borderRadius: size * 0.28,
@@ -105,13 +105,13 @@ export default function PostDetail() {
   const badge = ROLE_BADGE[post?.users?.role]
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
         <button onClick={() => navigate(-1)} aria-label="Quay lại"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#6e7b6c]">
+          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
           <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
         <h1 className="flex-1 text-[17px] font-extrabold text-[#0b1c30] m-0">Bài đăng</h1>
@@ -149,7 +149,7 @@ export default function PostDetail() {
             {/* Image */}
             {post.image_url && (
               <img src={post.image_url} alt="Ảnh bài đăng"
-                className="w-full max-h-80 object-cover rounded-2xl border border-[#e5eeff]" />
+                className="w-full max-h-80 object-cover rounded-2xl border border-[#f0e0d0]" />
             )}
 
             {/* Like button */}
@@ -178,7 +178,7 @@ export default function PostDetail() {
 
         {/* Comments section */}
         <div className="flex flex-col px-4 pt-4 gap-3">
-          <p className="text-[13px] font-bold text-[#6e7b6c] uppercase tracking-wider m-0">
+          <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider m-0">
             Bình luận {comments.length > 0 && `(${comments.length})`}
           </p>
 
@@ -200,7 +200,7 @@ export default function PostDetail() {
                 <Avatar name={c.users?.name} size={34} />
                 <div className="flex-1 min-w-0">
                   <div className="bg-white rounded-2xl rounded-tl-md px-3 py-2.5
-                                  border border-[#e5eeff] shadow-sm">
+                                  border border-[#f0e0d0] shadow-sm">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       <span className="text-[13px] font-bold text-[#0b1c30]">
                         {c.users?.name || 'Nông dân'}
@@ -237,7 +237,7 @@ export default function PostDetail() {
            style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
         <div className="flex items-end gap-2">
           <Avatar name={user?.name} size={34} />
-          <div className="flex-1 flex items-end gap-2 bg-[#f8f9ff] border border-[#e5eeff]
+          <div className="flex-1 flex items-end gap-2 bg-[#fdf8f5] border border-[#f0e0d0]
                           rounded-2xl px-3 py-2">
             <textarea
               ref={inputRef}
@@ -260,7 +260,7 @@ export default function PostDetail() {
           <button
             onClick={() => { if (comment.trim()) addCommentMutation.mutate() }}
             disabled={!comment.trim() || addCommentMutation.isPending}
-            className="w-10 h-10 rounded-full bg-[#006b2c] flex items-center justify-center
+            className="w-10 h-10 rounded-full bg-[#4B230A] flex items-center justify-center
                        disabled:opacity-40 flex-shrink-0"
             aria-label="Gửi bình luận"
           >

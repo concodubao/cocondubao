@@ -5,7 +5,7 @@ import { adminAPI } from '../../services/api'
 import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X } from 'lucide-react'
 
 const ROLE_MAP = {
-  farmer:   { label: 'Nông dân',  color: '#16a34a', bg: '#f0fdf4' },
+  farmer:   { label: 'Nông dân',  color: '#7a3b10', bg: '#fdf6f0' },
   engineer: { label: 'Kỹ sư',    color: '#3b82f6', bg: '#eff6ff' },
   admin:    { label: 'Admin',     color: '#8b5cf6', bg: '#f5f3ff' },
 }
@@ -137,7 +137,7 @@ function CreateEngineerModal({ onClose, onCreated }) {
                       padding: '8px 12px', borderRadius: 8, margin: 0 }}>{error}</p>
         )}
         <button onClick={handleSubmit} disabled={loading}
-          style={{ padding: '13px', fontSize: 15, fontWeight: 700, background: '#16a34a',
+          style={{ padding: '13px', fontSize: 15, fontWeight: 700, background: '#7a3b10',
                    color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer',
                    opacity: loading ? 0.6 : 1 }}>
           {loading ? 'Đang tạo...' : `Tạo tài khoản ${role === 'admin' ? 'quản trị' : 'kỹ sư'}`}
@@ -184,7 +184,7 @@ export default function Users() {
         <h1 style={s.title}>Quản lý người dùng</h1>
         <button onClick={() => setShowCreate(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px',
-                   background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10,
+                   background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 10,
                    cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
           <UserPlus size={15} strokeWidth={2} /> Tạo kỹ sư
         </button>
@@ -199,7 +199,7 @@ export default function Users() {
       <div style={s.tabs} role="tablist">
         {TABS.map(t => (
           <button key={t.key} role="tab" aria-selected={tab === t.key} onClick={() => setTab(t.key)}
-            style={{ ...s.tab, background: tab === t.key ? '#16a34a' : 'transparent', color: tab === t.key ? '#fff' : '#64748b', fontWeight: tab === t.key ? 700 : 400 }}>
+            style={{ ...s.tab, background: tab === t.key ? '#7a3b10' : 'transparent', color: tab === t.key ? '#fff' : '#64748b', fontWeight: tab === t.key ? 700 : 400 }}>
             {t.label}
           </button>
         ))}
@@ -236,7 +236,7 @@ export default function Users() {
 }
 
 const s = {
-  page:        { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
+  page:        { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
   header:      { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:     { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   title:       { fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
@@ -247,15 +247,15 @@ const s = {
   empty:       { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: 40 },
   card:        { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: 10 },
   cardHead:    { display: 'flex', gap: 10, alignItems: 'flex-start' },
-  avatar:      { width: 38, height: 38, borderRadius: '50%', background: '#16a34a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, flexShrink: 0 },
+  avatar:      { width: 38, height: 38, borderRadius: '50%', background: '#7a3b10', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, flexShrink: 0 },
   userName:    { fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 },
   userPhone:   { fontSize: 12, color: '#94a3b8', margin: '2px 0 0' },
   userVillage: { fontSize: 11, color: '#94a3b8', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 3 },
   roleBadge:   { fontSize: 11, padding: '3px 8px', borderRadius: 99, fontWeight: 600, whiteSpace: 'nowrap' },
-  cropTag:     { fontSize: 11, background: '#f0fdf4', color: '#16a34a', padding: '2px 7px', borderRadius: 99 },
+  cropTag:     { fontSize: 11, background: '#fdf6f0', color: '#7a3b10', padding: '2px 7px', borderRadius: 99 },
   actions:     { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  btnApprove:  { padding: '7px 12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 },
+  btnApprove:  { padding: '7px 12px', background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 },
   btnLock:     { padding: '7px 12px', background: 'transparent', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
-  btnUnlock:   { padding: '7px 12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
+  btnUnlock:   { padding: '7px 12px', background: '#fdf6f0', color: '#7a3b10', border: '1px solid #f5d5b0', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
   roleSelect:  { padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#0f172a', cursor: 'pointer' },
 }

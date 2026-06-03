@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/authStore'
 
 // ─── Role cards data ────────────────────────────────────────
 const ROLES = [
-  { id: 'farmer',   label: 'Nông dân',      icon: 'agriculture', desc: 'Tôi cần tư vấn canh tác',                    iconBg: '#F0FDF4', iconColor: '#006b2c' },
+  { id: 'farmer',   label: 'Nông dân',      icon: 'agriculture', desc: 'Tôi cần tư vấn canh tác',                    iconBg: '#F0FDF4', iconColor: '#4B230A' },
   { id: 'engineer', label: 'Kỹ sư / Admin', icon: 'engineering', desc: 'Đăng nhập bằng email do admin cấp', iconBg: '#E0F2FE', iconColor: '#00628d' },
 ]
 
@@ -39,7 +39,7 @@ function StepRole({ onNext }) {
           key={r.id}
           onClick={() => { setSelected(r.id); onNext(r.id) }}
           className={`flex items-center p-4 rounded-[20px] border-2 shadow-sm transition-all active:scale-[0.98]
-            ${selected === r.id ? 'border-[#006b2c] bg-[#F0FDF4] shadow-[0_8px_20px_rgba(0,107,44,0.1)] -translate-y-1' : 'border-transparent bg-white'}`}
+            ${selected === r.id ? 'border-[#4B230A] bg-[#F0FDF4] shadow-[0_8px_20px_rgba(75,35,10,0.1)] -translate-y-1' : 'border-transparent bg-white'}`}
           style={{ animationDelay: `${i * 0.07}s` }}
         >
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
@@ -48,9 +48,9 @@ function StepRole({ onNext }) {
           </div>
           <div className="ml-4 text-left flex-1">
             <div className="text-[20px] font-bold text-[#0b1c30]">{r.label}</div>
-            <div className="text-sm text-[#3e4a3d] mt-0.5">{r.desc}</div>
+            <div className="text-sm text-[#4a3328] mt-0.5">{r.desc}</div>
           </div>
-          <span className="material-symbols-outlined text-[#006b2c] ml-2 opacity-0 transition-opacity"
+          <span className="material-symbols-outlined text-[#4B230A] ml-2 opacity-0 transition-opacity"
                 style={{ opacity: selected === r.id ? 1 : 0 }}>
             check_circle
           </span>
@@ -89,21 +89,21 @@ function StepPhone({ onNext, onSwitchPassword }) {
       <div className="space-y-2">
         <label className="text-[18px] font-bold text-[#0b1c30]" htmlFor="phone">Số điện thoại</label>
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#6e7b6c]">call</span>
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#7a6358]">call</span>
           <input
             ref={inputRef} id="phone" type="tel" inputMode="numeric" autoComplete="tel"
             placeholder="Nhập số điện thoại của bà con"
             value={phone} onChange={e => setPhone(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
-            className="w-full h-[58px] pl-12 pr-4 bg-white border-2 border-[#bdcaba] rounded-2xl
-                       text-[20px] font-bold placeholder:text-[#bdcaba] placeholder:font-normal
-                       focus:border-[#006b2c] transition-colors"
+            className="w-full h-[58px] pl-12 pr-4 bg-white border-2 border-[#d4b8a8] rounded-2xl
+                       text-[20px] font-bold placeholder:text-[#d4b8a8] placeholder:font-normal
+                       focus:border-[#4B230A] transition-colors"
           />
         </div>
       </div>
       {error && <ErrorBox msg={error} />}
       <button onClick={handleSend} disabled={loading}
-        className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[20px] font-bold
+        className="w-full h-[60px] rounded-full bg-[#4B230A] text-white text-[20px] font-bold
                    shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all
                    disabled:opacity-60 disabled:cursor-not-allowed">
         {loading
@@ -111,7 +111,7 @@ function StepPhone({ onNext, onSwitchPassword }) {
           : <><span>Nhận mã OTP</span><span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
       <button type="button" onClick={() => onSwitchPassword?.()}
-        className="text-center text-[14px] text-[#006b2c] font-semibold py-1">
+        className="text-center text-[14px] text-[#4B230A] font-semibold py-1">
         Đã có mật khẩu? Đăng nhập bằng mật khẩu
       </button>
     </div>
@@ -156,7 +156,7 @@ function OTPBoxes({ value, onChange }) {
           onKeyDown={e => handleKeyDown(i, e)}
           onPaste={i === 0 ? handlePaste : undefined}
           className={`w-11 h-14 text-center text-[22px] font-bold rounded-xl border-2 transition-all
-            ${digits[i] ? 'border-[#006b2c] bg-[#F0FDF4] text-[#006b2c]' : 'border-[#bdcaba] bg-[#f8f9ff] text-[#0b1c30]'}`}
+            ${digits[i] ? 'border-[#4B230A] bg-[#F0FDF4] text-[#4B230A]' : 'border-[#d4b8a8] bg-[#fdf8f5] text-[#0b1c30]'}`}
           style={{ caretColor: 'transparent', outline: 'none' }}
         />
       ))}
@@ -203,17 +203,17 @@ function StepOTP({ phone, role, onResend }) {
 
   return (
     <div className="flex flex-col gap-5 fade-up">
-      <p className="text-center text-[#3e4a3d] text-[16px]">
+      <p className="text-center text-[#4a3328] text-[16px]">
         Mã đã gửi đến <strong className="text-[#0b1c30]">{phone}</strong>
       </p>
       <OTPBoxes value={otp} onChange={setOtp} />
-      <p className="text-center text-sm text-[#6e7b6c]">Mã hết hạn sau 10 phút</p>
+      <p className="text-center text-sm text-[#7a6358]">Mã hết hạn sau 10 phút</p>
       {error && <ErrorBox msg={error} />}
       <button onClick={handleVerify} disabled={loading || otp.length !== 6 || success}
         className={`w-full h-[60px] rounded-full text-white text-[20px] font-bold
                    flex items-center justify-center gap-2 transition-all active:scale-95
                    disabled:opacity-60 disabled:cursor-not-allowed
-                   ${success ? 'bg-[#15803d]' : 'bg-[#006b2c]'}`}>
+                   ${success ? 'bg-[#5a2a0a]' : 'bg-[#4B230A]'}`}>
         {success
           ? <><span className="material-symbols-outlined ms-fill">check_circle</span> Xác nhận thành công!</>
           : loading ? <><Spinner /> Đang xác nhận...</>
@@ -221,9 +221,9 @@ function StepOTP({ phone, role, onResend }) {
       </button>
       <div className="text-center">
         {countdown > 0
-          ? <p className="text-sm text-[#6e7b6c]">Gửi lại sau <strong className="text-[#0b1c30]">{countdown}s</strong></p>
+          ? <p className="text-sm text-[#7a6358]">Gửi lại sau <strong className="text-[#0b1c30]">{countdown}s</strong></p>
           : <button onClick={handleResend} disabled={resending}
-              className="text-[#006b2c] text-[16px] font-bold py-2 px-4">
+              className="text-[#4B230A] text-[16px] font-bold py-2 px-4">
               {resending ? 'Đang gửi lại...' : 'Gửi lại OTP'}
             </button>}
       </div>
@@ -260,13 +260,13 @@ function StepPhonePassword({ onSwitchOTP }) {
       <div className="space-y-1">
         <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="pw-phone">Số điện thoại</label>
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#6e7b6c]">call</span>
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#7a6358]">call</span>
           <input
             ref={inputRef} id="pw-phone" type="tel" inputMode="numeric" autoComplete="tel"
             placeholder="Nhập số điện thoại"
             value={phone} onChange={e => setPhone(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            className="w-full h-[54px] pl-12 pr-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px] font-bold placeholder:font-normal"
+            className="w-full h-[54px] pl-12 pr-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px] font-bold placeholder:font-normal"
           />
         </div>
       </div>
@@ -275,16 +275,16 @@ function StepPhonePassword({ onSwitchOTP }) {
         <input id="pw-pass" type="password" autoComplete="current-password" placeholder="••••••••"
           value={password} onChange={e => setPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" />
+          className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
       </div>
       {error && <ErrorBox msg={error} />}
       <button onClick={handleLogin} disabled={loading}
-        className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[20px] font-bold
+        className="w-full h-[60px] rounded-full bg-[#4B230A] text-white text-[20px] font-bold
                    flex items-center justify-center gap-2 shadow-lg active:scale-95
                    disabled:opacity-60 disabled:cursor-not-allowed transition-all">
         {loading ? <><Spinner /> Đang đăng nhập...</> : <><span>Đăng nhập</span><span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
-      <button onClick={onSwitchOTP} className="text-center text-[14px] text-[#006b2c] font-semibold py-1">
+      <button onClick={onSwitchOTP} className="text-center text-[14px] text-[#4B230A] font-semibold py-1">
         Đăng nhập bằng OTP thay thế
       </button>
     </div>
@@ -327,18 +327,18 @@ function StepEmailPassword() {
         <input id="email" type="email" autoComplete="email" placeholder="email@example.com"
           value={email} onChange={e => setEmail(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" autoFocus />
+          className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" autoFocus />
       </div>
       <div className="space-y-1">
         <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="password">Mật khẩu</label>
         <input id="password" type="password" autoComplete="current-password" placeholder="••••••••"
           value={password} onChange={e => setPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          className="w-full h-[54px] px-4 bg-white border-2 border-[#bdcaba] rounded-2xl text-[18px]" />
+          className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
       </div>
       {error && <ErrorBox msg={error} />}
       <button onClick={handleLogin} disabled={loading}
-        className="w-full h-[60px] rounded-full bg-[#006b2c] text-white text-[20px] font-bold
+        className="w-full h-[60px] rounded-full bg-[#4B230A] text-white text-[20px] font-bold
                    flex items-center justify-center gap-2 shadow-lg active:scale-95
                    disabled:opacity-60 disabled:cursor-not-allowed transition-all">
         {loading
@@ -392,14 +392,14 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#006b2c] overflow-hidden max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#4B230A] overflow-hidden max-w-[480px] mx-auto">
       {/* Hero */}
       <header className="flex-shrink-0 flex flex-col items-center gap-4 px-5 pb-8 fade-in"
               style={{ paddingTop: 'max(48px, env(safe-area-inset-top))' }}>
         {/* Mascot */}
-        <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center
-                        shadow-[0_0_0_2px_rgba(255,255,255,0.3)] backdrop-blur-sm">
-          <span className="material-symbols-outlined text-[56px] text-white">eco</span>
+        <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center
+                        shadow-[0_0_0_2px_rgba(255,255,255,0.3)]">
+          <img src="/cocon-icon.png" alt="Cò Con" className="w-20 h-20 object-contain" />
         </div>
         <div className="text-center">
           <h1 className="text-[28px] font-extrabold text-white tracking-tight">{HERO.title}</h1>
@@ -413,7 +413,7 @@ export default function Login() {
            style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
         {step !== 'role' && (
           <button onClick={handleBack}
-            className="flex items-center gap-1 text-[#006b2c] font-bold text-[16px] mb-5">
+            className="flex items-center gap-1 text-[#4B230A] font-bold text-[16px] mb-5">
             <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             Quay lại
           </button>
@@ -424,14 +424,14 @@ export default function Login() {
         {step === 'email'          && <StepEmailPassword />}
         {step === 'phone-password' && <StepPhonePassword onSwitchOTP={() => setStep('phone')} />}
 
-        <p className="text-center text-[#6e7b6c] text-[13px] mt-8">
+        <p className="text-center text-[#7a6358] text-[13px] mt-8">
           Bằng cách tiếp tục, bạn đồng ý với Điều khoản của Cò Con
         </p>
       </div>
 
       {/* Bottom ambient glow */}
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-32
-                      bg-gradient-to-t from-[#006b2c]/10 to-transparent pointer-events-none -z-10" />
+                      bg-gradient-to-t from-[#4B230A]/10 to-transparent pointer-events-none -z-10" />
     </div>
   )
 }

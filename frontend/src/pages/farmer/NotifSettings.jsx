@@ -55,7 +55,7 @@ export default function NotifSettings() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 {isSubscribed && permission === 'granted'
-                  ? <CheckCircle size={16} color="#16a34a" strokeWidth={2} />
+                  ? <CheckCircle size={16} color="#7a3b10" strokeWidth={2} />
                   : <XCircle size={16} color="#ef4444" strokeWidth={2} />
                 }
                 <p style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', margin: 0 }}>
@@ -82,7 +82,7 @@ export default function NotifSettings() {
                 <p style={{ fontSize: 13, color: '#94a3b8', margin: '3px 0 0' }}>{t.desc}</p>
               </div>
               <input id={`type-${t.id}`} type="checkbox" checked={types.includes(t.id)} onChange={() => toggleType(t.id)}
-                style={{ width: 20, height: 20, cursor: 'pointer', accentColor: '#16a34a' }} />
+                style={{ width: 20, height: 20, cursor: 'pointer', accentColor: '#7a3b10' }} />
             </label>
           ))}
         </section>
@@ -113,7 +113,7 @@ export default function NotifSettings() {
 }
 
 const s = {
-  page:      { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
+  page:      { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 480, margin: '0 auto' },
   header:    { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:   { width: 44, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   title:     { fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
@@ -122,7 +122,7 @@ const s = {
   sTitle:    { fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 },
   typeRow:   { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid #f1f5f9', cursor: 'pointer', minHeight: 52 },
   timeInput: { padding: '13px 14px', fontSize: 17, borderRadius: 10, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', width: '100%', boxSizing: 'border-box', marginTop: 6 },
-  btnOn:     { padding: '10px 20px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', minHeight: 44 },
+  btnOn:     { padding: '10px 20px', background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 700, whiteSpace: 'nowrap', minHeight: 44 },
   btnOff:    { padding: '10px 20px', background: 'transparent', color: '#ef4444', border: '1.5px solid #fecaca', borderRadius: 10, cursor: 'pointer', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', minHeight: 44 },
-  btnSave:   { padding: '15px', fontSize: 17, fontWeight: 700, background: '#16a34a', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 54 },
+  btnSave:   { padding: '15px', fontSize: 17, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 54 },
 }

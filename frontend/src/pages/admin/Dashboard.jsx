@@ -21,9 +21,9 @@ function BarChart({ data }) {
         const y    = H - barH
         return (
           <g key={d.date}>
-            <rect x={x} y={y} width={barW} height={barH} rx="3" fill="#16a34a" fillOpacity="0.7" />
+            <rect x={x} y={y} width={barW} height={barH} rx="3" fill="#7a3b10" fillOpacity="0.7" />
             <text x={x + barW / 2} y={H + 14} textAnchor="middle" fontSize="9" fill="#94a3b8">{d.date}</text>
-            {d.count > 0 && <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="10" fill="#16a34a" fontWeight="600">{d.count}</text>}
+            {d.count > 0 && <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="10" fill="#7a3b10" fontWeight="600">{d.count}</text>}
           </g>
         )
       })}
@@ -48,8 +48,8 @@ function WaitBadge({ minutes }) {
     <span style={{
       fontSize: 11, padding: '2px 7px', borderRadius: 99, fontWeight: 600,
       display: 'inline-flex', alignItems: 'center', gap: 3,
-      background: urgent ? '#fef2f2' : warn ? '#fffbeb' : '#f0fdf4',
-      color:      urgent ? '#ef4444' : warn ? '#f59e0b' : '#16a34a',
+      background: urgent ? '#fef2f2' : warn ? '#fffbeb' : '#fdf6f0',
+      color:      urgent ? '#ef4444' : warn ? '#f59e0b' : '#7a3b10',
     }}>
       <Clock size={9} strokeWidth={2} />
       {minutes < 60 ? `${minutes}p` : `${Math.round(minutes / 60)}h`}
@@ -180,12 +180,12 @@ export default function Dashboard() {
             <div style={s.card}>
               <div style={s.cardHead}>
                 <span style={s.cardTitle}>AI tự trả lời</span>
-                <span style={{ fontSize: 20, fontWeight: 700, color: (data?.ragRate || 0) >= 70 ? '#16a34a' : '#f59e0b' }}>
+                <span style={{ fontSize: 20, fontWeight: 700, color: (data?.ragRate || 0) >= 70 ? '#7a3b10' : '#f59e0b' }}>
                   {data?.ragRate ?? 0}%
                 </span>
               </div>
               <div style={s.progressBg}>
-                <div style={{ height: '100%', borderRadius: 99, width: `${data?.ragRate || 0}%`, background: (data?.ragRate || 0) >= 70 ? '#16a34a' : '#f59e0b', transition: 'width 0.5s' }} />
+                <div style={{ height: '100%', borderRadius: 99, width: `${data?.ragRate || 0}%`, background: (data?.ragRate || 0) >= 70 ? '#7a3b10' : '#f59e0b', transition: 'width 0.5s' }} />
               </div>
               <p style={s.cardSub}>
                 {(data?.ragRate || 0) >= 70 ? 'Đạt mục tiêu ≥70% — AI đang hoạt động tốt' : 'Chưa đạt mục tiêu 70% — cần upload thêm tài liệu RAG'}
@@ -201,11 +201,11 @@ export default function Dashboard() {
 
             <div style={s.grid2}>
               <button onClick={() => navigate('/admin/notifications/send')} style={s.actionBtn}>
-                <Send size={20} color="#16a34a" strokeWidth={1.5} />
+                <Send size={20} color="#7a3b10" strokeWidth={1.5} />
                 <span>Gửi thông báo</span>
               </button>
               <button onClick={() => navigate('/engineer/knowledge')} style={s.actionBtn}>
-                <BookOpen size={20} color="#16a34a" strokeWidth={1.5} />
+                <BookOpen size={20} color="#7a3b10" strokeWidth={1.5} />
                 <span>Kho tri thức</span>
               </button>
               <button onClick={() => navigate('/admin/ai-errors')} style={s.actionBtn}>
@@ -225,7 +225,7 @@ export default function Dashboard() {
 }
 
 const s = {
-  page:      { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#f8fafc', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
+  page:      { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
   header:    { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:   { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   title:     { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
@@ -241,8 +241,8 @@ const s = {
   cardSub:   { fontSize: 12, color: '#64748b', margin: 0 },
   progressBg:{ height: 6, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' },
   actionBtn:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#0f172a' },
-  viewAllBtn:   { display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 12, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 },
-  queueRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' },
-  takeBtn:      { flexShrink: 0, padding: '6px 14px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  viewAllBtn:   { display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 12, color: '#7a3b10', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 },
+  queueRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fdf8f5', borderRadius: 10, border: '1px solid #e2e8f0' },
+  takeBtn:      { flexShrink: 0, padding: '6px 14px', background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   processingTag:{ flexShrink: 0, padding: '5px 10px', background: '#f1f5f9', color: '#94a3b8', borderRadius: 8, fontSize: 12, fontWeight: 500 },
 }

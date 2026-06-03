@@ -8,15 +8,15 @@ import { useWeather, getWMO } from '../hooks/useWeather'
 import BottomNav from '../components/BottomNav'
 
 const ENGINEER_LINKS = [
-  { path: '/engineer/queue',     icon: 'assignment',  iconBg: 'bg-[#f0fdf4]', iconColor: 'text-[#006b2c]', title: 'Hàng đợi câu hỏi',   desc: 'Xem và trả lời câu hỏi từ nông dân' },
-  { path: '/engineer/history',   icon: 'history',     iconBg: 'bg-[#e5eeff]', iconColor: 'text-[#00628d]', title: 'Lịch sử trả lời',     desc: 'Xem lại các câu hỏi đã trả lời' },
+  { path: '/engineer/queue',     icon: 'assignment',  iconBg: 'bg-[#fdf6f0]', iconColor: 'text-[#4B230A]', title: 'Hàng đợi câu hỏi',   desc: 'Xem và trả lời câu hỏi từ nông dân' },
+  { path: '/engineer/history',   icon: 'history',     iconBg: 'bg-[#f0e0d0]', iconColor: 'text-[#00628d]', title: 'Lịch sử trả lời',     desc: 'Xem lại các câu hỏi đã trả lời' },
   { path: '/engineer/knowledge', icon: 'menu_book',   iconBg: 'bg-[#fffbeb]', iconColor: 'text-[#855300]', title: 'Kiến thức AI',        desc: 'Quản lý tài liệu và cơ sở kiến thức' },
-  { path: '/engineer/test-ai',   icon: 'science',     iconBg: 'bg-[#f0fdf4]', iconColor: 'text-[#006b2c]', title: 'Kiểm thử AI',         desc: 'Thử câu hỏi trực tiếp với mô hình AI' },
+  { path: '/engineer/test-ai',   icon: 'science',     iconBg: 'bg-[#fdf6f0]', iconColor: 'text-[#4B230A]', title: 'Kiểm thử AI',         desc: 'Thử câu hỏi trực tiếp với mô hình AI' },
 ]
 
 const ADMIN_LINKS = [
-  { path: '/admin',                       icon: 'bar_chart',         iconBg: 'bg-[#f0fdf4]', iconColor: 'text-[#006b2c]', title: 'Dashboard quản trị',    desc: 'Thống kê và quản lý hệ thống' },
-  { path: '/admin/users',                 icon: 'group',             iconBg: 'bg-[#e5eeff]', iconColor: 'text-[#00628d]', title: 'Quản lý người dùng',    desc: 'Xem và phân quyền tài khoản' },
+  { path: '/admin',                       icon: 'bar_chart',         iconBg: 'bg-[#fdf6f0]', iconColor: 'text-[#4B230A]', title: 'Dashboard quản trị',    desc: 'Thống kê và quản lý hệ thống' },
+  { path: '/admin/users',                 icon: 'group',             iconBg: 'bg-[#f0e0d0]', iconColor: 'text-[#00628d]', title: 'Quản lý người dùng',    desc: 'Xem và phân quyền tài khoản' },
   { path: '/admin/notifications/send',    icon: 'campaign',          iconBg: 'bg-[#fffbeb]', iconColor: 'text-[#855300]', title: 'Gửi thông báo',         desc: 'Đẩy thông báo đến nông dân' },
   { path: '/admin/ai-errors',             icon: 'bug_report',        iconBg: 'bg-[#fef2f2]', iconColor: 'text-[#ba1a1a]', title: 'Lỗi AI',                desc: 'Xem câu hỏi AI trả lời sai' },
 ]
@@ -25,7 +25,7 @@ function NavCard({ icon, iconBg, iconColor, title, desc, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-4 bg-white border border-[#e5eeff] rounded-3xl px-5 py-4
+      className="flex items-center gap-4 bg-white border border-[#f0e0d0] rounded-3xl px-5 py-4
                  shadow-sm active:scale-[0.98] transition-transform text-left w-full"
     >
       <div className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center flex-shrink-0`}>
@@ -33,9 +33,9 @@ function NavCard({ icon, iconBg, iconColor, title, desc, onClick }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[17px] font-bold text-[#0b1c30]">{title}</div>
-        <div className="text-[13px] text-[#6e7b6c] mt-0.5">{desc}</div>
+        <div className="text-[13px] text-[#7a6358] mt-0.5">{desc}</div>
       </div>
-      <span className="material-symbols-outlined text-[20px] text-[#bdcaba]">chevron_right</span>
+      <span className="material-symbols-outlined text-[20px] text-[#d4b8a8]">chevron_right</span>
     </button>
   )
 }
@@ -79,14 +79,14 @@ function PushBanner({ permission, isSubscribed, pushError, subscribe }) {
   }
 
   return (
-    <div className="mx-4 mb-3 flex items-center gap-3 bg-[#f0fdf4] border border-[#bbf7d0] rounded-2xl px-4 py-3">
-      <span className="material-symbols-outlined text-[20px] text-[#006b2c]">notifications</span>
+    <div className="mx-4 mb-3 flex items-center gap-3 bg-[#fdf6f0] border border-[#f5d5b0] rounded-2xl px-4 py-3">
+      <span className="material-symbols-outlined text-[20px] text-[#4B230A]">notifications</span>
       <p className="flex-1 text-[13px] text-[#0b1c30] m-0 leading-snug">
         {pushError ? pushError : 'Bật thông báo để nhận cảnh báo kịp thời'}
       </p>
       <button
         onClick={subscribe}
-        className="px-4 py-1.5 bg-[#006b2c] text-white text-[13px] font-bold rounded-full whitespace-nowrap"
+        className="px-4 py-1.5 bg-[#4B230A] text-white text-[13px] font-bold rounded-full whitespace-nowrap"
       >
         {pushError ? 'Thử lại' : 'Bật'}
       </button>
@@ -125,19 +125,19 @@ export default function Home() {
   const isFarmer = user?.role === 'farmer'
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#f8f9ff] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 pt-5 pb-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00873a] to-[#006b2c]
-                          flex items-center justify-center shadow-[0_4px_12px_rgba(0,107,44,0.3)]
-                          flex-shrink-0">
-            <span className="material-symbols-outlined text-white text-[26px] ms-fill">eco</span>
+          <div className="w-12 h-12 rounded-2xl bg-white border border-[#f0e0d0]
+                          flex items-center justify-center shadow-[0_4px_12px_rgba(75,35,10,0.15)]
+                          flex-shrink-0 overflow-hidden">
+            <img src="/cocon-icon.png" alt="Cò Con" className="w-10 h-10 object-contain" />
           </div>
           <div>
             <div className="text-[17px] font-extrabold text-[#0b1c30] leading-tight">Cò Con Dự Báo</div>
-            <div className="text-[12px] text-[#6e7b6c] mt-0.5">
+            <div className="text-[12px] text-[#7a6358] mt-0.5">
               {greeting}{user?.name ? `, ${user.name}` : ''}
             </div>
           </div>
@@ -149,7 +149,7 @@ export default function Home() {
             aria-label="Hồ sơ"
             className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center"
           >
-            <span className="material-symbols-outlined text-[22px] text-[#006b2c]">person</span>
+            <span className="material-symbols-outlined text-[22px] text-[#4B230A]">person</span>
           </button>
         </div>
       </header>
@@ -169,9 +169,9 @@ export default function Home() {
               onClick={() => navigate('/chat')}
               aria-label="Hỏi Cò Con"
               className="relative flex flex-col items-center justify-center gap-3 overflow-hidden
-                         bg-gradient-to-br from-[#00873a] to-[#006b2c]
+                         bg-gradient-to-br from-[#6b3410] to-[#4B230A]
                          rounded-[24px] py-7 px-3
-                         shadow-[0_8px_24px_rgba(0,107,44,0.35)]
+                         shadow-[0_8px_24px_rgba(75,35,10,0.35)]
                          active:scale-95 transition-transform"
             >
               {/* Pulse ring */}
@@ -190,13 +190,13 @@ export default function Home() {
               onClick={() => navigate('/notifications')}
               aria-label="Thông báo"
               className="relative flex flex-col items-center justify-center gap-3
-                         bg-white border border-[#e5eeff]
+                         bg-white border border-[#f0e0d0]
                          rounded-[24px] py-7 px-3
                          shadow-[0_4px_12px_rgba(0,0,0,0.05)]
                          active:scale-95 transition-transform"
             >
-              <div className="relative w-16 h-16 rounded-full bg-[#f0fdf4] flex items-center justify-center">
-                <span className="material-symbols-outlined text-[36px] text-[#006b2c] ms-fill">notifications</span>
+              <div className="relative w-16 h-16 rounded-full bg-[#fdf6f0] flex items-center justify-center">
+                <span className="material-symbols-outlined text-[36px] text-[#4B230A] ms-fill">notifications</span>
                 {unreadCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[22px] h-[22px] bg-[#EF4444] rounded-full
                                    flex items-center justify-center text-[11px] font-extrabold text-white px-1">
@@ -206,7 +206,7 @@ export default function Home() {
               </div>
               <div className="text-center">
                 <div className="text-[#0b1c30] text-[16px] font-extrabold leading-tight">Thông báo</div>
-                <div className="text-[#6e7b6c] text-[12px] mt-0.5">
+                <div className="text-[#7a6358] text-[12px] mt-0.5">
                   {unreadCount > 0 ? `${unreadCount} tin chưa đọc` : 'Không có tin mới'}
                 </div>
               </div>
@@ -216,7 +216,7 @@ export default function Home() {
           {/* ── Weather card — full width ────────────────────────── */}
           <button
             onClick={() => navigate('/weather')}
-            className="flex items-center gap-4 bg-white rounded-[20px] px-5 py-4 shadow-sm border border-[#e5eeff]
+            className="flex items-center gap-4 bg-white rounded-[20px] px-5 py-4 shadow-sm border border-[#f0e0d0]
                        active:scale-95 transition-transform text-left w-full"
           >
             <div className="w-12 h-12 rounded-2xl bg-[#fffbeb] flex items-center justify-center flex-shrink-0">
@@ -229,7 +229,7 @@ export default function Home() {
               <div className="text-[22px] font-extrabold text-[#0b1c30] leading-none">
                 {weatherLoading ? '...' : `${currentTemp}°C`}
               </div>
-              <div className="text-[13px] text-[#6e7b6c] mt-0.5 truncate">
+              <div className="text-[13px] text-[#7a6358] mt-0.5 truncate">
                 {weatherLoading ? 'Đang tải...' : wmo.label}
                 {!weatherLoading && today && (
                   <span className="ml-2 text-[#3b82f6]">
@@ -238,7 +238,7 @@ export default function Home() {
                 )}
               </div>
             </div>
-            <span className="material-symbols-outlined text-[18px] text-[#bdcaba]">chevron_right</span>
+            <span className="material-symbols-outlined text-[18px] text-[#d4b8a8]">chevron_right</span>
           </button>
 
           {/* ── Daily tip card ───────────────────────────────────── */}
@@ -259,7 +259,7 @@ export default function Home() {
       {/* ── Dashboard links for engineer / admin ─────────────────── */}
       {!isFarmer && (
         <main className="flex-1 flex flex-col gap-3 px-5 py-4 overflow-y-auto">
-          <p className="text-[12px] text-[#6e7b6c] font-semibold uppercase tracking-wider mb-1">
+          <p className="text-[12px] text-[#7a6358] font-semibold uppercase tracking-wider mb-1">
             Truy cập nhanh
           </p>
 
@@ -276,7 +276,7 @@ export default function Home() {
           <button
             onClick={logout}
             className="mt-2 flex items-center justify-center gap-2
-                       text-[13px] text-[#6e7b6c] font-semibold py-3"
+                       text-[13px] text-[#7a6358] font-semibold py-3"
           >
             <span className="material-symbols-outlined text-[18px]">logout</span>
             Đăng xuất
