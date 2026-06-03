@@ -84,14 +84,19 @@ function _cacheKey(question, cropType) {
   return `${cropType || '*'}::${q}`
 }
 
-function getAnswerCache(question, cropType) {
+export function getAnswerCache(question, cropType) {
   const entry = _answerCache.get(_cacheKey(question, cropType))
   if (!entry) return null
   if (Date.now() > entry.expiresAt) { _answerCache.delete(_cacheKey(question, cropType)); return null }
   return entry.result
 }
 
-function setAnswerCache(question, cropType, result) {
+// Dùng cho test — xoá toàn bộ cache để các test độc lập nhau
+export function _clearAnswerCache() {
+  _answerCache.clear()
+}
+
+export function setAnswerCache(question, cropType, result) {
   if (_answerCache.size >= CACHE_MAX) {
     // Xóa entry cũ nhất (insertion order)
     _answerCache.delete(_answerCache.keys().next().value)
@@ -160,7 +165,7 @@ Với những quyết định quan trọng như phun thuốc liều cao hay xử
   },
 ]
 
-function checkFAQ(question) {
+export function checkFAQ(question) {
   const q = question.trim()
   for (const faq of FAQ) {
     if (faq.patterns.some(p => p.test(q))) return faq.answer
