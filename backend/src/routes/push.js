@@ -7,41 +7,11 @@
 // PATCH /api/v1/notifications/settings   — cài đặt thông báo cá nhân
 
 import express   from 'express'
-import webpush   from 'web-push'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
+import { sendPush, dispatchNotification } from '../services/notifications.js'
 
 const router = express.Router()
-
-// ─── Helper: gửi push đến 1 subscription, bắt lỗi nhẹ ────────────────────────
-async function sendPush(subscription, payload) {
-  try {
-    await webpush.sendNotification(subscription, JSON.stringify(payload))
-    return { success: true }
-  } catch (err) {
-    if (err.statusCode === 410) {
-      await supabase
-        .from('push_subscriptions')
-        .update({ active: false })
-        .eq('endpoint', subscription.endpoint)
-    }
-    return { success: false, error: err.message }
-  }
-}
-
-// ─── Helper: kiểm tra khung giờ yên tĩnh ────────────────────────────────────
-function isQuietHour(quietStart, quietEnd) {
-  if (!quietStart || !quietEnd) return false
-  const now   = new Date()
-  const hhmm  = now.getHours() * 60 + now.getMinutes()
-  const [sh, sm] = quietStart.split(':').map(Number)
-  const [eh, em] = quietEnd.split(':').map(Number)
-  const start = sh * 60 + sm
-  const end   = eh * 60 + em
-  // Xử lý trường hợp khung giờ qua nửa đêm (vd: 22:00 - 06:00)
-  if (start > end) return hhmm >= start || hhmm < end
-  return hhmm >= start && hhmm < end
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ĐĂNG KÝ / HUỶ ĐĂNG KÝ
@@ -120,92 +90,60 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
     return res.status(400).json({ error: 'Tiêu đề và nội dung không được để trống.' })
   }
 
+  // Chuẩn hoá thời điểm đặt lịch (nếu có)
+  let scheduledAt = null
+  if (scheduleAt) {
+    const t = new Date(scheduleAt)
+    if (isNaN(t.getTime())) {
+      return res.status(400).json({ error: 'Thời điểm đặt lịch không hợp lệ.' })
+    }
+    scheduledAt = t.toISOString()
+  }
+
   try {
     const { data: notif, error: notifError } = await supabase
       .from('notifications')
       .insert({
-        title:      title.trim(),
-        body:       body.trim(),
+        title:        title.trim(),
+        body:         body.trim(),
         type,
-        image_url:  imageUrl || null,
-        crop_tags:  cropTags,
-        region:     region || null,
-        created_by: req.user.userId,
-        sent_at:    scheduleAt ? null : new Date().toISOString(),
+        image_url:    imageUrl || null,
+        crop_tags:    cropTags,
+        region:       region || null,
+        created_by:   req.user.userId,
+        scheduled_at: scheduledAt,
+        sent_at:      scheduledAt ? null : new Date().toISOString(),
       })
-      .select('id')
+      .select('id, title, body, type, image_url, crop_tags')
       .single()
 
     if (notifError) throw notifError
 
-    // scheduleAt: lưu DB nhưng chưa gửi push (cần cron job xử lý sent_at=null)
-    if (scheduleAt) {
+    // Đặt lịch: chỉ lưu DB, scheduler sẽ gửi khi tới hạn (xem services/notifications.js)
+    if (scheduledAt) {
       return res.json({
         success:        true,
         notificationId: notif.id,
         scheduled:      true,
-        scheduledAt:    scheduleAt,
-        message:        'Đã lưu thông báo, sẽ gửi vào lúc ' + scheduleAt,
+        scheduledAt,
+        message:        'Đã lưu thông báo, sẽ gửi vào lúc ' + scheduledAt,
       })
     }
 
-    const { data: subscriptions } = await supabase
-      .from('push_subscriptions')
-      .select('endpoint, keys, user_id, notif_types, quiet_start, quiet_end')
-      .eq('active', true)
+    // Gửi ngay — dùng chung logic với scheduler
+    const stats = await dispatchNotification(notif)
 
-    if (!subscriptions?.length) {
-      return res.json({ success: true, sent: 0, message: 'Không có thiết bị nào đăng ký.' })
+    if (stats.total === 0) {
+      return res.json({ success: true, sent: 0, message: 'Không có thiết bị nào phù hợp để gửi.' })
     }
-
-    const filtered = subscriptions.filter(sub => {
-      if (sub.notif_types && !sub.notif_types.includes(type)) return false
-      if (isQuietHour(sub.quiet_start, sub.quiet_end)) return false
-      return true
-    })
-
-    let targetSubs = filtered
-    if (cropTags.length > 0) {
-      const userIds = [...new Set(filtered.map(s => s.user_id))]
-      const { data: users } = await supabase
-        .from('users')
-        .select('id, crops')
-        .in('id', userIds)
-
-      const userMap = Object.fromEntries((users || []).map(u => [u.id, u.crops || []]))
-      targetSubs = filtered.filter(sub => {
-        const userCrops = userMap[sub.user_id] || []
-        return cropTags.some(tag => userCrops.includes(tag))
-      })
-    }
-
-    const payload = {
-      title:   title.trim(),
-      body:    body.trim(),
-      image:   imageUrl || null,
-      url:     `/notifications`,
-      notifId: notif.id,
-    }
-
-    const results = await Promise.allSettled(
-      targetSubs.map(sub => sendPush({ endpoint: sub.endpoint, keys: sub.keys }, payload))
-    )
-
-    const sent   = results.filter(r => r.status === 'fulfilled' && r.value.success).length
-    const failed = results.length - sent
-
-    await supabase
-      .from('notifications')
-      .update({ sent_at: new Date().toISOString() })
-      .eq('id', notif.id)
 
     res.json({
       success:        true,
       notificationId: notif.id,
-      sent,
-      failed,
-      total:          targetSubs.length,
-      message:        `Đã gửi đến ${sent}/${targetSubs.length} thiết bị.`,
+      sent:           stats.sent,
+      failed:         stats.failed,
+      total:          stats.total,
+      message:        `Đã gửi đến ${stats.sent}/${stats.total} thiết bị.`,
     })
 
   } catch (err) {

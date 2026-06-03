@@ -14,6 +14,7 @@ import pushRoutes      from './routes/push.js'
 import engineerRoutes  from './routes/engineer.js'
 import adminRoutes     from './routes/admin.js'
 import communityRoutes from './routes/community.js'
+import { startNotificationScheduler } from './services/notifications.js'
 
 const app = express()
 
@@ -78,4 +79,7 @@ app.listen(PORT, () => {
   console.log(`🐦 Cò Con API đang chạy tại http://localhost:${PORT}`)
   console.log(`📋 Môi trường: ${process.env.NODE_ENV}`)
   console.log(`🔗 Supabase: ${process.env.SUPABASE_URL ? '✅ Connected' : '❌ Missing URL'}`)
+
+  // Scheduler gửi thông báo đặt lịch (quét mỗi 60s). In-process — đúng khi 1 replica.
+  startNotificationScheduler()
 })
