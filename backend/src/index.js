@@ -18,14 +18,19 @@ import { startNotificationScheduler } from './services/notifications.js'
 
 const app = express()
 
+// Railway chạy sau reverse proxy → tin 1 hop để req.ip là IP thật của client
+// (cần cho rate-limit theo IP chính xác).
+app.set('trust proxy', 1)
+
 // ─── Rate limiters ────────────────────────────────────────────────────────────
-// Chat: 15 req/phút/IP (tránh spam AI)
+// Chat: 15 req/phút/IP (tránh spam AI). Dùng keyGenerator mặc định — đã an toàn
+// IPv6 và đọc req.ip đúng nhờ 'trust proxy' ở trên (keyGenerator thủ công cũ gây
+// lỗi ERR_ERL_KEY_GEN_IPV6 trên express-rate-limit v8).
 const chatLimiter = rateLimit({
   windowMs:         60 * 1000,
   max:              15,
   standardHeaders:  true,
   legacyHeaders:    false,
-  keyGenerator:     (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.ip,
   message:          { error: 'Bạn hỏi quá nhiều rồi, thử lại sau 1 phút nhé.' },
 })
 
