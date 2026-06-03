@@ -8,12 +8,16 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-// gemini-embedding-exp-03-07: 1500 RPD free — gửi tuần tự 1 request mỗi 700ms
-const EMBED_MODEL  = 'gemini-embedding-exp-03-07'
+// gemini-embedding-001: bản GA ổn định (kế thừa gemini-embedding-exp-03-07 đã bị Google gỡ).
+// Hỗ trợ outputDimensionality 768/1536/3072 — dùng 1536 để khớp cột vector(1536) trong DB.
+// Gửi tuần tự 1 request mỗi 700ms để tránh vượt rate-limit free tier.
+// ⚠️ Đổi model embedding = đổi không gian vector → phải re-embed toàn bộ chunks cũ
+//    (chạy: node scripts/reembed_all.js) nếu không search sẽ lệch.
+const EMBED_MODEL  = 'gemini-embedding-001'
 const EMBED_DIMS   = 1536
 const REQ_DELAY    = 700  // ms giữa mỗi request
 
-async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
+export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
   if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
 

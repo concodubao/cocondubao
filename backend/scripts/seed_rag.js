@@ -1,16 +1,12 @@
-import { OpenAIEmbeddings } from '@langchain/openai'
-import { createClient }     from '@supabase/supabase-js'
- 
+import 'dotenv/config'
+import { createClient } from '@supabase/supabase-js'
+import { embedTexts }   from '../src/services/rag.js'  // dùng chung pipeline Gemini (gemini-embedding-001)
+
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY
 )
- 
-const embeddings = new OpenAIEmbeddings({
-  model:  'text-embedding-3-small',
-  apiKey: process.env.OPENAI_API_KEY,
-})
- 
+
 // ─── 20 QA pairs mẫu — đủ để AI trả lời các câu hỏi phổ biến nhất ─────────
 // Format: { q: câu hỏi, a: câu trả lời, crops: ['rice'|'veggie'|'fruit'] }
 const SEED_QA = [
@@ -145,8 +141,8 @@ async function seedRAG() {
   // Embed từng QA pair (dạng "Q: ... A: ...")
   const texts = SEED_QA.map(qa => `Câu hỏi: ${qa.q}\n\nCâu trả lời: ${qa.a}`)
  
-  console.log('🔄 Đang embed vectors... (~10-20 giây)')
-  const vectors = await embeddings.embedDocuments(texts)
+  console.log('🔄 Đang embed vectors bằng Gemini... (gửi tuần tự, có thể mất ~1 phút)')
+  const vectors = await embedTexts(texts)
  
   // Lưu chunks vào DB
   const chunks = SEED_QA.map((qa, i) => ({
