@@ -57,9 +57,11 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   return results
 }
 
-// ─── LLM: gemini-2.0-flash ────────────────────────────────────────────────────
+// ─── LLM: gemini-2.0-flash-lite ───────────────────────────────────────────────
+// flash-lite có giới hạn free tier cao hơn flash (giảm 429) và dùng quota riêng,
+// tách khỏi Gemini Vision (chat.js vẫn dùng gemini-2.0-flash cho phân tích ảnh).
 const llm = new ChatGoogleGenerativeAI({
-  model:           'gemini-2.0-flash',
+  model:           'gemini-2.0-flash-lite',
   temperature:     0.2,
   maxOutputTokens: 500,
   apiKey:          process.env.GOOGLE_API_KEY,
