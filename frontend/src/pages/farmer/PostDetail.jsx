@@ -152,21 +152,23 @@ export default function PostDetail() {
                 className="w-full max-h-80 object-cover rounded-2xl border border-[#f0e0d0]" />
             )}
 
-            {/* Like button */}
-            <div className="flex items-center gap-4 pt-2 border-t border-[#f1f5f9]">
+            {/* Reaction */}
+            <div className="flex items-center gap-2 pt-2.5 border-t border-[#f1f5f9]">
               <button onClick={handleLike}
-                className="flex items-center gap-2 text-[14px] font-semibold transition-colors"
-                style={{ color: likedByMe ? '#ef4444' : '#64748b' }}
-                aria-label={likedByMe ? 'Bỏ thích' : 'Thích'}>
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[14px] font-bold transition-colors"
+                style={{
+                  background: likedByMe ? '#fff8e8' : '#fdf8f5',
+                  color:      likedByMe ? '#855300' : '#64748b',
+                  border:     `1.5px solid ${likedByMe ? '#fde68a' : '#f0e0d0'}`,
+                }}
+                aria-label={likedByMe ? 'Bỏ chúc mừng' : 'Chúc mừng'}>
                 <span className="material-symbols-outlined text-[20px]"
                       style={likedByMe ? { fontVariationSettings: "'FILL' 1" } : {}}>
-                  favorite
+                  thumb_up
                 </span>
-                {likeCount !== null && likeCount > 0
-                  ? `${likeCount} lượt thích`
-                  : likedByMe ? '1 lượt thích' : 'Thích'}
+                Chúc mừng{likeCount !== null && likeCount > 0 ? ` · ${likeCount}` : ''}
               </button>
-              <span className="text-[14px] text-[#64748b] flex items-center gap-1.5">
+              <span className="text-[14px] text-[#64748b] flex items-center gap-1.5 px-2">
                 <span className="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
                 {comments.length} bình luận
               </span>

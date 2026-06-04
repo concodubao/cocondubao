@@ -120,27 +120,32 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
       )}
 
       {/* Footer actions */}
-      <div className="flex items-center gap-4 pt-1 border-t border-[#f1f5f9]">
+      <div className="flex items-center gap-2 pt-2.5 border-t border-[#f1f5f9]">
         <button
           onClick={handleLike}
-          className="flex items-center gap-1.5 text-[13px] font-semibold transition-colors"
-          style={{ color: likedByMe ? '#ef4444' : '#64748b' }}
-          aria-label={likedByMe ? 'Bỏ thích' : 'Thích'}
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-bold transition-colors"
+          style={{
+            background: likedByMe ? '#fff8e8' : '#fdf8f5',
+            color:      likedByMe ? '#855300' : '#64748b',
+            border:     `1.5px solid ${likedByMe ? '#fde68a' : '#f0e0d0'}`,
+          }}
+          aria-label={likedByMe ? 'Bỏ chúc mừng' : 'Chúc mừng'}
         >
           <span className="material-symbols-outlined text-[18px]"
                 style={likedByMe ? { fontVariationSettings: "'FILL' 1" } : {}}>
-            favorite
+            thumb_up
           </span>
-          {likeCount > 0 && likeCount}
+          Chúc mừng{likeCount > 0 ? ` · ${likeCount}` : ''}
         </button>
 
         <button
           onClick={e => { e.stopPropagation(); navigate(`/community/${post.id}`) }}
-          className="flex items-center gap-1.5 text-[13px] font-semibold text-[#64748b]"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-semibold
+                     text-[#64748b] bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0]"
           aria-label="Bình luận"
         >
           <span className="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
-          {post.commentCount > 0 && post.commentCount}
+          Bình luận{post.commentCount > 0 ? ` · ${post.commentCount}` : ''}
         </button>
       </div>
     </div>
@@ -360,17 +365,13 @@ export default function Community() {
     <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between px-4 py-3
+      <header className="sticky top-0 z-10 flex items-center gap-3 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
-        <h1 className="text-[18px] font-extrabold text-[#0b1c30] m-0">Cộng đồng</h1>
-        <button
-          onClick={() => setShowCompose(true)}
-          className="flex items-center gap-2 h-9 px-4 bg-[#4B230A] text-white text-[13px] font-bold
-                     rounded-full active:scale-95 transition-transform"
-        >
-          <span className="material-symbols-outlined text-[16px]">edit</span>
-          Đăng bài
-        </button>
+        <img src="/cocon-icon-bg.png" alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <h1 className="text-[18px] font-extrabold text-[#0b1c30] m-0 leading-tight">Cộng đồng nhà nông</h1>
+          <p className="text-[12px] text-[#64748b] m-0">Chia sẻ kinh nghiệm cùng bà con</p>
+        </div>
       </header>
 
       <main className="flex-1 flex flex-col gap-3 px-4 py-3 pb-24">
@@ -417,6 +418,21 @@ export default function Community() {
           </button>
         )}
       </main>
+
+      {/* FAB — Chia sẻ niềm vui (nổi trên bottom nav) */}
+      {!showCompose && (
+        <button
+          onClick={() => setShowCompose(true)}
+          aria-label="Chia sẻ niềm vui"
+          className="fixed left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-5 h-12
+                     bg-gradient-to-br from-[#6b3410] to-[#4B230A] text-white text-[15px] font-bold
+                     rounded-full shadow-[0_6px_20px_rgba(75,35,10,0.4)] active:scale-95 transition-transform"
+          style={{ bottom: 'calc(80px + max(8px, env(safe-area-inset-bottom)))' }}
+        >
+          <span className="material-symbols-outlined text-[20px]">edit</span>
+          Chia sẻ niềm vui
+        </button>
+      )}
 
       {showCompose && (
         <NewPostSheet onClose={() => setShowCompose(false)} onPosted={handlePosted} user={user} />
