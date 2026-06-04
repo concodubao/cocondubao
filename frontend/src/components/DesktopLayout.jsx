@@ -79,9 +79,8 @@ export default function DesktopLayout({ children }) {
       <aside style={s.sidebar}>
         {/* Logo */}
         <div style={s.logo}>
-          <div style={s.logoMark}>
-            <Leaf size={16} color="#fff" strokeWidth={1.5} />
-          </div>
+          <img src="/cocon-icon-bg.png" alt="Cò Con"
+               style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
           <div>
             <div style={s.logoTitle}>Cò Con</div>
             <div style={s.logoRole}>

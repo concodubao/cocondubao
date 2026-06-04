@@ -14,7 +14,7 @@ export default defineConfig({
         name: 'Cò Con Dự báo',
         short_name: 'CòCon',
         description: 'Trợ lý nông nghiệp thông minh',
-        theme_color: '#16a34a',
+        theme_color: '#4B230A',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',

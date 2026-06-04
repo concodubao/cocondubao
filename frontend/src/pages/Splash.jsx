@@ -36,7 +36,7 @@ function AppLogo({ size = 72 }) {
       border: '1.5px solid #f0e0d0',
       overflow: 'hidden',
     }}>
-      <img src="/cocon-icon.png" alt="Cò Con" style={{ width: size * 0.85, height: size * 0.85, objectFit: 'contain' }} />
+      <img src="/cocon-icon-bg.png" alt="Cò Con" style={{ width: size * 0.85, height: size * 0.85, objectFit: 'contain' }} />
     </div>
   )
 }

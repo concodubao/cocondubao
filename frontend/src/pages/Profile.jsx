@@ -164,7 +164,7 @@ export default function Profile() {
         <div className="flex flex-col items-center gap-4 px-5 pt-10 pb-6 text-center fade-up">
           <div className="w-20 h-20 rounded-[28px] bg-white border border-[#f0e0d0]
                           flex items-center justify-center shadow-[0_8px_24px_rgba(75,35,10,0.2)]">
-            <img src="/cocon-icon.png" alt="Cò Con" className="w-16 h-16 object-contain" />
+            <img src="/cocon-icon-bg.png" alt="Cò Con" className="w-16 h-16 object-contain" />
           </div>
           <div>
             <h1 className="text-[24px] font-extrabold text-[#0b1c30] leading-tight">Chào mừng!</h1>

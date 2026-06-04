@@ -57,13 +57,25 @@
   --color-background:               #fdf8f5;
   --color-on-background:            #0b1c30;
 
-  /* Semantic shortcuts */
+  /* Semantic shortcuts — bảng màu thương hiệu Cò Con */
   --color-ink-black:                #0F172A;
-  --color-seedling-light:           #F0FDF4;
-  --color-harvest-cream:            #FFFBEB;
-  --color-pest-alert:               #EF4444;
+  --color-text-ink:                 #0b1c30;
+  --color-text-muted:               #6b7280;
+  --color-surface-card:             #ffffff;
+  --color-border-warm:              #f0e0d0;
+  --color-accent-blue:              #00628d;
+  --color-seedling-light:           #e8f5e9;
+  --color-rice-green-dark:          #2e7d32;
+  --color-harvest-cream:            #fff8e8;
+  --color-harvest-amber:            #f59e0b;
+  --color-pest-alert:               #c62828;
+  --color-pest-alert-light:         #fde8e8;
   --color-sun-glare-bg:             #F8FAFC;
-  --color-rice-green-dark:          #15803D;
+  --color-tab-active-bg:            #fdf6f0;
+  --color-badge:                    #d32f2f;
+  --color-push-info:                #e3f2fd;
+  --color-push-border:              #90caf9;
+  --color-push-blue:                #1565c0;
 
   /* Spacing */
   --spacing-margin-safe:    20px;

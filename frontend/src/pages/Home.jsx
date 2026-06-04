@@ -133,7 +133,7 @@ export default function Home() {
           <div className="w-12 h-12 rounded-2xl bg-[#4B230A]
                           flex items-center justify-center shadow-[0_4px_12px_rgba(75,35,10,0.3)]
                           flex-shrink-0 overflow-hidden">
-            <img src="/cocon-icon.png" alt="Cò Con" className="w-10 h-10 object-contain" />
+            <img src="/cocon-icon-bg.png" alt="Cò Con" className="w-10 h-10 object-contain" />
           </div>
           <div>
             <div className="text-[17px] font-extrabold text-[#0b1c30] leading-tight">Cò Con Dự Báo</div>

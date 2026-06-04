@@ -399,7 +399,7 @@ export default function Login() {
         {/* Mascot */}
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center
                         shadow-[0_0_0_2px_rgba(255,255,255,0.3)]">
-          <img src="/cocon-icon.png" alt="Cò Con" className="w-20 h-20 object-contain" />
+          <img src="/cocon-icon-bg.png" alt="Cò Con" className="w-20 h-20 object-contain" />
         </div>
         <div className="text-center">
           <h1 className="text-[28px] font-extrabold text-white tracking-tight">{HERO.title}</h1>

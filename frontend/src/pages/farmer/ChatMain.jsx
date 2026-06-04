@@ -28,7 +28,7 @@ function TypingIndicator() {
     <div className="flex items-end gap-2 mb-4" aria-label="Cò Con đang trả lời">
       <div className="w-7 h-7 rounded-xl bg-white border-[1.5px] border-[#f0e0d0]
                       flex items-center justify-center flex-shrink-0 overflow-hidden">
-        <img src="/cocon-icon.png" alt="Cò Con" className="w-6 h-6 object-contain" />
+        <img src="/cocon-icon-bg.png" alt="Cò Con" className="w-6 h-6 object-contain" />
       </div>
       <div className="flex items-center gap-1.5 px-4 py-3 bg-white
                       rounded-[4px_18px_18px_18px] border border-[#f1f5f9] shadow-sm">
@@ -71,10 +71,8 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
       {/* AI bubble */}
       {!isUser && !isSystem && (
         <div className="flex items-end gap-2">
-          <div className="w-7 h-7 rounded-xl bg-[#fdf6f0] border-[1.5px] border-[#f5d5b0]
-                          flex items-center justify-center flex-shrink-0 mb-0.5">
-            <span className="material-symbols-outlined text-[14px] text-[#4B230A] ms-fill">eco</span>
-          </div>
+          <img src="/cocon-icon-bg.png" alt="Cò Con"
+               className="w-7 h-7 rounded-full flex-shrink-0 mb-0.5 object-cover" />
           <div>
             {msg.image_url && (
               <img src={msg.image_url} alt="Ảnh sâu bệnh"
@@ -347,7 +345,7 @@ export default function ChatMain() {
         <div className="flex-1 flex items-center gap-2.5 justify-center">
           <div className="w-9 h-9 rounded-[12px] bg-white border border-[#f0e0d0]
                           flex items-center justify-center flex-shrink-0 overflow-hidden">
-            <img src="/cocon-icon.png" alt="Cò Con" className="w-8 h-8 object-contain" />
+            <img src="/cocon-icon-bg.png" alt="Cò Con" className="w-8 h-8 object-contain" />
           </div>
           <div>
             <div className="text-[15px] font-bold text-[#0b1c30] leading-tight">Cò Con</div>
@@ -389,7 +387,7 @@ export default function ChatMain() {
           <div className="flex flex-col items-center gap-4 pt-8">
             <div className="rounded-[22px] bg-white border-2 border-[#f0e0d0]
                             flex items-center justify-center overflow-hidden" style={{ width: 72, height: 72 }}>
-              <img src="/cocon-icon.png" alt="Cò Con" className="w-16 h-16 object-contain" />
+              <img src="/cocon-icon-bg.png" alt="Cò Con" className="w-16 h-16 object-contain" />
             </div>
             <p className="text-[15px] text-[#7a6358] text-center m-0">
               Xin chào! Bạn cần hỏi gì về cây trồng không?
