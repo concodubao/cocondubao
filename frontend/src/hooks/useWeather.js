@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 const DEFAULT_LAT = 9.6027    // Sóc Trăng
 const DEFAULT_LON = 105.9740
 const CACHE_KEY   = 'cocon-weather-v1'
-const CACHE_TTL   = 30 * 60 * 1000 // 30 phút
+const CACHE_TTL   = 60 * 60 * 1000 // 60 phút (giảm số lần gọi Open-Meteo, tránh 429)
 
 // WMO Weather Code → nhãn tiếng Việt + Material Symbol icon
 export const WMO_MAP = {
@@ -147,7 +147,21 @@ export function useWeather() {
         localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data, location: loc }))
         if (!cancelled) { setRaw(data); setLocation(loc); setError(null) }
       } catch (err) {
-        if (!cancelled) setError(err.message)
+        // Lỗi mạng / 429 Open-Meteo → ưu tiên dùng dữ liệu cũ đã cache (kể cả hết hạn)
+        let usedStale = false
+        try {
+          const stale = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null')
+          if (stale?.data && !cancelled) {
+            setRaw(stale.data); setLocation(stale.location); setError(null)
+            usedStale = true
+          }
+        } catch {}
+        if (!usedStale && !cancelled) {
+          const is429 = /429|too many/i.test(err.message || '')
+          setError(is429
+            ? 'Thời tiết đang tải lại quá nhiều lần, bạn chờ chút rồi thử lại nhé.'
+            : err.message)
+        }
       } finally {
         if (!cancelled) setLoading(false)
       }
