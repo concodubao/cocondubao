@@ -94,7 +94,7 @@ function CreateEngineerModal({ onClose, onCreated }) {
         <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 99, margin: '0 auto 4px' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 }}>Tạo tài khoản nhân sự</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
             <X size={20} />
           </button>
         </div>
@@ -207,7 +207,7 @@ export default function Users() {
 
       <main style={s.main} aria-live="polite" aria-busy={isLoading}>
         {isLoading ? (
-          <p style={{ textAlign: 'center', color: '#94a3b8', padding: 24 }}>Đang tải...</p>
+          <p style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>Đang tải...</p>
         ) : users.length === 0 ? (
           <div style={s.empty}>
             <p style={{ color: '#64748b' }}>Chưa có người dùng nào.</p>
@@ -249,8 +249,8 @@ const s = {
   cardHead:    { display: 'flex', gap: 10, alignItems: 'flex-start' },
   avatar:      { width: 38, height: 38, borderRadius: '50%', background: '#4B230A', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, flexShrink: 0 },
   userName:    { fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 },
-  userPhone:   { fontSize: 12, color: '#94a3b8', margin: '2px 0 0' },
-  userVillage: { fontSize: 11, color: '#94a3b8', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 3 },
+  userPhone:   { fontSize: 12, color: '#64748b', margin: '2px 0 0' },
+  userVillage: { fontSize: 11, color: '#64748b', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: 3 },
   roleBadge:   { fontSize: 11, padding: '3px 8px', borderRadius: 99, fontWeight: 600, whiteSpace: 'nowrap' },
   cropTag:     { fontSize: 11, background: '#fdf6f0', color: '#4B230A', padding: '2px 7px', borderRadius: 99 },
   actions:     { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' },

@@ -41,7 +41,7 @@ function SessionCard({ session, onClick }) {
         {/* Dòng 1: loại cây + số tin nhắn */}
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="text-[15px] font-bold text-[#0b1c30]">{label}</span>
-          <span className="text-[12px] text-[#94a3b8] flex items-center gap-1 flex-shrink-0">
+          <span className="text-[12px] text-[#64748b] flex items-center gap-1 flex-shrink-0">
             <span className="material-symbols-outlined text-[13px]">chat_bubble_outline</span>
             {session.messageCount}
           </span>
@@ -55,7 +55,7 @@ function SessionCard({ session, onClick }) {
         )}
 
         {/* Ngày giờ */}
-        <div className="flex items-center gap-1 mt-1.5 text-[11px] text-[#94a3b8]">
+        <div className="flex items-center gap-1 mt-1.5 text-[11px] text-[#64748b]">
           <span className="material-symbols-outlined text-[12px]">schedule</span>
           {formatDate(session.created_at)}
         </div>
@@ -107,7 +107,7 @@ export default function ChatHistory() {
       <main className="flex-1 flex flex-col gap-3 px-4 py-4">
 
         {isLoading && (
-          <div className="flex flex-col items-center gap-2 pt-16 text-[#94a3b8]">
+          <div className="flex flex-col items-center gap-2 pt-16 text-[#64748b]">
             <span className="material-symbols-outlined text-[40px] animate-spin">refresh</span>
             <p className="text-[14px]">Đang tải...</p>
           </div>

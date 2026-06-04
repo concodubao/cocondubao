@@ -26,7 +26,7 @@ export default function NotifDetail() {
   if (!notif) {
     return (
       <div style={{ padding: 32, textAlign: 'center' }}>
-        <p style={{ color: '#94a3b8' }}>Không tìm thấy thông báo.</p>
+        <p style={{ color: '#64748b' }}>Không tìm thấy thông báo.</p>
         <button onClick={() => navigate('/notifications')} style={styles.backBtn}>← Quay lại</button>
       </div>
     )
@@ -91,10 +91,10 @@ const styles = {
   main:      { flex: 1, padding: '20px 16px', paddingBottom: 'max(32px, calc(32px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 14 },
   image:     { width: '100%', borderRadius: 12, objectFit: 'cover', maxHeight: 200, border: '1px solid #e2e8f0' },
   title:     { fontSize: 22, fontWeight: 800, color: '#0f172a', margin: 0, lineHeight: 1.3 },
-  date:      { fontSize: 13, color: '#94a3b8' },
+  date:      { fontSize: 13, color: '#64748b' },
   body:      { fontSize: 16, color: '#0f172a', lineHeight: 1.7 },
   tagRow:    { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
-  tagLabel:  { fontSize: 13, color: '#94a3b8' },
+  tagLabel:  { fontSize: 13, color: '#64748b' },
   tag:       { fontSize: 12, background: '#fdf6f0', color: '#4B230A', padding: '3px 10px', borderRadius: 99 },
   btnAsk:    { padding: '14px', fontSize: 17, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
   backBtn:   { padding: '10px 20px', background: 'transparent', border: '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontSize: 14, color: '#64748b', marginTop: 12 },

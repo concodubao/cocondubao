@@ -91,7 +91,7 @@ export default function NotifSettings() {
             <label key={t.id} style={s.typeRow} htmlFor={`type-${t.id}`}>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', margin: 0 }}>{t.label}</p>
-                <p style={{ fontSize: 13, color: '#94a3b8', margin: '3px 0 0' }}>{t.desc}</p>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '3px 0 0' }}>{t.desc}</p>
               </div>
               <input id={`type-${t.id}`} type="checkbox" checked={types.includes(t.id)} onChange={() => toggleType(t.id)}
                 style={{ width: 20, height: 20, cursor: 'pointer', accentColor: '#4B230A' }} />
@@ -101,19 +101,19 @@ export default function NotifSettings() {
 
         <section style={s.section}>
           <p style={s.sTitle}>Khung giờ không gửi thông báo</p>
-          <p style={{ fontSize: 13, color: '#94a3b8', margin: '-4px 0 4px' }}>Trong khung giờ này, thông báo sẽ được giữ lại và gửi sau.</p>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '-4px 0 4px' }}>Trong khung giờ này, thông báo sẽ được giữ lại và gửi sau.</p>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 13, color: '#64748b' }} htmlFor="qs">Từ</label>
               <input id="qs" type="time" value={quietStart} onChange={e => setQuietStart(e.target.value)} style={s.timeInput} />
             </div>
-            <span style={{ color: '#94a3b8', paddingBottom: 8 }}>đến</span>
+            <span style={{ color: '#64748b', paddingBottom: 8 }}>đến</span>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 13, color: '#64748b' }} htmlFor="qe">Đến</label>
               <input id="qe" type="time" value={quietEnd} onChange={e => setQuietEnd(e.target.value)} style={s.timeInput} />
             </div>
           </div>
-          <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>Mặc định: 22:00 – 06:00</p>
+          <p style={{ fontSize: 12, color: '#64748b', margin: '4px 0 0' }}>Mặc định: 22:00 – 06:00</p>
         </section>
 
         <button onClick={handleSave} disabled={saving} style={{ ...s.btnSave, opacity: saving ? 0.7 : 1 }} aria-busy={saving}>

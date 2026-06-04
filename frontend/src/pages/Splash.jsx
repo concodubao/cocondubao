@@ -152,5 +152,5 @@ const s = {
   card:     { background: '#fff', borderRadius: 24, padding: '36px 28px', width: '100%', textAlign: 'center', border: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, boxSizing: 'border-box', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' },
   iconWrap: { width: 80, height: 80, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   btnStart: { padding: '16px 20px', fontSize: 16, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 52, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 12px rgba(75,35,10,0.3)' },
-  btnSkip:  { padding: '16px 18px', fontSize: 14, background: 'transparent', color: '#94a3b8', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', minHeight: 52, whiteSpace: 'nowrap', fontWeight: 500 },
+  btnSkip:  { padding: '16px 18px', fontSize: 14, background: 'transparent', color: '#64748b', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', minHeight: 52, whiteSpace: 'nowrap', fontWeight: 500 },
 }

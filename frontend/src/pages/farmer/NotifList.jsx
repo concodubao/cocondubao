@@ -211,10 +211,10 @@ const styles = {
   cardBody:       { fontSize: 13, color: '#64748b', margin: 0, lineHeight: 1.5 },
   cardMeta:       { display: 'flex', alignItems: 'center', gap: 8, marginTop: 7, flexWrap: 'wrap' },
   typeBadge:      { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99 },
-  cardDate:       { fontSize: 11, color: '#94a3b8' },
+  cardDate:       { fontSize: 11, color: '#64748b' },
   unreadDot:      { width: 7, height: 7, borderRadius: '50%', display: 'inline-block', flexShrink: 0 },
   emptyState:     { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '60px 20px 40px', textAlign: 'center' },
   emptyIconWrap:  { width: 72, height: 72, borderRadius: 22, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   emptyTitle:     { fontSize: 16, fontWeight: 700, color: '#374151', margin: 0 },
-  emptySub:       { fontSize: 14, color: '#94a3b8', margin: 0, lineHeight: 1.6, maxWidth: 260 },
+  emptySub:       { fontSize: 14, color: '#64748b', margin: 0, lineHeight: 1.6, maxWidth: 260 },
 }

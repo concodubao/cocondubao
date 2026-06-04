@@ -16,7 +16,7 @@ function StatusBadge({ status }) {
     draft:     { label: 'Chờ duyệt',   bg: '#fffbeb', color: '#d97706' },
     embedding: { label: 'Đang embed…', bg: '#eff6ff', color: '#2563eb' },
     approved:  { label: 'Đang dùng',   bg: '#fdf6f0', color: '#4B230A' },
-    archived:  { label: 'Lưu trữ',     bg: '#f1f5f9', color: '#94a3b8' },
+    archived:  { label: 'Lưu trữ',     bg: '#f1f5f9', color: '#64748b' },
   }
   const c = MAP[status] || MAP.draft
   return (
@@ -141,7 +141,7 @@ function DocCard({ doc, onApprove, onArchive, onDelete, approving, deleting }) {
           </button>
         )}
         {doc.status === 'archived' && (
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Đã lưu trữ — không dùng trong RAG</span>
+          <span style={{ fontSize: 12, color: '#64748b' }}>Đã lưu trữ — không dùng trong RAG</span>
         )}
         {canDelete && (
           <button onClick={() => onDelete(doc.id, doc.title)} disabled={isDeleting}
@@ -273,7 +273,7 @@ export default function Knowledge() {
       {/* Search box */}
       <div style={{ padding: '8px 14px 0' }}>
         <div style={styles.searchBox}>
-          <Search size={15} color="#94a3b8" strokeWidth={2} />
+          <Search size={15} color="#64748b" strokeWidth={2} />
           <input
             type="search"
             placeholder="Tìm theo tên, nguồn, loại cây..."
@@ -283,14 +283,14 @@ export default function Knowledge() {
             aria-label="Tìm kiếm tài liệu"
           />
           {search && (
-            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0 }} aria-label="Xóa tìm kiếm">✕</button>
+            <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 0 }} aria-label="Xóa tìm kiếm">✕</button>
           )}
         </div>
       </div>
 
       <main style={styles.main} role="region" aria-label="Danh sách tài liệu" aria-live="polite">
         {isLoading ? (
-          <p style={{ color: '#94a3b8', textAlign: 'center', padding: 24 }}>Đang tải...</p>
+          <p style={{ color: '#64748b', textAlign: 'center', padding: 24 }}>Đang tải...</p>
         ) : filteredDocs.length === 0 ? (
           <div style={styles.empty}>
             <FolderOpen size={40} color="#e2e8f0" strokeWidth={1} />
@@ -324,7 +324,7 @@ const styles = {
   statsRow:       { display: 'flex', padding: '12px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0' },
   stat:           { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
   statNum:        { fontSize: 22, fontWeight: 700, color: '#0f172a' },
-  statLabel:      { fontSize: 11, color: '#94a3b8' },
+  statLabel:      { fontSize: 11, color: '#64748b' },
   btnToggleUpload:{ width: '100%', padding: '11px', fontSize: 14, fontWeight: 600, background: '#fdf6f0', color: '#4B230A', border: '1.5px dashed #f5d5b0', borderRadius: 10, cursor: 'pointer', margin: '12px 0 0' },
   uploadCard:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 },
   filePicker:     { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#fdf8f5', border: '2px dashed #f5d5b0', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#64748b', width: '100%', textAlign: 'left', overflow: 'hidden' },
@@ -339,11 +339,11 @@ const styles = {
   docCard:        { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: 8 },
   docHead:        { display: 'flex', gap: 10, alignItems: 'flex-start' },
   docTitle:       { fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0, lineHeight: 1.4 },
-  docSource:      { fontSize: 12, color: '#94a3b8', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: 4 },
+  docSource:      { fontSize: 12, color: '#64748b', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: 4 },
   tag:            { fontSize: 12, padding: '2px 8px', borderRadius: 99, background: '#fdf6f0', color: '#4B230A' },
   docActions:     { display: 'flex', gap: 8, flexWrap: 'wrap' },
   btnApprove:     { padding: '8px 12px', fontSize: 13, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 },
-  btnArchive:     { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
+  btnArchive:     { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
   btnDelete:      { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
   searchBox:      { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '8px 12px', marginBottom: 2 },
   searchInput:    { flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#0f172a', background: 'transparent', fontFamily: "'Noto Sans', sans-serif" },

@@ -107,7 +107,7 @@ export default function AIErrors() {
               <div key={type} style={s.statItem}>
                 <Icon size={16} color={cfg.color} strokeWidth={2} />
                 <span style={{ fontSize: 14, color: '#0f172a', fontWeight: 600 }}>{byType[type] || 0}</span>
-                <span style={{ fontSize: 11, color: '#94a3b8' }}>{cfg.label}</span>
+                <span style={{ fontSize: 11, color: '#64748b' }}>{cfg.label}</span>
               </div>
             )
           })}
@@ -126,7 +126,7 @@ export default function AIErrors() {
 
       <main style={s.main} aria-live="polite" aria-busy={isLoading}>
         {isLoading ? (
-          <p style={{ textAlign: 'center', color: '#94a3b8', padding: 24 }}>Đang tải...</p>
+          <p style={{ textAlign: 'center', color: '#64748b', padding: 24 }}>Đang tải...</p>
         ) : errors.length === 0 ? (
           <div style={s.empty}>
             <CheckCircle size={48} color="#f5d5b0" strokeWidth={1} />
@@ -158,15 +158,15 @@ const s = {
   card:          { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
   cardHead:      { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
   typeBadge:     { fontSize: 12, padding: '3px 10px', borderRadius: 99, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 },
-  date:          { fontSize: 12, color: '#94a3b8', marginLeft: 'auto' },
+  date:          { fontSize: 12, color: '#64748b', marginLeft: 'auto' },
   reviewedBadge: { fontSize: 11, background: '#fdf6f0', color: '#4B230A', padding: '2px 8px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 3 },
   aiAnswer:      { background: '#fdf8f5', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
-  aiLabel:       { fontSize: 12, color: '#94a3b8', margin: 0, fontWeight: 600 },
+  aiLabel:       { fontSize: 12, color: '#64748b', margin: 0, fontWeight: 600 },
   aiText:        { fontSize: 14, color: '#0f172a', margin: 0, lineHeight: 1.6 },
   confTag:       { fontSize: 11, background: '#fffbeb', color: '#f59e0b', padding: '2px 8px', borderRadius: 99, alignSelf: 'flex-start' },
   noteBox:       { background: '#fffbeb', borderRadius: 10, padding: '8px 12px' },
   noteLabel:     { fontSize: 12, color: '#f59e0b', margin: '0 0 4px', fontWeight: 600 },
   noteText:      { fontSize: 14, color: '#78350f', margin: 0, lineHeight: 1.5 },
-  farmerInfo:    { fontSize: 12, color: '#94a3b8', margin: 0 },
+  farmerInfo:    { fontSize: 12, color: '#64748b', margin: 0 },
   btnReview:     { padding: '9px 12px', fontSize: 13, fontWeight: 600, background: '#fdf6f0', color: '#4B230A', border: '1px solid #f5d5b0', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
 }

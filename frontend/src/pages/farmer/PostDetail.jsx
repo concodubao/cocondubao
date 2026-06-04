@@ -137,7 +137,7 @@ export default function PostDetail() {
                     </span>
                   )}
                 </div>
-                <div className="text-[12px] text-[#94a3b8] mt-0.5">
+                <div className="text-[12px] text-[#64748b] mt-0.5">
                   {post.users?.village && `${post.users.village} · `}{timeAgo(post.created_at)}
                 </div>
               </div>
@@ -156,7 +156,7 @@ export default function PostDetail() {
             <div className="flex items-center gap-4 pt-2 border-t border-[#f1f5f9]">
               <button onClick={handleLike}
                 className="flex items-center gap-2 text-[14px] font-semibold transition-colors"
-                style={{ color: likedByMe ? '#ef4444' : '#94a3b8' }}
+                style={{ color: likedByMe ? '#ef4444' : '#64748b' }}
                 aria-label={likedByMe ? 'Bỏ thích' : 'Thích'}>
                 <span className="material-symbols-outlined text-[20px]"
                       style={likedByMe ? { fontVariationSettings: "'FILL' 1" } : {}}>
@@ -166,14 +166,14 @@ export default function PostDetail() {
                   ? `${likeCount} lượt thích`
                   : likedByMe ? '1 lượt thích' : 'Thích'}
               </button>
-              <span className="text-[14px] text-[#94a3b8] flex items-center gap-1.5">
+              <span className="text-[14px] text-[#64748b] flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
                 {comments.length} bình luận
               </span>
             </div>
           </div>
         ) : (
-          <div className="p-5 text-center text-[#94a3b8] text-[14px]">Đang tải bài đăng...</div>
+          <div className="p-5 text-center text-[#64748b] text-[14px]">Đang tải bài đăng...</div>
         )}
 
         {/* Comments section */}
@@ -183,11 +183,11 @@ export default function PostDetail() {
           </p>
 
           {loadingComments && (
-            <p className="text-[13px] text-[#94a3b8]">Đang tải...</p>
+            <p className="text-[13px] text-[#64748b]">Đang tải...</p>
           )}
 
           {!loadingComments && comments.length === 0 && (
-            <p className="text-[14px] text-[#94a3b8] text-center py-4">
+            <p className="text-[14px] text-[#64748b] text-center py-4">
               Chưa có bình luận. Hãy là người đầu tiên!
             </p>
           )}
@@ -215,7 +215,7 @@ export default function PostDetail() {
                     <p className="text-[14px] text-[#0b1c30] leading-snug m-0">{c.content}</p>
                   </div>
                   <div className="flex items-center gap-3 mt-1 pl-1">
-                    <span className="text-[11px] text-[#94a3b8]">{timeAgo(c.created_at)}</span>
+                    <span className="text-[11px] text-[#64748b]">{timeAgo(c.created_at)}</span>
                     {isOwn && (
                       <button onClick={() => handleDeleteComment(c.id)}
                         className="text-[11px] text-[#ef4444] font-semibold">

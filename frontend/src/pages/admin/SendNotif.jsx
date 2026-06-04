@@ -16,7 +16,7 @@ function NotifPreview({ type, title, body }) {
 
   if (!title && !body) {
     return (
-      <div style={{ padding: '20px 0', textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
+      <div style={{ padding: '20px 0', textAlign: 'center', color: '#64748b', fontSize: 14 }}>
         Preview sẽ hiện ở đây khi bạn nhập nội dung...
       </div>
     )
@@ -127,10 +127,10 @@ export default function SendNotif() {
                   <input id={`type-${t.id}`} type="radio" name="type" value={t.id}
                     checked={active} onChange={() => setType(t.id)}
                     style={{ accentColor: t.color }} />
-                  <t.Icon size={16} color={active ? t.color : '#94a3b8'} strokeWidth={2} />
+                  <t.Icon size={16} color={active ? t.color : '#64748b'} strokeWidth={2} />
                   <div>
                     <span style={{ fontSize: 14, fontWeight: active ? 700 : 400, color: '#0f172a' }}>{t.label}</span>
-                    <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 6 }}>{t.desc}</span>
+                    <span style={{ fontSize: 12, color: '#64748b', marginLeft: 6 }}>{t.desc}</span>
                   </div>
                 </label>
               )
@@ -193,7 +193,7 @@ const s = {
   main:        { flex: 1, padding: '14px', display: 'flex', flexDirection: 'column', gap: 12 },
   section:     { background: '#fff', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, border: '1px solid #e2e8f0' },
   sLabel:      { fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 },
-  sDesc:       { fontSize: 12, color: '#94a3b8', margin: '-4px 0 0' },
+  sDesc:       { fontSize: 12, color: '#64748b', margin: '-4px 0 0' },
   typeOption:  { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1.5px solid', transition: 'all 0.15s' },
   input:       { padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', width: '100%', boxSizing: 'border-box' },
   error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 10, margin: 0 },

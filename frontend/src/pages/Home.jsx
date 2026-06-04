@@ -219,7 +219,7 @@ export default function Home() {
             className="flex items-center gap-4 bg-white rounded-[20px] px-5 py-4 shadow-sm border border-[#f0e0d0]
                        active:scale-95 transition-transform text-left w-full"
           >
-            <div className="w-12 h-12 rounded-2xl bg-[#fffbeb] flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-[#e0f2fe] flex items-center justify-center flex-shrink-0">
               <span className="material-symbols-outlined text-[26px] ms-fill"
                     style={{ color: wmo.color }}>
                 {weatherLoading ? 'wb_sunny' : wmo.icon}

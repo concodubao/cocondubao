@@ -68,7 +68,7 @@ export default function ImageUpload() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{ ...styles.pickText, fontWeight: 600, color: '#2e1505', marginBottom: 4 }}>Nhấn để chụp ảnh</p>
-              <p style={{ ...styles.pickText, fontSize: 14, color: '#94a3b8' }}>hoặc chọn từ thư viện ảnh</p>
+              <p style={{ ...styles.pickText, fontSize: 14, color: '#64748b' }}>hoặc chọn từ thư viện ảnh</p>
             </div>
           </div>
         ) : (

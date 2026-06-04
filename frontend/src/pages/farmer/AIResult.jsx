@@ -134,10 +134,10 @@ const s = {
   actionRow:     { display: 'flex', gap: 10 },
   btnAsk:        { flex: 1, padding: '14px', fontSize: 16, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   btnHome:       { flex: 1, padding: '14px', fontSize: 16, background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  reportLink:    { fontSize: 13, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', textAlign: 'center', padding: '4px 0' },
+  reportLink:    { fontSize: 13, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', textAlign: 'center', padding: '4px 0' },
   reportedText:  { fontSize: 13, color: '#4B230A', textAlign: 'center' },
   overlay:       { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end' },
   modal:         { background: '#fff', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   reportBtn:     { padding: '13px', fontSize: 16, background: '#fdf8f5', border: '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', color: '#0f172a', textAlign: 'left' },
-  cancelBtn:     { padding: '12px', fontSize: 16, background: 'transparent', border: 'none', cursor: 'pointer', color: '#94a3b8', textAlign: 'center' },
+  cancelBtn:     { padding: '12px', fontSize: 16, background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748b', textAlign: 'center' },
 }

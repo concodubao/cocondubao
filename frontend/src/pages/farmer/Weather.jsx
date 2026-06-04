@@ -35,7 +35,7 @@ function DayCard({ day, index }) {
 
   return (
     <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 border
-                     ${isToday ? 'bg-[#4B230A] border-[#005a24]' : 'bg-white border-[#f0e0d0]'}
+                     ${isToday ? 'bg-[#0369a1] border-[#075985]' : 'bg-white border-[#f0e0d0]'}
                      shadow-sm`}>
       {/* Ngày */}
       <div className={`w-16 flex-shrink-0 text-[13px] font-bold ${isToday ? 'text-white/90' : 'text-[#7a6358]'}`}>
@@ -66,7 +66,7 @@ function DayCard({ day, index }) {
         <div className={`text-[17px] font-extrabold ${isToday ? 'text-white' : 'text-[#0b1c30]'}`}>
           {day.tmax}°
         </div>
-        <div className={`text-[12px] ${isToday ? 'text-white/70' : 'text-[#94a3b8]'}`}>
+        <div className={`text-[12px] ${isToday ? 'text-white/70' : 'text-[#64748b]'}`}>
           {day.tmin}°
         </div>
       </div>
@@ -97,7 +97,7 @@ export default function Weather() {
       <main className="flex-1 flex flex-col gap-4 px-4 py-4">
 
         {loading && (
-          <div className="flex flex-col items-center justify-center gap-3 pt-16 text-[#94a3b8]">
+          <div className="flex flex-col items-center justify-center gap-3 pt-16 text-[#64748b]">
             <span className="material-symbols-outlined text-[48px] animate-spin">refresh</span>
             <p className="text-[14px]">Đang lấy dữ liệu thời tiết...</p>
           </div>
@@ -115,7 +115,7 @@ export default function Weather() {
           <>
             {/* Hero card hôm nay */}
             <div className="rounded-3xl px-6 py-6 text-white shadow-lg"
-                 style={{ background: 'linear-gradient(135deg, #6b3410, #4B230A)' }}>
+                 style={{ background: 'linear-gradient(135deg, #0ea5e9, #075985)' }}>
               {/* Vị trí */}
               <div className="flex items-center gap-1.5 text-white/80 text-[13px] mb-4">
                 <span className="material-symbols-outlined text-[15px]">location_on</span>
@@ -208,7 +208,7 @@ export default function Weather() {
             </div>
 
             {/* Footer */}
-            <p className="text-center text-[11px] text-[#94a3b8] pb-2">
+            <p className="text-center text-[11px] text-[#64748b] pb-2">
               Nguồn: Open-Meteo · Cập nhật mỗi 30 phút
             </p>
           </>

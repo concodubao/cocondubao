@@ -127,7 +127,7 @@ export default function VoiceRecord() {
             {displayText && (
               <p style={styles.transcriptText}>
                 {transcript && <span style={{ color: '#0f172a' }}>{transcript}</span>}
-                {interimText && <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>{transcript ? ' ' : ''}{interimText}</span>}
+                {interimText && <span style={{ color: '#64748b', fontStyle: 'italic' }}>{transcript ? ' ' : ''}{interimText}</span>}
               </p>
             )}
             {isProcessing && <p style={styles.processingText} aria-live="assertive">Đang nhận dạng giọng nói...</p>}
@@ -177,12 +177,12 @@ const styles = {
   header:         { display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:        { width: 44, height: 44, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   headerTitle:    { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a' },
-  modeTag:        { fontSize: 10, color: '#94a3b8', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 },
+  modeTag:        { fontSize: 10, color: '#64748b', background: '#f1f5f9', padding: '2px 6px', borderRadius: 4 },
   main:           { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '20px 20px 0' },
   displayArea:    { display: 'flex', flexDirection: 'column', gap: 12 },
   micArea:        { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, paddingBottom: 'max(36px, env(safe-area-inset-bottom))' },
   textBox:        { width: '100%', minHeight: 130, border: '2px solid', borderRadius: 16, padding: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border-color 0.3s, background 0.3s', boxSizing: 'border-box' },
-  placeholder:    { fontSize: 15, color: '#94a3b8', textAlign: 'center', margin: 0, lineHeight: 1.6 },
+  placeholder:    { fontSize: 15, color: '#64748b', textAlign: 'center', margin: 0, lineHeight: 1.6 },
   transcriptText: { fontSize: 18, lineHeight: 1.7, margin: 0, wordBreak: 'break-word', textAlign: 'left' },
   processingText: { fontSize: 15, color: '#f59e0b', margin: 0, fontStyle: 'italic' },
   errorBox:       { width: '100%', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12, padding: '12px 16px', fontSize: 15, color: '#ef4444', lineHeight: 1.5 },
@@ -190,5 +190,5 @@ const styles = {
   actionRow:      { display: 'flex', gap: 10, width: '100%' },
   btnRetry:       { flex: 1, padding: '14px', fontSize: 16, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', color: '#0f172a', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   btnConfirm:     { flex: 2, padding: '14px', fontSize: 17, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  hint:           { fontSize: 14, color: '#94a3b8', textAlign: 'center', margin: 0, lineHeight: 1.6 },
+  hint:           { fontSize: 14, color: '#64748b', textAlign: 'center', margin: 0, lineHeight: 1.6 },
 }

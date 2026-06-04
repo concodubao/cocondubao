@@ -22,7 +22,7 @@ function BarChart({ data }) {
         return (
           <g key={d.date}>
             <rect x={x} y={y} width={barW} height={barH} rx="3" fill="#4B230A" fillOpacity="0.7" />
-            <text x={x + barW / 2} y={H + 14} textAnchor="middle" fontSize="9" fill="#94a3b8">{d.date}</text>
+            <text x={x + barW / 2} y={H + 14} textAnchor="middle" fontSize="9" fill="#64748b">{d.date}</text>
             {d.count > 0 && <text x={x + barW / 2} y={y - 3} textAnchor="middle" fontSize="10" fill="#4B230A" fontWeight="600">{d.count}</text>}
           </g>
         )
@@ -106,7 +106,7 @@ function QueueSection({ navigate, currentUserId }) {
       </div>
 
       {all.length === 0 ? (
-        <p style={{ fontSize: 14, color: '#94a3b8', textAlign: 'center', padding: '12px 0', margin: 0 }}>
+        <p style={{ fontSize: 14, color: '#64748b', textAlign: 'center', padding: '12px 0', margin: 0 }}>
           Không có câu hỏi nào đang chờ
         </p>
       ) : (
@@ -122,7 +122,7 @@ function QueueSection({ navigate, currentUserId }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{farmer?.name || 'Nông dân'}</span>
                     <WaitBadge minutes={item.waitMinutes} />
-                    {isOthersItem && <span style={{ fontSize: 11, color: '#94a3b8' }}>· Đang xử lý</span>}
+                    {isOthersItem && <span style={{ fontSize: 11, color: '#64748b' }}>· Đang xử lý</span>}
                   </div>
                   <p style={{ fontSize: 13, color: '#475569', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {msg?.content || '—'}
@@ -167,7 +167,7 @@ export default function Dashboard() {
 
       <main style={s.main}>
         {isLoading ? (
-          <p style={{ textAlign: 'center', color: '#94a3b8', padding: 32 }}>Đang tải...</p>
+          <p style={{ textAlign: 'center', color: '#64748b', padding: 32 }}>Đang tải...</p>
         ) : (
           <>
             <div style={s.grid4}>
@@ -233,7 +233,7 @@ const s = {
   grid4:     { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 },
   grid2:     { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
   statCard:  { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
-  statLabel: { fontSize: 11, color: '#94a3b8', textAlign: 'center' },
+  statLabel: { fontSize: 11, color: '#64748b', textAlign: 'center' },
   statSub:   { fontSize: 10, color: '#e2e8f0' },
   card:      { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
   cardHead:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
@@ -244,5 +244,5 @@ const s = {
   viewAllBtn:   { display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 12, color: '#4B230A', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 },
   queueRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fdf8f5', borderRadius: 10, border: '1px solid #e2e8f0' },
   takeBtn:      { flexShrink: 0, padding: '6px 14px', background: '#4B230A', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  processingTag:{ flexShrink: 0, padding: '5px 10px', background: '#f1f5f9', color: '#94a3b8', borderRadius: 8, fontSize: 12, fontWeight: 500 },
+  processingTag:{ flexShrink: 0, padding: '5px 10px', background: '#f1f5f9', color: '#64748b', borderRadius: 8, fontSize: 12, fontWeight: 500 },
 }

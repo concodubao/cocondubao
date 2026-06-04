@@ -79,7 +79,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
               </span>
             )}
           </div>
-          <div className="text-[12px] text-[#94a3b8] mt-0.5">
+          <div className="text-[12px] text-[#64748b] mt-0.5">
             {post.users?.village && `${post.users.village} · `}{timeAgo(post.created_at)}
           </div>
         </div>
@@ -87,7 +87,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
           <button
             onClick={e => { e.stopPropagation(); onDelete(post.id) }}
             aria-label="Xóa bài"
-            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#94a3b8]
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#64748b]
                        hover:bg-[#fef2f2] hover:text-[#ef4444] transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -124,7 +124,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
         <button
           onClick={handleLike}
           className="flex items-center gap-1.5 text-[13px] font-semibold transition-colors"
-          style={{ color: likedByMe ? '#ef4444' : '#94a3b8' }}
+          style={{ color: likedByMe ? '#ef4444' : '#64748b' }}
           aria-label={likedByMe ? 'Bỏ thích' : 'Thích'}
         >
           <span className="material-symbols-outlined text-[18px]"
@@ -136,7 +136,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
 
         <button
           onClick={e => { e.stopPropagation(); navigate(`/community/${post.id}`) }}
-          className="flex items-center gap-1.5 text-[13px] font-semibold text-[#94a3b8]"
+          className="flex items-center gap-1.5 text-[13px] font-semibold text-[#64748b]"
           aria-label="Bình luận"
         >
           <span className="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
@@ -211,7 +211,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
           className="h-9 px-5 rounded-full text-[14px] font-bold transition-all"
           style={{
             background: canPost && !loading ? '#4B230A' : '#f0e0d0',
-            color:      canPost && !loading ? '#fff' : '#94a3b8',
+            color:      canPost && !loading ? '#fff' : '#64748b',
           }}>
           {loading ? 'Đăng...' : 'Đăng'}
         </button>
@@ -227,7 +227,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
           </div>
           <div>
             <div className="text-[15px] font-bold text-[#0b1c30]">{user?.name || 'Bạn'}</div>
-            {user?.village && <div className="text-[12px] text-[#94a3b8]">{user.village}</div>}
+            {user?.village && <div className="text-[12px] text-[#64748b]">{user.village}</div>}
           </div>
         </div>
 
@@ -301,7 +301,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
         </button>
         {image && (
           <button onClick={() => { setImage(null); setPreview(null) }}
-            className="text-[12px] text-[#94a3b8] underline">
+            className="text-[12px] text-[#64748b] underline">
             Xóa ảnh
           </button>
         )}
@@ -376,7 +376,7 @@ export default function Community() {
       <main className="flex-1 flex flex-col gap-3 px-4 py-3 pb-24">
 
         {isLoading && (
-          <div className="flex flex-col items-center gap-2 pt-16 text-[#94a3b8]">
+          <div className="flex flex-col items-center gap-2 pt-16 text-[#64748b]">
             <span className="material-symbols-outlined text-[40px] animate-spin">refresh</span>
             <p className="text-[14px]">Đang tải...</p>
           </div>
