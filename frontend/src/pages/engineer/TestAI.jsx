@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { chatAPI } from '../../services/api'
 import { Send, FlaskConical, ClipboardList } from 'lucide-react'
+import AnswerContent from '../../components/AnswerContent'
 
 const TEST_SUGGESTIONS = [
   'Lúa bị vàng lá là bệnh gì?',
@@ -120,7 +121,9 @@ export default function TestAI() {
                 fontSize: 15, lineHeight: 1.6,
                 border: isSystem ? '1px solid #fde68a' : isUser ? 'none' : '1px solid #e2e8f0',
               }}>
-                {msg.content}
+                {(!isUser && !isSystem)
+                  ? <AnswerContent content={msg.content} showDisclaimer={msg.source !== 'faq' && msg.source !== 'engineer'} />
+                  : msg.content}
               </div>
               {!isUser && !isSystem && (
                 <div style={{ display: 'flex', gap: 6, paddingLeft: 4, flexWrap: 'wrap' }}>

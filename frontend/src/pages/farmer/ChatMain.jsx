@@ -6,6 +6,7 @@ import { useSTT } from '../../hooks/useSTT'
 import { useTTS } from '../../hooks/useTTS'
 import { toast } from '../../components/Toast'
 import BottomNav from '../../components/BottomNav'
+import AnswerContent from '../../components/AnswerContent'
 
 const CROP_OPTIONS = [
   { id: 'rice',   label: 'Lúa',          icon: 'grass' },
@@ -88,7 +89,7 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
                   Phân tích ảnh bằng AI Vision
                 </div>
               )}
-              {msg.content}
+              <AnswerContent content={msg.content} showDisclaimer={msg.source !== 'faq' && msg.source !== 'engineer'} />
             </div>
           </div>
         </div>

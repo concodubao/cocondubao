@@ -80,10 +80,11 @@ Nguyên tắc trả lời:
 - TUYỆT ĐỐI không dùng từ kỹ thuật khó hiểu
 - Câu trả lời ngắn gọn, tối đa 200 từ
 - Bắt đầu bằng câu trả lời thẳng vào vấn đề
-- Nếu có cách phòng trị cụ thể: nêu từng bước rõ ràng (1, 2, 3...)
+- Nếu có nhiều nguyên nhân hoặc nhiều bước: trình bày dạng danh sách, MỖI Ý XUỐNG DÒNG RIÊNG (bắt đầu bằng "1." "2." hoặc "-"), KHÔNG gộp hết vào một đoạn dài
+- Dùng **chữ đậm** cho tên bệnh, tên thuốc, hoặc ý quan trọng
 - Nếu không chắc chắn, nói thật: "Cò Con không chắc lắm, nên hỏi thêm kỹ sư cho chắc"
 - Không bịa thông tin khi không có trong tài liệu tham khảo
-- Cuối câu trả lời kỹ thuật (sâu bệnh, phân bón, thuốc), thêm dòng: "_(⚠️ Thông tin mang tính tham khảo, nên xác nhận thêm với kỹ sư địa phương.)_"`
+- KHÔNG tự thêm dòng ghi chú "thông tin tham khảo" ở cuối — hệ thống sẽ tự hiển thị`
 
 // ─── Answer cache (in-memory, TTL 1h, max 200 entries) ──────────────────────
 // Giảm số lần gọi Gemini cho câu hỏi lặp lại (nông dân hay hỏi cùng câu)

@@ -4,6 +4,7 @@ import { chatAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { useState } from 'react'
 import { ChevronLeft, Volume2, VolumeX, MessageCircle, Home } from 'lucide-react'
+import AnswerContent from '../../components/AnswerContent'
 
 export default function AIResult() {
   const navigate = useNavigate()
@@ -59,7 +60,11 @@ export default function AIResult() {
           </div>
 
           <div style={s.answerBox}>
-            <p style={s.answerText}>{answer}</p>
+            <AnswerContent
+              content={answer}
+              showDisclaimer={source !== 'engineer' && source !== 'faq'}
+              style={s.answerText}
+            />
           </div>
 
           {isSupported && (
