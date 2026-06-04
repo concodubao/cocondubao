@@ -434,6 +434,13 @@ export default function ChatMain() {
           </p>
         )}
         <div className="flex items-end gap-2">
+          <button
+            onClick={() => navigate('/chat/image')}
+            aria-label="Gửi ảnh sâu bệnh"
+            className="w-11 h-11 rounded-full bg-[#f0e0d0] flex items-center justify-center flex-shrink-0"
+          >
+            <span className="material-symbols-outlined text-[20px] text-[#7a6358]">photo_camera</span>
+          </button>
           <textarea
             ref={textareaRef}
             value={inputText}
