@@ -9,6 +9,7 @@ import Splash        from './pages/Splash'
 import Login         from './pages/Login'
 import Home          from './pages/Home'
 import Profile       from './pages/Profile'
+import Policies      from './pages/Policies'
 import ChatMain      from './pages/farmer/ChatMain'
 import VoiceRecord   from './pages/farmer/VoiceRecord'
 import ImageUpload   from './pages/farmer/ImageUpload'
@@ -76,8 +77,9 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Chung — không cần đăng nhập */}
-          <Route path="/"      element={<Splash />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/"        element={<Splash />} />
+          <Route path="/login"    element={<Login />} />
+          <Route path="/policies" element={<Policies />} />
 
           {/* Chung — cần đăng nhập */}
           <Route path="/home"    element={<ProtectedRoute><Home /></ProtectedRoute>} />

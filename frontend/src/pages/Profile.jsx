@@ -314,6 +314,32 @@ export default function Profile() {
           </p>
         )}
 
+        {/* Khác — cài đặt & chính sách */}
+        {!isOnboard && (
+          <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm divide-y divide-[#f0e0d0]">
+            <button
+              onClick={() => navigate('/notifications/settings')}
+              className="w-full flex items-center justify-between px-5 py-4 active:bg-[#fdf8f5] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px] text-[#4B230A]">notifications</span>
+                <span className="text-[14px] text-[#0b1c30]">Cài đặt thông báo</span>
+              </div>
+              <span className="material-symbols-outlined text-[18px] text-[#c4a898]">chevron_right</span>
+            </button>
+            <button
+              onClick={() => navigate('/policies')}
+              className="w-full flex items-center justify-between px-5 py-4 active:bg-[#fdf8f5] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px] text-[#4B230A]">shield</span>
+                <span className="text-[14px] text-[#0b1c30]">Chính sách & Điều khoản</span>
+              </div>
+              <span className="material-symbols-outlined text-[18px] text-[#c4a898]">chevron_right</span>
+            </button>
+          </div>
+        )}
+
         {/* Logout row */}
         {!isOnboard && (
           <button

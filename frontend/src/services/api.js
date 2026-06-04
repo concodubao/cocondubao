@@ -53,6 +53,7 @@ export const pushAPI = {
   send:             data    => api.post('/push/send', data),
   getNotifications: userId  => api.get(`/push/notifications/${userId}`),
   markRead:         (id)    => api.patch(`/push/notifications/${id}/read`),
+  getSettings:      ()      => api.get('/push/notifications/settings'),
   updateSettings:   settings => api.patch('/push/notifications/settings', settings),
 }
 

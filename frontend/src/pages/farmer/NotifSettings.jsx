@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { pushAPI } from '../../services/api'
@@ -21,6 +21,18 @@ export default function NotifSettings() {
   const [quietEnd,   setQuietEnd]   = useState('06:00')
   const [saving,     setSaving]     = useState(false)
   const [saved,      setSaved]      = useState(false)
+
+  // Tải cài đặt đã lưu để form hiển thị đúng thay vì luôn về mặc định
+  useEffect(() => {
+    pushAPI.getSettings()
+      .then(res => {
+        const d = res.data
+        if (Array.isArray(d.notifTypes)) setTypes(d.notifTypes)
+        if (d.quietStart) setQuietStart(d.quietStart)
+        if (d.quietEnd)   setQuietEnd(d.quietEnd)
+      })
+      .catch(() => {})
+  }, [])
 
   function toggleType(id) {
     setTypes(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])

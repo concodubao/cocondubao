@@ -221,6 +221,29 @@ router.patch('/notifications/:id/read', verifyJWT, async (req, res) => {
   }
 })
 
+// GET /notifications/settings — lấy cài đặt thông báo đã lưu (để form hiển thị đúng)
+router.get('/notifications/settings', verifyJWT, async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('push_subscriptions')
+      .select('notif_types, quiet_start, quiet_end, crops_filter')
+      .eq('user_id', req.user.userId)
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    res.json({
+      notifTypes:  data?.notif_types  ?? ['alert', 'promotion', 'weather'],
+      quietStart:  data?.quiet_start?.slice(0, 5) ?? '22:00',
+      quietEnd:    data?.quiet_end?.slice(0, 5)   ?? '06:00',
+      cropsFilter: data?.crops_filter ?? [],
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // PATCH /notifications/settings — cài đặt thông báo cá nhân
 router.patch('/notifications/settings', verifyJWT, async (req, res) => {
   const { notifTypes, cropsFilter, quietStart, quietEnd } = req.body
