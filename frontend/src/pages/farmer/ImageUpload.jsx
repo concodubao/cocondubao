@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { chatAPI } from '../../services/api'
-import { ChevronLeft, Camera, X } from 'lucide-react'
+import { useSTT } from '../../hooks/useSTT'
+import { ChevronLeft, Camera, X, Mic } from 'lucide-react'
 
 export default function ImageUpload() {
   const navigate = useNavigate()
@@ -14,6 +15,10 @@ export default function ImageUpload() {
   const [text,     setText]     = useState('')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
+
+  // Ghi âm mô tả bằng giọng nói (nhất quán với màn Trò chuyện)
+  const { transcript, isListening, isProcessing, error: sttError, startListening, stopListening } = useSTT()
+  useEffect(() => { if (transcript) setText(transcript) }, [transcript])
 
   function handleFile(e) {
     const f = e.target.files?.[0]
@@ -81,12 +86,34 @@ export default function ImageUpload() {
           </div>
         )}
 
-        <label style={styles.label}>Mô tả thêm (không bắt buộc)</label>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <label style={styles.label}>Mô tả thêm (không bắt buộc)</label>
+          <button
+            type="button"
+            onClick={isListening ? stopListening : startListening}
+            aria-label={isListening ? 'Dừng ghi âm' : 'Nói để mô tả'}
+            aria-pressed={isListening}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 999,
+              border: '1.5px solid', borderColor: isListening ? '#fecaca' : '#f5d5b0',
+              background: isListening ? '#fef2f2' : '#fdf6f0',
+              color: isListening ? '#ef4444' : '#4B230A', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              ...(isListening ? { animation: 'pulse 1s infinite' } : {}),
+            }}
+          >
+            <Mic size={15} /> {isListening ? 'Đang nghe...' : 'Nói'}
+          </button>
+        </div>
         <textarea
           value={text} onChange={e => setText(e.target.value)}
           placeholder="Ví dụ: Lúa bị đốm nâu trên lá, xuất hiện từ 3 ngày nay..."
           style={styles.textarea} rows={3} aria-label="Mô tả thêm"
         />
+        {(sttError || isProcessing) && (
+          <p style={{ fontSize: 13, color: sttError ? '#ba1a1a' : '#7c3aed', margin: '-6px 0 0' }}>
+            {isProcessing ? '⏳ Đang nhận dạng giọng nói...' : sttError}
+          </p>
+        )}
 
         {error && <p style={styles.error} role="alert">{error}</p>}
 
