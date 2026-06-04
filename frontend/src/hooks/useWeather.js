@@ -66,7 +66,8 @@ async function fetchWeather(lat, lon) {
     latitude:        lat,
     longitude:       lon,
     daily:           'temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,weathercode',
-    current_weather: 'true',
+    hourly:          'temperature_2m,precipitation_probability,weather_code',
+    current:         'temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation',
     timezone:        'Asia/Ho_Chi_Minh',
     forecast_days:   '7',
   })
@@ -85,6 +86,35 @@ function parseDaily(raw) {
     rain:        Math.round((raw.daily.precipitation_sum[i] ?? 0) * 10) / 10,
     rainProb:    raw.daily.precipitation_probability_max[i] ?? 0,
   }))
+}
+
+// Thời tiết hiện tại chi tiết (cảm giác như, độ ẩm, gió)
+function parseCurrent(raw) {
+  const c = raw?.current
+  if (!c) return null
+  return {
+    temp:        Math.round(c.temperature_2m),
+    feelsLike:   Math.round(c.apparent_temperature),
+    humidity:    Math.round(c.relative_humidity_2m),
+    wind:        Math.round(c.wind_speed_10m),
+    weathercode: c.weather_code,
+  }
+}
+
+// Dự báo theo giờ — lấy ~12 giờ tới tính từ bây giờ
+function parseHourly(raw) {
+  if (!raw?.hourly?.time) return []
+  const now = Date.now()
+  const all = raw.hourly.time.map((t, i) => ({
+    time:        t,
+    ts:          new Date(t).getTime(),
+    hour:        new Date(t).getHours(),
+    temp:        Math.round(raw.hourly.temperature_2m[i]),
+    rainProb:    raw.hourly.precipitation_probability?.[i] ?? 0,
+    weathercode: raw.hourly.weather_code?.[i] ?? 0,
+  }))
+  const startIdx = all.findIndex(h => h.ts >= now - 3600_000) // gồm cả giờ hiện tại
+  return all.slice(Math.max(0, startIdx), Math.max(0, startIdx) + 12)
 }
 
 export function useWeather() {
@@ -129,9 +159,9 @@ export function useWeather() {
 
   const days        = parseDaily(raw)
   const today       = days[0] ?? null
-  const currentTemp = raw?.current_weather
-    ? Math.round(raw.current_weather.temperature)
-    : today?.tmax ?? null
+  const current     = parseCurrent(raw)
+  const hourly      = parseHourly(raw)
+  const currentTemp = current?.temp ?? today?.tmax ?? null
 
-  return { days, today, currentTemp, location, loading, error }
+  return { days, today, current, hourly, currentTemp, location, loading, error }
 }

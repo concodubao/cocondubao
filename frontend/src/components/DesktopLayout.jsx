@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { ClipboardList, BookOpen, BarChart2, Users, Send, AlertTriangle, Home, LogOut, FlaskConical, Leaf, ChevronRight } from 'lucide-react'
+import { ClipboardList, BookOpen, BarChart2, Users, Send, AlertTriangle, Home, LogOut, FlaskConical, Leaf, ChevronRight, CloudSun } from 'lucide-react'
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
@@ -17,6 +17,7 @@ const ENGINEER_NAV = [
   { path: '/engineer/queue',     Icon: ClipboardList, label: 'Hàng đợi' },
   { path: '/engineer/knowledge', Icon: BookOpen,      label: 'Kho tri thức' },
   { path: '/engineer/test-ai',   Icon: FlaskConical,  label: 'Test AI' },
+  { path: '/weather',            Icon: CloudSun,      label: 'Thời tiết' },
 ]
 
 const ADMIN_NAV = [
@@ -26,6 +27,7 @@ const ADMIN_NAV = [
   { path: '/admin/ai-errors',          Icon: AlertTriangle, label: 'Báo lỗi AI' },
   { path: '/engineer/knowledge',       Icon: BookOpen,      label: 'Kho tri thức' },
   { path: '/engineer/test-ai',         Icon: FlaskConical,  label: 'Test AI' },
+  { path: '/weather',                  Icon: CloudSun,      label: 'Thời tiết' },
 ]
 
 function NavButton({ item, active, onClick }) {

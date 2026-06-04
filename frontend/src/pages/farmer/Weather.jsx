@@ -76,7 +76,7 @@ function DayCard({ day, index }) {
 
 export default function Weather() {
   const navigate = useNavigate()
-  const { days, today, currentTemp, location, loading, error } = useWeather()
+  const { days, today, current, hourly, currentTemp, location, loading, error } = useWeather()
 
   const wmo = getWMO(today?.weathercode)
   const tip = farmingTip(today)
@@ -87,7 +87,7 @@ export default function Weather() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
-        <button onClick={() => navigate('/home')} aria-label="Quay lại"
+        <button onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')} aria-label="Quay lại"
           className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
           <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
@@ -128,6 +128,7 @@ export default function Weather() {
                   <div className="text-[18px] font-bold mt-1">{wmo.label}</div>
                   <div className="text-white/75 text-[13px] mt-1">
                     {today.tmin}° – {today.tmax}°  ·  Mưa {today.rainProb}%
+                    {current && <>{'  '}·  Cảm giác {current.feelsLike}°</>}
                   </div>
                 </div>
                 <span className="material-symbols-outlined ms-fill"
@@ -136,17 +137,63 @@ export default function Weather() {
                 </span>
               </div>
 
-              {/* Lượng mưa */}
-              {today.rain > 0 && (
-                <div className="mt-4 flex items-center gap-2 bg-white/15 rounded-xl px-3 py-2 w-fit">
-                  <span className="material-symbols-outlined text-[16px]">water_drop</span>
-                  <span className="text-[13px] font-semibold">{today.rain}mm mưa hôm nay</span>
+              {/* Chỉ số nhanh: mưa · gió · độ ẩm */}
+              {(current || today.rain > 0) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {today.rain > 0 && (
+                    <div className="flex items-center gap-1.5 bg-white/15 rounded-xl px-3 py-2">
+                      <span className="material-symbols-outlined text-[16px]">water_drop</span>
+                      <span className="text-[13px] font-semibold">{today.rain}mm</span>
+                    </div>
+                  )}
+                  {current && (
+                    <div className="flex items-center gap-1.5 bg-white/15 rounded-xl px-3 py-2">
+                      <span className="material-symbols-outlined text-[16px]">air</span>
+                      <span className="text-[13px] font-semibold">{current.wind} km/h</span>
+                    </div>
+                  )}
+                  {current && (
+                    <div className="flex items-center gap-1.5 bg-white/15 rounded-xl px-3 py-2">
+                      <span className="material-symbols-outlined text-[16px]">humidity_percentage</span>
+                      <span className="text-[13px] font-semibold">Độ ẩm {current.humidity}%</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             {/* Lời khuyên canh tác */}
             {tip && <TipBanner tip={tip} />}
+
+            {/* Dự báo theo giờ */}
+            {hourly.length > 0 && (
+              <div>
+                <p className="text-[12px] font-bold text-[#7a6358] uppercase tracking-wider mb-2 px-1">
+                  Theo giờ
+                </p>
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {hourly.map((h, i) => {
+                    const w = getWMO(h.weathercode)
+                    return (
+                      <div key={h.time}
+                        className="flex flex-col items-center gap-1 bg-white border border-[#f0e0d0]
+                                   rounded-2xl px-3 py-2.5 flex-shrink-0 min-w-[62px] shadow-sm">
+                        <span className="text-[12px] font-semibold text-[#7a6358]">
+                          {i === 0 ? 'Giờ này' : `${h.hour}h`}
+                        </span>
+                        <span className="material-symbols-outlined text-[22px] ms-fill" style={{ color: w.color }}>
+                          {w.icon}
+                        </span>
+                        <span className="text-[15px] font-bold text-[#0b1c30]">{h.temp}°</span>
+                        <span className="text-[11px] text-[#3b82f6] flex items-center gap-0.5">
+                          <span className="material-symbols-outlined text-[12px]">water_drop</span>{h.rainProb}%
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Dự báo 7 ngày */}
             <div>

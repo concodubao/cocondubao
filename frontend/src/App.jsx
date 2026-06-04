@@ -92,7 +92,7 @@ export default function App() {
           <Route path="/chat/result"  element={<ProtectedRoute><AIResult /></ProtectedRoute>} />
           <Route path="/chat/waiting" element={<ProtectedRoute><WaitEngineer /></ProtectedRoute>} />
           <Route path="/chat/history" element={<ProtectedRoute><ChatHistory /></ProtectedRoute>} />
-          <Route path="/weather"          element={<ProtectedRoute><Weather /></ProtectedRoute>} />
+          <Route path="/weather"          element={<Weather />} />{/* công khai — ai cũng xem được */}
           <Route path="/community"        element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/community/:id"    element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
 
