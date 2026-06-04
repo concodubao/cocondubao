@@ -54,6 +54,10 @@ describe('checkFAQ', () => {
   it('câu hỏi kỹ thuật KHÔNG khớp FAQ → null', () => {
     expect(checkFAQ('lúa bị vàng lá là bệnh gì?')).toBeNull()
   })
+
+  it('khớp lời tạm biệt', () => {
+    expect(checkFAQ('tạm biệt')).toBeTypeOf('string')
+  })
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -129,6 +133,24 @@ describe('askRAG — phân tầng theo confidence', () => {
     expect(mocks.invoke).toHaveBeenCalledOnce()
     // low-conf không được cache
     expect(getAnswerCache('đạo ôn lá trị sao', null)).toBeNull()
+  })
+
+  it('chunk QA biên soạn khớp cao → trả thẳng câu trả lời, KHÔNG gọi LLM', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{
+        id: '1', doc_id: 'd1',
+        chunk_text: 'Câu hỏi: Lúa bị vàng lá là bệnh gì?\n\nCâu trả lời: Vàng lá thường do thiếu đạm, bón thêm urê 5-7kg/công.',
+        similarity: 0.85,
+      }],
+      error: null,
+    })
+
+    const res = await askRAG('lúa bị vàng lá là bệnh gì')
+
+    expect(res.source).toBe('qa_direct')
+    expect(res.answer).toBe('Vàng lá thường do thiếu đạm, bón thêm urê 5-7kg/công.')
+    expect(res.needEngineer).toBe(false)
+    expect(mocks.invoke).not.toHaveBeenCalled()
   })
 
   it('confidence ≥ 0.7 → trả lời tin cậy (rag) và được cache', async () => {

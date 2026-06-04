@@ -179,6 +179,14 @@ Bà con hỏi gì về đồng ruộng cũng được nhé! 🌱`,
 
 Với những quyết định quan trọng như phun thuốc liều cao hay xử lý bệnh nặng, bà con nên xác nhận thêm với kỹ sư địa phương để chắc chắn hơn nhé. 🙏`,
   },
+  {
+    patterns: [/^(tạm biệt|bye|goodbye|chào tạm biệt)\b/i, /^(ok|okê|oke|được rồi|hiểu rồi|rõ rồi)\b/i],
+    answer: `Dạ! Bà con cần gì cứ quay lại hỏi Cò Con nhé. Chúc bà con mùa màng bội thu 🌾`,
+  },
+  {
+    patterns: [/bạn tên (gì|là gì)/i, /tên (bạn|mày|mi) là/i],
+    answer: `Mình tên là Cò Con 🐦 — trợ lý nông nghiệp của bà con. Bà con cần hỏi gì về cây trồng cứ nói nhé!`,
+  },
 ]
 
 export function checkFAQ(question) {
@@ -187,6 +195,20 @@ export function checkFAQ(question) {
     if (faq.patterns.some(p => p.test(q))) return faq.answer
   }
   return null
+}
+
+// ─── Trả thẳng câu trả lời từ chunk QA đã biên soạn (tiết kiệm quota LLM) ─────
+// Seed + câu trả lời kỹ sư được lưu dạng "Câu hỏi: ... Câu trả lời: ...". Nếu chunk
+// khớp nhất là một QA như vậy VÀ độ tương đồng đủ cao → dùng luôn câu trả lời đã
+// biên soạn (đã được kiểm duyệt), khỏi gọi Gemini. Giúp câu phổ biến tốn 0 quota.
+const DIRECT_SERVE_THRESHOLD = 0.80
+export function extractCuratedAnswer(chunk, similarity) {
+  if (!chunk || similarity < DIRECT_SERVE_THRESHOLD) return null
+  const text = chunk.chunk_text || ''
+  const idx = text.indexOf('Câu trả lời:')
+  if (idx === -1) return null
+  const answer = text.slice(idx + 'Câu trả lời:'.length).trim()
+  return answer.length > 0 ? answer : null
 }
 
 // ─── askRAG: hàm chính được gọi từ chat route ─────────────────────────────────
@@ -239,6 +261,21 @@ export async function askRAG(question, cropType = null, history = []) {
         source:       'rag',
         chunksFound:  0,
       }
+    }
+
+    // BƯỚC 3.5: Chunk khớp nhất là QA đã biên soạn & rất sát → trả thẳng, bỏ qua LLM
+    const directAnswer = extractCuratedAnswer(chunks[0], topSimilarity)
+    if (directAnswer) {
+      console.log(`[RAG] direct-serve QA (sim=${topSimilarity.toFixed(3)}) — bỏ qua LLM`)
+      const result = {
+        answer:       directAnswer,
+        confidence,
+        needEngineer: false,
+        source:       'qa_direct',
+        chunksFound:  chunks.length,
+      }
+      setAnswerCache(question, cropType, result)
+      return result
     }
 
     if (confidence < 0.7) {
