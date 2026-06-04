@@ -118,6 +118,8 @@ export default function Profile() {
   const [error,        setError]        = useState('')
   const [passwordModal, setPasswordModal] = useState(null) // 'set' | 'change' | null
   const [pwSuccess,    setPwSuccess]    = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting,     setDeleting]     = useState(false)
 
   if (isOnboard && user?.name) return <Navigate to="/home" replace />
 
@@ -141,6 +143,18 @@ export default function Profile() {
       setError(err.response?.data?.error || err.message || 'Không lưu được. Thử lại nhé.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true)
+    try {
+      await authAPI.deleteAccount()
+      logout()  // token bị xoá → ProtectedRoute tự đưa về /login
+    } catch (err) {
+      setError(err.response?.data?.error || 'Không xoá được tài khoản. Thử lại nhé.')
+      setDeleting(false)
+      setConfirmDelete(false)
     }
   }
 
@@ -349,6 +363,32 @@ export default function Profile() {
             <span className="material-symbols-outlined text-[18px]">logout</span>
             Đăng xuất
           </button>
+        )}
+
+        {/* Vùng nguy hiểm — xoá tài khoản */}
+        {!isOnboard && (
+          confirmDelete ? (
+            <div className="bg-[#fde8e8] border border-[#f3b4b4] rounded-2xl p-4 flex flex-col gap-3">
+              <p className="text-[13.5px] text-[#7a2020] m-0 leading-relaxed">
+                Tài khoản sẽ bị vô hiệu hoá và thông tin cá nhân (tên, ấp/xã, cây trồng) sẽ bị xoá. Bạn sẽ bị đăng xuất ngay.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDelete(false)}
+                  className="flex-1 h-11 rounded-xl bg-white border border-[#f0e0d0] text-[14px] text-[#7a6358] font-semibold">
+                  Huỷ
+                </button>
+                <button onClick={handleDeleteAccount} disabled={deleting}
+                  className="flex-1 h-11 rounded-xl bg-[#c62828] text-white text-[14px] font-semibold disabled:opacity-60">
+                  {deleting ? 'Đang xoá...' : 'Xác nhận xoá'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmDelete(true)}
+              className="text-[13px] text-[#c62828] font-medium py-2 mx-auto block">
+              Xoá tài khoản
+            </button>
+          )
         )}
       </main>
 

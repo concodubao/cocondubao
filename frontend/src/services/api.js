@@ -33,6 +33,7 @@ export const authAPI = {
   updateProfile:   (data)                   => api.patch('/auth/profile', data),
   setPassword:     (password)               => api.patch('/auth/set-password', { password }),
   changePassword:  (currentPassword, newPassword) => api.patch('/auth/change-password', { currentPassword, newPassword }),
+  deleteAccount:   ()                       => api.delete('/auth/account'),
 }
 
 export const chatAPI = {

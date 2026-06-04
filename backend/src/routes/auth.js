@@ -229,6 +229,22 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
   }
 })
 
+// ─── DELETE /auth/account — người dùng tự xoá tài khoản (vô hiệu hoá + xoá PII) ──
+// Dùng update (không hard-delete) để không vỡ FK của lịch sử chat/báo lỗi.
+router.delete('/account', verifyJWT, async (req, res) => {
+  try {
+    await supabase.from('users')
+      .update({ is_active: false, name: null, village: null, crops: [] })
+      .eq('id', req.user.userId)
+    await supabase.from('push_subscriptions')
+      .update({ active: false })
+      .eq('user_id', req.user.userId)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ─── GET /auth/me ─────────────────────────────────────────────────────────────
 router.get('/me', verifyJWT, async (req, res) => {
   try {
