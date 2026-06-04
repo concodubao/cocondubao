@@ -40,16 +40,16 @@ function NavButton({ item, active, onClick }) {
         padding: '10px 12px', borderRadius: 10, border: 'none',
         fontSize: 14, cursor: 'pointer', textAlign: 'left', width: '100%',
         background: active ? '#fdf6f0' : hovered ? '#fdf8f5' : 'transparent',
-        color: active ? '#7a3b10' : hovered ? '#374151' : '#64748b',
+        color: active ? '#4B230A' : hovered ? '#374151' : '#64748b',
         fontWeight: active ? 700 : 500,
         fontFamily: "'Noto Sans', sans-serif",
         transition: 'background 0.15s, color 0.15s',
       }}
     >
       <item.Icon size={17} strokeWidth={active ? 2.5 : 1.5}
-        style={{ flexShrink: 0, color: active ? '#7a3b10' : hovered ? '#374151' : '#64748b' }} />
+        style={{ flexShrink: 0, color: active ? '#4B230A' : hovered ? '#374151' : '#64748b' }} />
       <span style={{ flex: 1 }}>{item.label}</span>
-      {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#7a3b10', flexShrink: 0 }} />}
+      {active && <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#4B230A', flexShrink: 0 }} />}
     </button>
   )
 }
@@ -134,14 +134,14 @@ const s = {
   wrapper:   { display: 'flex', minHeight: '100dvh', fontFamily: "'Noto Sans', sans-serif", background: '#fdf8f5' },
   sidebar:   { width: 224, background: '#fff', borderRight: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100dvh', flexShrink: 0, boxShadow: '1px 0 12px rgba(0,0,0,0.04)' },
   logo:      { display: 'flex', alignItems: 'center', gap: 10, padding: '18px 16px 16px', borderBottom: '1px solid #f1f5f9' },
-  logoMark:  { width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#7a3b10,#5a2a0a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(22,163,74,0.3)' },
+  logoMark:  { width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#4B230A,#2e1505)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(22,163,74,0.3)' },
   logoTitle: { fontSize: 14, fontWeight: 800, color: '#0f172a', lineHeight: 1.2 },
   logoRole:  { fontSize: 11, color: '#94a3b8', marginTop: 2 },
   nav:       { flex: 1, padding: '10px 8px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' },
   divider:   { height: 1, background: '#f1f5f9', margin: '8px 4px' },
   footer:    { padding: '12px 14px', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: 10 },
   userRow:   { display: 'flex', gap: 10, alignItems: 'center' },
-  userAvatar:{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#7a3b10,#5a2a0a)', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  userAvatar:{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg,#4B230A,#2e1505)', color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   userName:  { fontSize: 13, fontWeight: 600, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   userSub:   { fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 },
   logoutBtn: { fontSize: 12, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 5, fontFamily: "'Noto Sans', sans-serif" },

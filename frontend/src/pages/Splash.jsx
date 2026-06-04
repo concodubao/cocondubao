@@ -9,7 +9,7 @@ const STEPS = [
     Icon: MessageCircle,
     title: 'Hỏi bằng giọng nói',
     desc:  'Nói câu hỏi về sâu bệnh, Cò Con sẽ trả lời ngay cho bạn',
-    color: '#7a3b10', bg: '#fdf6f0',
+    color: '#4B230A', bg: '#fdf6f0',
   },
   {
     Icon: Camera,
@@ -72,7 +72,7 @@ export default function Splash() {
           {[0, 1, 2].map(i => (
             <div key={i} style={{
               width: 7, height: 7, borderRadius: '50%',
-              background: '#7a3b10', opacity: 0.3,
+              background: '#4B230A', opacity: 0.3,
               animation: `blink 1.2s ease ${i * 0.2}s infinite`,
             }} />
           ))}
@@ -116,7 +116,7 @@ export default function Splash() {
               border: 'none', cursor: 'pointer', padding: 0,
               transition: 'all 0.35s cubic-bezier(0.32,0.72,0,1)',
               width: i === step ? 24 : 6,
-              background: i === step ? '#7a3b10' : '#e2e8f0',
+              background: i === step ? '#4B230A' : '#e2e8f0',
             }} aria-label={`Trang ${i + 1}`} />
           ))}
         </div>

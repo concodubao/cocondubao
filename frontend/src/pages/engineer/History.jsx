@@ -61,7 +61,7 @@ function HistoryCard({ item, onEdit }) {
       <div className="flex items-center gap-2 flex-wrap">
         {crop && (
           <span className="inline-flex items-center gap-1 text-[12px] font-semibold
-                           bg-[#fdf6f0] text-[#7a3b10] px-2.5 py-0.5 rounded-full">
+                           bg-[#fdf6f0] text-[#4B230A] px-2.5 py-0.5 rounded-full">
             <span className="material-symbols-outlined text-[13px] ms-fill">
               {CROP_ICON[crop] || 'grass'}
             </span>

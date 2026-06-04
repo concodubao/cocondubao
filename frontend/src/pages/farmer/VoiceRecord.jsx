@@ -35,7 +35,7 @@ function MicButton({ isListening, isProcessing, onStart, onStop }) {
   let bg, icon, label
   if (isProcessing) { bg = '#f59e0b'; icon = <Square size={48} color="#fff" />; label = 'Đang xử lý...' }
   else if (isListening) { bg = '#ef4444'; icon = <Square size={48} color="#fff" />; label = 'Nhấn để dừng' }
-  else { bg = '#7a3b10'; icon = <Mic size={48} color="#fff" strokeWidth={1.5} />; label = 'Nhấn để nói' }
+  else { bg = '#4B230A'; icon = <Mic size={48} color="#fff" strokeWidth={1.5} />; label = 'Nhấn để nói' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
@@ -66,7 +66,7 @@ function CountdownBar({ isListening, maxSeconds = 30 }) {
   }, [isListening, maxSeconds])
   if (!isListening) return null
   const pct   = (seconds / maxSeconds) * 100
-  const color = seconds < 10 ? '#ef4444' : seconds < 20 ? '#f59e0b' : '#7a3b10'
+  const color = seconds < 10 ? '#ef4444' : seconds < 20 ? '#f59e0b' : '#4B230A'
   return (
     <div style={{ width: '100%', padding: '0 8px' }}>
       <div style={{ height: 4, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}>
@@ -118,7 +118,7 @@ export default function VoiceRecord() {
         <div style={styles.displayArea}>
           <div style={{
             ...styles.textBox,
-            borderColor: isListening ? '#f5d5b0' : hasResult ? '#7a3b10' : '#e2e8f0',
+            borderColor: isListening ? '#f5d5b0' : hasResult ? '#4B230A' : '#e2e8f0',
             background:  hasResult ? '#fdf6f0' : '#fdf8f5',
           }} role="region" aria-label="Text nhận dạng" aria-live="polite">
             {!displayText && !isListening && !isProcessing && (
@@ -189,6 +189,6 @@ const styles = {
   infoBox:        { width: '100%', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 12, padding: '12px 16px' },
   actionRow:      { display: 'flex', gap: 10, width: '100%' },
   btnRetry:       { flex: 1, padding: '14px', fontSize: 16, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', color: '#0f172a', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  btnConfirm:     { flex: 2, padding: '14px', fontSize: 17, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  btnConfirm:     { flex: 2, padding: '14px', fontSize: 17, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   hint:           { fontSize: 14, color: '#94a3b8', textAlign: 'center', margin: 0, lineHeight: 1.6 },
 }

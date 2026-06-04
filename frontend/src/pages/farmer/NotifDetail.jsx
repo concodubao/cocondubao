@@ -95,7 +95,7 @@ const styles = {
   body:      { fontSize: 16, color: '#0f172a', lineHeight: 1.7 },
   tagRow:    { display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' },
   tagLabel:  { fontSize: 13, color: '#94a3b8' },
-  tag:       { fontSize: 12, background: '#fdf6f0', color: '#7a3b10', padding: '3px 10px', borderRadius: 99 },
-  btnAsk:    { padding: '14px', fontSize: 17, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
+  tag:       { fontSize: 12, background: '#fdf6f0', color: '#4B230A', padding: '3px 10px', borderRadius: 99 },
+  btnAsk:    { padding: '14px', fontSize: 17, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
   backBtn:   { padding: '10px 20px', background: 'transparent', border: '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontSize: 14, color: '#64748b', marginTop: 12 },
 }

@@ -15,7 +15,7 @@ function StatusBadge({ status }) {
   const MAP = {
     draft:     { label: 'Chờ duyệt',   bg: '#fffbeb', color: '#d97706' },
     embedding: { label: 'Đang embed…', bg: '#eff6ff', color: '#2563eb' },
-    approved:  { label: 'Đang dùng',   bg: '#fdf6f0', color: '#7a3b10' },
+    approved:  { label: 'Đang dùng',   bg: '#fdf6f0', color: '#4B230A' },
     archived:  { label: 'Lưu trữ',     bg: '#f1f5f9', color: '#94a3b8' },
   }
   const c = MAP[status] || MAP.draft
@@ -70,7 +70,7 @@ function UploadForm({ onSuccess }) {
         style={{ display: 'none' }} />
       <button onClick={() => fileRef.current?.click()} style={styles.filePicker}>
         {file
-          ? <><FileText size={16} color="#7a3b10" strokeWidth={2} /> <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span></>
+          ? <><FileText size={16} color="#4B230A" strokeWidth={2} /> <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span></>
           : <><FolderOpen size={16} color="#64748b" strokeWidth={1.5} /> <span>Chọn file PDF / DOCX / TXT</span></>
         }
       </button>
@@ -81,7 +81,7 @@ function UploadForm({ onSuccess }) {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {CROP_OPTIONS.map(c => (
             <button key={c.id} onClick={() => toggleCrop(c.id)} aria-pressed={crops.includes(c.id)}
-              style={{ ...styles.cropBtn, background: crops.includes(c.id) ? '#fdf6f0' : '#fff', border: `1.5px solid ${crops.includes(c.id) ? '#7a3b10' : '#e2e8f0'}`, color: crops.includes(c.id) ? '#7a3b10' : '#64748b', fontWeight: crops.includes(c.id) ? 700 : 400 }}>
+              style={{ ...styles.cropBtn, background: crops.includes(c.id) ? '#fdf6f0' : '#fff', border: `1.5px solid ${crops.includes(c.id) ? '#4B230A' : '#e2e8f0'}`, color: crops.includes(c.id) ? '#4B230A' : '#64748b', fontWeight: crops.includes(c.id) ? 700 : 400 }}>
               {c.label}
             </button>
           ))}
@@ -245,7 +245,7 @@ export default function Knowledge() {
 
       <div style={styles.statsRow}>
         <div style={styles.stat}><span style={styles.statNum}>{approved}</span><span style={styles.statLabel}>Đang dùng</span></div>
-        <div style={styles.stat}><span style={{ ...styles.statNum, color: draft > 0 ? '#d97706' : '#7a3b10' }}>{draft}</span><span style={styles.statLabel}>Chờ duyệt</span></div>
+        <div style={styles.stat}><span style={{ ...styles.statNum, color: draft > 0 ? '#d97706' : '#4B230A' }}>{draft}</span><span style={styles.statLabel}>Chờ duyệt</span></div>
         <div style={styles.stat}><span style={styles.statNum}>{total}</span><span style={styles.statLabel}>Tổng số</span></div>
       </div>
 
@@ -264,7 +264,7 @@ export default function Knowledge() {
       <div style={styles.filterRow} role="tablist">
         {FILTERS.map(f => (
           <button key={f.key} role="tab" aria-selected={filter === f.key} onClick={() => setFilter(f.key)}
-            style={{ ...styles.filterBtn, background: filter === f.key ? '#7a3b10' : 'transparent', color: filter === f.key ? '#fff' : '#64748b', fontWeight: filter === f.key ? 700 : 400 }}>
+            style={{ ...styles.filterBtn, background: filter === f.key ? '#4B230A' : 'transparent', color: filter === f.key ? '#fff' : '#64748b', fontWeight: filter === f.key ? 700 : 400 }}>
             {f.label}
           </button>
         ))}
@@ -325,13 +325,13 @@ const styles = {
   stat:           { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
   statNum:        { fontSize: 22, fontWeight: 700, color: '#0f172a' },
   statLabel:      { fontSize: 11, color: '#94a3b8' },
-  btnToggleUpload:{ width: '100%', padding: '11px', fontSize: 14, fontWeight: 600, background: '#fdf6f0', color: '#7a3b10', border: '1.5px dashed #f5d5b0', borderRadius: 10, cursor: 'pointer', margin: '12px 0 0' },
+  btnToggleUpload:{ width: '100%', padding: '11px', fontSize: 14, fontWeight: 600, background: '#fdf6f0', color: '#4B230A', border: '1.5px dashed #f5d5b0', borderRadius: 10, cursor: 'pointer', margin: '12px 0 0' },
   uploadCard:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 },
   filePicker:     { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#fdf8f5', border: '2px dashed #f5d5b0', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#64748b', width: '100%', textAlign: 'left', overflow: 'hidden' },
   input:          { padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', width: '100%', boxSizing: 'border-box' },
   cropBtn:        { padding: '6px 12px', borderRadius: 99, cursor: 'pointer', fontSize: 13, transition: 'all 0.15s' },
   errorText:      { color: '#ef4444', fontSize: 13, background: '#fef2f2', padding: '8px 10px', borderRadius: 8, margin: 0 },
-  btnUpload:      { padding: '11px', fontSize: 15, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  btnUpload:      { padding: '11px', fontSize: 15, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   filterRow:      { display: 'flex', padding: '8px 12px', gap: 6, background: '#fff', borderBottom: '1px solid #e2e8f0', overflowX: 'auto' },
   filterBtn:      { padding: '6px 12px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' },
   main:           { flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 },
@@ -340,9 +340,9 @@ const styles = {
   docHead:        { display: 'flex', gap: 10, alignItems: 'flex-start' },
   docTitle:       { fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0, lineHeight: 1.4 },
   docSource:      { fontSize: 12, color: '#94a3b8', margin: '3px 0 0', display: 'flex', alignItems: 'center', gap: 4 },
-  tag:            { fontSize: 12, padding: '2px 8px', borderRadius: 99, background: '#fdf6f0', color: '#7a3b10' },
+  tag:            { fontSize: 12, padding: '2px 8px', borderRadius: 99, background: '#fdf6f0', color: '#4B230A' },
   docActions:     { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  btnApprove:     { padding: '8px 12px', fontSize: 13, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 },
+  btnApprove:     { padding: '8px 12px', fontSize: 13, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 },
   btnArchive:     { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#94a3b8', border: '1px solid #e2e8f0', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
   btnDelete:      { padding: '7px 12px', fontSize: 13, background: 'transparent', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 },
   searchBox:      { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '8px 12px', marginBottom: 2 },

@@ -23,7 +23,7 @@ export default function WaitEngineer() {
       {/* Vùng trên — icon + tiêu đề + mô tả */}
       <div style={styles.topSection}>
         <div style={styles.iconWrap}>
-          <MessageCircle size={48} color="#7a3b10" strokeWidth={1.5} />
+          <MessageCircle size={48} color="#4B230A" strokeWidth={1.5} />
         </div>
         <h1 style={styles.title}>Đã gửi cho kỹ sư!</h1>
         <p style={styles.desc}>
@@ -36,14 +36,14 @@ export default function WaitEngineer() {
       <div style={styles.card}>
         <div style={styles.cardRow}>
           <div style={styles.cardIconWrap}>
-            <Bell size={20} color="#7a3b10" strokeWidth={1.5} />
+            <Bell size={20} color="#4B230A" strokeWidth={1.5} />
           </div>
           <span style={styles.cardText}>Bạn sẽ nhận thông báo ngay khi có câu trả lời</span>
         </div>
         <div style={styles.divider} />
         <div style={styles.cardRow}>
           <div style={styles.cardIconWrap}>
-            <Smartphone size={20} color="#7a3b10" strokeWidth={1.5} />
+            <Smartphone size={20} color="#4B230A" strokeWidth={1.5} />
           </div>
           <span style={styles.cardText}>Bạn có thể đóng ứng dụng, thông báo vẫn đến</span>
         </div>
@@ -74,6 +74,6 @@ const styles = {
   cardText:    { fontSize: 15, color: '#374151', lineHeight: 1.55 },
   divider:     { height: 1, background: '#f1f5f9', margin: '12px 0' },
   buttons:     { display: 'flex', flexDirection: 'column', gap: 12 },
-  btnAsk:      { width: '100%', padding: '16px', fontSize: 17, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  btnAsk:      { width: '100%', padding: '16px', fontSize: 17, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
   btnHome:     { width: '100%', padding: '15px', fontSize: 16, background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
 }

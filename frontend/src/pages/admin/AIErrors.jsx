@@ -118,7 +118,7 @@ export default function AIErrors() {
         {FILTERS.map(f => (
           <button key={f.key} role="tab" aria-selected={filter === f.key}
             onClick={() => setFilter(f.key)}
-            style={{ ...s.tab, background: filter === f.key ? '#7a3b10' : 'transparent', color: filter === f.key ? '#fff' : '#64748b', fontWeight: filter === f.key ? 700 : 400 }}>
+            style={{ ...s.tab, background: filter === f.key ? '#4B230A' : 'transparent', color: filter === f.key ? '#fff' : '#64748b', fontWeight: filter === f.key ? 700 : 400 }}>
             {f.label}
           </button>
         ))}
@@ -159,7 +159,7 @@ const s = {
   cardHead:      { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
   typeBadge:     { fontSize: 12, padding: '3px 10px', borderRadius: 99, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 },
   date:          { fontSize: 12, color: '#94a3b8', marginLeft: 'auto' },
-  reviewedBadge: { fontSize: 11, background: '#fdf6f0', color: '#7a3b10', padding: '2px 8px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 3 },
+  reviewedBadge: { fontSize: 11, background: '#fdf6f0', color: '#4B230A', padding: '2px 8px', borderRadius: 99, display: 'flex', alignItems: 'center', gap: 3 },
   aiAnswer:      { background: '#fdf8f5', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 },
   aiLabel:       { fontSize: 12, color: '#94a3b8', margin: 0, fontWeight: 600 },
   aiText:        { fontSize: 14, color: '#0f172a', margin: 0, lineHeight: 1.6 },
@@ -168,5 +168,5 @@ const s = {
   noteLabel:     { fontSize: 12, color: '#f59e0b', margin: '0 0 4px', fontWeight: 600 },
   noteText:      { fontSize: 14, color: '#78350f', margin: 0, lineHeight: 1.5 },
   farmerInfo:    { fontSize: 12, color: '#94a3b8', margin: 0 },
-  btnReview:     { padding: '9px 12px', fontSize: 13, fontWeight: 600, background: '#fdf6f0', color: '#7a3b10', border: '1px solid #f5d5b0', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
+  btnReview:     { padding: '9px 12px', fontSize: 13, fontWeight: 600, background: '#fdf6f0', color: '#4B230A', border: '1px solid #f5d5b0', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
 }

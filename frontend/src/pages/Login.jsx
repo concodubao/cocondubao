@@ -213,7 +213,7 @@ function StepOTP({ phone, role, onResend }) {
         className={`w-full h-[60px] rounded-full text-white text-[20px] font-bold
                    flex items-center justify-center gap-2 transition-all active:scale-95
                    disabled:opacity-60 disabled:cursor-not-allowed
-                   ${success ? 'bg-[#5a2a0a]' : 'bg-[#4B230A]'}`}>
+                   ${success ? 'bg-[#2e1505]' : 'bg-[#4B230A]'}`}>
         {success
           ? <><span className="material-symbols-outlined ms-fill">check_circle</span> Xác nhận thành công!</>
           : loading ? <><Spinner /> Đang xác nhận...</>

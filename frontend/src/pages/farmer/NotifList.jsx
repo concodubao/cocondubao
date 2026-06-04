@@ -126,7 +126,7 @@ export default function NotifList() {
       {permission !== 'granted' && !isSubscribed && (
         <div style={styles.pushBanner} className="fade-up">
           <div style={styles.pushIconWrap}>
-            <Bell size={18} color="#7a3b10" strokeWidth={2} />
+            <Bell size={18} color="#4B230A" strokeWidth={2} />
           </div>
           <div style={{ flex: 1 }}>
             <p style={styles.pushBannerTitle}>Bật thông báo để nhận cảnh báo sâu bệnh</p>
@@ -143,7 +143,7 @@ export default function NotifList() {
             onClick={() => setFilter(f.key)}
             style={{
               ...styles.filterBtn,
-              background: filter === f.key ? '#7a3b10' : 'transparent',
+              background: filter === f.key ? '#4B230A' : 'transparent',
               color:      filter === f.key ? '#fff' : '#64748b',
               fontWeight: filter === f.key ? 700 : 400,
               boxShadow:  filter === f.key ? '0 2px 6px rgba(22,163,74,0.25)' : 'none',
@@ -200,7 +200,7 @@ const styles = {
   pushIconWrap:   { width: 36, height: 36, borderRadius: 10, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   pushBannerTitle:{ fontSize: 13, fontWeight: 700, color: '#0f172a', margin: 0 },
   pushBannerSub:  { fontSize: 12, color: '#64748b', margin: '2px 0 0', lineHeight: 1.4 },
-  pushBannerBtn:  { padding: '7px 14px', background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 2px 6px rgba(22,163,74,0.3)' },
+  pushBannerBtn:  { padding: '7px 14px', background: '#4B230A', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', boxShadow: '0 2px 6px rgba(22,163,74,0.3)' },
   filterRow:      { display: 'flex', padding: '10px 12px', gap: 6, background: '#fff', borderBottom: '1px solid #f1f5f9', overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
   filterBtn:      { padding: '6px 14px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0, fontFamily: "'Noto Sans', sans-serif", transition: 'background 0.15s, color 0.15s, box-shadow 0.15s' },
   main:           { flex: 1, padding: '10px 14px', paddingBottom: 'max(24px, calc(24px + env(safe-area-inset-bottom)))', display: 'flex', flexDirection: 'column', gap: 8 },

@@ -13,7 +13,7 @@ const TEST_SUGGESTIONS = [
 
 function ConfidenceBadge({ confidence }) {
   const pct = Math.round((confidence || 0) * 100)
-  const color = pct >= 70 ? '#7a3b10' : pct >= 50 ? '#f59e0b' : '#ef4444'
+  const color = pct >= 70 ? '#4B230A' : pct >= 50 ? '#f59e0b' : '#ef4444'
   const bg    = pct >= 70 ? '#fdf6f0' : pct >= 50 ? '#fffbeb' : '#fef2f2'
   return (
     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: bg, color, fontWeight: 600, border: `1px solid ${color}33` }}>
@@ -83,7 +83,7 @@ export default function TestAI() {
     <div style={s.page}>
       <header style={s.header}>
         <div style={s.headerIcon}>
-          <FlaskConical size={18} color="#7a3b10" />
+          <FlaskConical size={18} color="#4B230A" />
         </div>
         <div style={s.headerTitle}>Test AI</div>
         <button onClick={() => navigate('/engineer/queue')} style={s.queueBtn}>
@@ -115,7 +115,7 @@ export default function TestAI() {
               <div style={{
                 maxWidth: '82%', padding: '11px 15px',
                 borderRadius: isUser ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                background: isUser ? '#7a3b10' : isSystem ? '#fffbeb' : '#fff',
+                background: isUser ? '#4B230A' : isSystem ? '#fffbeb' : '#fff',
                 color: isUser ? '#fff' : isSystem ? '#92400e' : '#0f172a',
                 fontSize: 15, lineHeight: 1.6,
                 border: isSystem ? '1px solid #fde68a' : isUser ? 'none' : '1px solid #e2e8f0',
@@ -126,7 +126,7 @@ export default function TestAI() {
                 <div style={{ display: 'flex', gap: 6, paddingLeft: 4, flexWrap: 'wrap' }}>
                   <ConfidenceBadge confidence={msg.confidence} />
                   {msg.source === 'engineer' && (
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#fdf6f0', color: '#5a2a0a', fontWeight: 600 }}>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#fdf6f0', color: '#2e1505', fontWeight: 600 }}>
                       Kỹ sư xác nhận
                     </span>
                   )}
@@ -187,15 +187,15 @@ const s = {
   queueBtn:       { display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: 13, cursor: 'pointer', fontWeight: 500, flexShrink: 0 },
   chatArea:       { flex: 1, overflowY: 'auto', padding: '16px' },
   emptyState:     { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, paddingTop: 24, maxWidth: 480, margin: '0 auto' },
-  emptyIcon:      { width: 60, height: 60, borderRadius: 18, background: '#7a3b10', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  emptyIcon:      { width: 60, height: 60, borderRadius: 18, background: '#4B230A', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   emptyText:      { fontSize: 15, color: '#64748b', textAlign: 'center', margin: 0 },
   suggestions:    { display: 'flex', flexDirection: 'column', gap: 8, width: '100%' },
   suggestionBtn:  { padding: '10px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, fontSize: 14, color: '#0f172a', cursor: 'pointer', textAlign: 'left', lineHeight: 1.4 },
   typingIndicator:{ display: 'flex', gap: 5, alignItems: 'center', padding: '10px 14px', background: '#fff', borderRadius: '18px 18px 18px 4px', width: 'fit-content', border: '1px solid #e2e8f0' },
-  typingDot:      { width: 7, height: 7, borderRadius: '50%', background: '#7a3b10', display: 'inline-block', animation: 'blink 1.4s infinite' },
-  goQueueBtn:     { fontSize: 13, color: '#7a3b10', background: 'none', border: '1px solid #f5d5b0', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 600 },
+  typingDot:      { width: 7, height: 7, borderRadius: '50%', background: '#4B230A', display: 'inline-block', animation: 'blink 1.4s infinite' },
+  goQueueBtn:     { fontSize: 13, color: '#4B230A', background: 'none', border: '1px solid #f5d5b0', borderRadius: 8, padding: '5px 12px', cursor: 'pointer', fontWeight: 600 },
   inputBar:       { padding: '10px 16px', paddingBottom: 'max(10px, env(safe-area-inset-bottom))', background: '#fff', borderTop: '1px solid #e2e8f0', position: 'sticky', bottom: 0 },
   inputRow:       { display: 'flex', gap: 8, alignItems: 'flex-end' },
   textarea:       { flex: 1, padding: '11px 13px', fontSize: 15, borderRadius: 12, border: '1.5px solid #e2e8f0', resize: 'none', outline: 'none', background: '#fdf8f5', color: '#0f172a', lineHeight: 1.5, maxHeight: 120 },
-  sendBtn:        { width: 48, height: 48, borderRadius: '50%', border: 'none', background: '#7a3b10', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  sendBtn:        { width: 48, height: 48, borderRadius: '50%', border: 'none', background: '#4B230A', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
 }

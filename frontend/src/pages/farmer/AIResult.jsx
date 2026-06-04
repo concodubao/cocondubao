@@ -51,7 +51,7 @@ export default function AIResult() {
               <span style={{
                 ...s.confBadge,
                 background: isHighConf ? '#fdf6f0' : isMidConf ? '#fffbeb' : '#eff6ff',
-                color:      isHighConf ? '#7a3b10' : isMidConf ? '#d97706' : '#2563eb',
+                color:      isHighConf ? '#4B230A' : isMidConf ? '#d97706' : '#2563eb',
               }}>
                 Độ tin cậy {confidencePct}%
               </span>
@@ -121,16 +121,16 @@ const s = {
   topContent:    { display: 'flex', flexDirection: 'column', gap: 14, flex: 1 },
   bottomContent: { display: 'flex', flexDirection: 'column', gap: 10 },
   sourceRow:     { display: 'flex', gap: 8, flexWrap: 'wrap' },
-  engineerBadge: { fontSize: 12, background: '#fdf6f0', color: '#5a2a0a', padding: '5px 12px', borderRadius: 99, fontWeight: 600 },
+  engineerBadge: { fontSize: 12, background: '#fdf6f0', color: '#2e1505', padding: '5px 12px', borderRadius: 99, fontWeight: 600 },
   confBadge:     { fontSize: 12, padding: '5px 12px', borderRadius: 99 },
   answerBox:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '18px', flex: 1 },
   answerText:    { fontSize: 17, color: '#0f172a', lineHeight: 1.85, margin: 0, whiteSpace: 'pre-wrap', textAlign: 'left' },
-  ttsBtn:        { padding: '13px', fontSize: 15, fontWeight: 600, background: '#fdf6f0', color: '#7a3b10', border: '1px solid #f5d5b0', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  ttsBtn:        { padding: '13px', fontSize: 15, fontWeight: 600, background: '#fdf6f0', color: '#4B230A', border: '1px solid #f5d5b0', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
   actionRow:     { display: 'flex', gap: 10 },
-  btnAsk:        { flex: 1, padding: '14px', fontSize: 16, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  btnAsk:        { flex: 1, padding: '14px', fontSize: 16, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   btnHome:       { flex: 1, padding: '14px', fontSize: 16, background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   reportLink:    { fontSize: 13, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', textAlign: 'center', padding: '4px 0' },
-  reportedText:  { fontSize: 13, color: '#7a3b10', textAlign: 'center' },
+  reportedText:  { fontSize: 13, color: '#4B230A', textAlign: 'center' },
   overlay:       { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end' },
   modal:         { background: '#fff', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   reportBtn:     { padding: '13px', fontSize: 16, background: '#fdf8f5', border: '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', color: '#0f172a', textAlign: 'left' },

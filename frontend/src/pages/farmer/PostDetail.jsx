@@ -6,7 +6,7 @@ import { communityAPI } from '../../services/api'
 import { toast } from '../../components/Toast'
 
 const ROLE_BADGE = {
-  engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#5a2a0a' },
+  engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#2e1505' },
   admin:    { label: 'Admin', bg: '#eff6ff', color: '#1d4ed8' },
 }
 

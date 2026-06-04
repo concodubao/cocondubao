@@ -140,7 +140,7 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
           {/* Secondary badges */}
           <div className="flex items-center gap-1.5">
             {msg.source === 'engineer' && (
-              <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#5a2a0a] font-semibold
+              <span className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-[#2e1505] font-semibold
                                bg-[#fdf6f0] border border-[#f5d5b0] rounded-lg">
                 <span className="material-symbols-outlined text-[13px] ms-fill">check_circle</span>
                 Kỹ sư xác nhận

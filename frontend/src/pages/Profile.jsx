@@ -309,7 +309,7 @@ export default function Profile() {
         )}
 
         {pwSuccess && (
-          <p className="text-[13px] text-[#5a2a0a] bg-[#fdf6f0] border border-[#f5d5b0] px-4 py-3 rounded-2xl text-center">
+          <p className="text-[13px] text-[#2e1505] bg-[#fdf6f0] border border-[#f5d5b0] px-4 py-3 rounded-2xl text-center">
             ✓ {passwordModal === 'set' || !user?.hasPassword ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
           </p>
         )}

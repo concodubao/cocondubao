@@ -64,10 +64,10 @@ export default function ImageUpload() {
           <div style={styles.pickArea} onClick={() => fileRef.current?.click()} role="button" tabIndex={0}
             aria-label="Nhấn để chọn ảnh">
             <div style={styles.pickIconWrap}>
-              <Camera size={40} color="#7a3b10" strokeWidth={1.5} />
+              <Camera size={40} color="#4B230A" strokeWidth={1.5} />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ ...styles.pickText, fontWeight: 600, color: '#5a2a0a', marginBottom: 4 }}>Nhấn để chụp ảnh</p>
+              <p style={{ ...styles.pickText, fontWeight: 600, color: '#2e1505', marginBottom: 4 }}>Nhấn để chụp ảnh</p>
               <p style={{ ...styles.pickText, fontSize: 14, color: '#94a3b8' }}>hoặc chọn từ thư viện ảnh</p>
             </div>
           </div>
@@ -114,5 +114,5 @@ const styles = {
   label:       { fontSize: 15, fontWeight: 600, color: '#0f172a' },
   textarea:    { width: '100%', padding: '13px 14px', fontSize: 16, borderRadius: 12, border: '1.5px solid #e2e8f0', resize: 'none', outline: 'none', color: '#0f172a', background: '#fff', lineHeight: 1.6, textAlign: 'left', boxSizing: 'border-box' },
   error:       { color: '#ef4444', fontSize: 14, background: '#fef2f2', padding: '10px 14px', borderRadius: 10, margin: 0 },
-  btnSend:     { padding: '15px', fontSize: 18, fontWeight: 700, background: '#7a3b10', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 54 },
+  btnSend:     { padding: '15px', fontSize: 18, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', minHeight: 54 },
 }

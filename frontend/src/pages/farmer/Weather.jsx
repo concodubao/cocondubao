@@ -16,7 +16,7 @@ function TipBanner({ tip }) {
     danger:  { bg: '#fef2f2', border: '#fecaca', text: '#b91c1c', icon: 'warning',      iconColor: '#ef4444' },
     warning: { bg: '#fffbeb', border: '#fde68a', text: '#92400e', icon: 'info',          iconColor: '#f59e0b' },
     info:    { bg: '#eff6ff', border: '#bfdbfe', text: '#1e40af', icon: 'info',          iconColor: '#3b82f6' },
-    success: { bg: '#fdf6f0', border: '#f5d5b0', text: '#5a2a0a', icon: 'check_circle',  iconColor: '#7a3b10' },
+    success: { bg: '#fdf6f0', border: '#f5d5b0', text: '#2e1505', icon: 'check_circle',  iconColor: '#4B230A' },
   }
   const c = cfg[tip.type] || cfg.info
   return (

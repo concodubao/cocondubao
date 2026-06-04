@@ -14,7 +14,7 @@ const CROP_OPTIONS = [
 ]
 
 const ROLE_BADGE = {
-  engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#5a2a0a' },
+  engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#2e1505' },
   admin:    { label: 'Admin', bg: '#eff6ff', color: '#1d4ed8' },
 }
 
@@ -111,7 +111,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
             const c = CROP_OPTIONS.find(o => o.id === tag)
             return (
               <span key={tag} className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full
-                                         bg-[#fdf6f0] text-[#5a2a0a]">
+                                         bg-[#fdf6f0] text-[#2e1505]">
                 #{c?.label || tag}
               </span>
             )
@@ -278,8 +278,8 @@ function NewPostSheet({ onClose, onPosted, user }) {
                   className="px-3 py-1.5 text-[13px] font-semibold rounded-full border-[1.5px] transition-all"
                   style={{
                     background:  active ? '#fdf6f0' : '#fdf8f5',
-                    borderColor: active ? '#7a3b10' : '#f0e0d0',
-                    color:       active ? '#5a2a0a' : '#7a6358',
+                    borderColor: active ? '#4B230A' : '#f0e0d0',
+                    color:       active ? '#2e1505' : '#7a6358',
                   }}>
                   {active && '✓ '}{c.label}
                 </button>

@@ -12,7 +12,7 @@ function WaitBadge({ minutes }) {
   const warn   = minutes > 30
   return (
     <span className={`inline-flex items-center gap-1 text-[12px] font-semibold px-2.5 py-0.5 rounded-full
-      ${urgent ? 'bg-[#fef2f2] text-[#ef4444]' : warn ? 'bg-[#fffbeb] text-[#f59e0b]' : 'bg-[#fdf6f0] text-[#7a3b10]'}`}>
+      ${urgent ? 'bg-[#fef2f2] text-[#ef4444]' : warn ? 'bg-[#fffbeb] text-[#f59e0b]' : 'bg-[#fdf6f0] text-[#4B230A]'}`}>
       <span className="material-symbols-outlined text-[13px]">schedule</span>
       {minutes < 60 ? `${minutes} phút` : `${Math.round(minutes / 60)} giờ`} chờ
     </span>
@@ -61,7 +61,7 @@ function QueueCard({ item, onTake, onDelete, currentUserId, deleting }) {
       <div className="flex items-center gap-2 flex-wrap">
         {crop && (
           <span className="inline-flex items-center gap-1 text-[12px] font-semibold
-                           bg-[#fdf6f0] text-[#7a3b10] px-2.5 py-0.5 rounded-full">
+                           bg-[#fdf6f0] text-[#4B230A] px-2.5 py-0.5 rounded-full">
             <span className="material-symbols-outlined text-[13px] ms-fill">
               {CROP_ICON[crop] || 'grass'}
             </span>

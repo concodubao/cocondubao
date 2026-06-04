@@ -45,7 +45,7 @@ function PageLoader() {
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 10,
-          background: 'linear-gradient(135deg,#7a3b10,#5a2a0a)',
+          background: 'linear-gradient(135deg,#4B230A,#2e1505)',
           animation: 'spin 0.8s linear infinite',
         }} />
         <p style={{ fontSize: 14, color: '#94a3b8', margin: 0 }}>Đang tải...</p>
