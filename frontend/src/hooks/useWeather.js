@@ -134,7 +134,7 @@ export function useWeather() {
           if (!cancelled) { setRaw(cached.data); setLocation(cached.location); setLoading(false) }
           return
         }
-      } catch {}
+      } catch { /* cache hỏng → bỏ qua, tải mới */ }
 
       setLoading(true)
       try {
@@ -155,7 +155,7 @@ export function useWeather() {
             setRaw(stale.data); setLocation(stale.location); setError(null)
             usedStale = true
           }
-        } catch {}
+        } catch { /* cache hỏng → để rơi xuống nhánh báo lỗi */ }
         if (!usedStale && !cancelled) {
           const is429 = /429|too many/i.test(err.message || '')
           setError(is429
