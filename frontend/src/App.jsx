@@ -60,6 +60,17 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 1000 * 60 * 5 } },
 })
 
+// ─── WeatherRoute ─────────────────────────────────────────────────────────────
+// /weather là route công khai (nông dân + khách xem được). Với kỹ sư/admin thì
+// bọc trong DesktopLayout để giữ sidebar + thanh tab, không rớt ra trang rời rạc.
+function WeatherRoute() {
+  const { user } = useAuthStore()
+  const isStaff = user?.role === 'engineer' || user?.role === 'admin'
+  return isStaff
+    ? <DesktopLayout><Weather /></DesktopLayout>
+    : <Weather />
+}
+
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
 function ProtectedRoute({ children, allowedRoles }) {
   const { token, user } = useAuthStore()
@@ -92,7 +103,7 @@ export default function App() {
           <Route path="/chat/result"  element={<ProtectedRoute><AIResult /></ProtectedRoute>} />
           <Route path="/chat/waiting" element={<ProtectedRoute><WaitEngineer /></ProtectedRoute>} />
           <Route path="/chat/history" element={<ProtectedRoute><ChatHistory /></ProtectedRoute>} />
-          <Route path="/weather"          element={<Weather />} />{/* công khai — ai cũng xem được */}
+          <Route path="/weather"          element={<WeatherRoute />} />{/* công khai; staff thì có layout */}
           <Route path="/community"        element={<ProtectedRoute><Community /></ProtectedRoute>} />
           <Route path="/community/:id"    element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
 
