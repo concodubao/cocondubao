@@ -92,6 +92,8 @@ function StepPhonePin() {
   const [mode,     setMode]     = useState('login') // 'login' | 'register'
   const [phone,    setPhone]    = useState('')
   const [pin,      setPin]      = useState('')
+  const [legacy,   setLegacy]   = useState(false) // đăng nhập bằng mật khẩu chữ (tài khoản cũ)
+  const [textPass, setTextPass] = useState('')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
   const { setUser, setToken }   = useAuthStore()
@@ -100,13 +102,18 @@ function StepPhonePin() {
 
   async function submit() {
     const p = phone.trim()
-    if (!p)              return setError('Vui lòng nhập số điện thoại.')
-    if (pin.length !== 6) return setError('Mã PIN gồm 6 chữ số.')
+    if (!p) return setError('Vui lòng nhập số điện thoại.')
+    const useLegacy = mode === 'login' && legacy
+    if (useLegacy) {
+      if (!textPass) return setError('Vui lòng nhập mật khẩu.')
+    } else if (pin.length !== 6) {
+      return setError('Mã PIN gồm 6 chữ số.')
+    }
     setError(''); setLoading(true)
     try {
       const res = mode === 'register'
         ? await authAPI.registerPhone(p, pin)
-        : await authAPI.loginPhone(p, pin)
+        : await authAPI.loginPhone(p, useLegacy ? textPass : pin)
       const { token, user, isNewUser } = res.data
       setToken(token); setUser(user)
       window.location.href = isNewUser ? '/profile?onboard=true' : '/home'
@@ -143,11 +150,24 @@ function StepPhonePin() {
 
       <div className="space-y-2">
         <label className="text-[16px] font-bold text-[#0b1c30]">
-          {mode === 'register' ? 'Tạo mã PIN (6 số)' : 'Mã PIN (6 số)'}
+          {mode === 'register' ? 'Tạo mã PIN (6 số)' : (legacy ? 'Mật khẩu (tài khoản cũ)' : 'Mã PIN (6 số)')}
         </label>
-        <DigitBoxes value={pin} onChange={setPin} autoFocus={false} />
+        {mode === 'login' && legacy ? (
+          <input type="password" autoComplete="current-password" placeholder="Nhập mật khẩu cũ" autoFocus
+            value={textPass} onChange={e => setTextPass(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && submit()}
+            className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
+        ) : (
+          <DigitBoxes value={pin} onChange={setPin} autoFocus={false} />
+        )}
         {mode === 'register' && (
           <p className="text-[12.5px] text-[#7a6358] text-center">Nhớ kỹ mã PIN này để đăng nhập lần sau nhé.</p>
+        )}
+        {mode === 'login' && (
+          <button type="button" onClick={() => { setLegacy(v => !v); setError('') }}
+            className="block mx-auto text-[13px] text-[#4B230A] font-semibold pt-1">
+            {legacy ? 'Dùng mã PIN 6 số' : 'Tài khoản cũ dùng mật khẩu chữ?'}
+          </button>
         )}
       </div>
 
