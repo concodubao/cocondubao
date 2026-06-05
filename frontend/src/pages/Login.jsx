@@ -38,7 +38,10 @@ function StepRole({ onNext }) {
 
 // ─── Ô nhập 6 chữ số (dùng cho cả PIN lẫn OTP) ──────────────
 function DigitBoxes({ value, onChange, autoFocus = true }) {
-  const refs = Array.from({ length: 6 }, () => useRef(null))
+  // 6 ref tường minh — không gọi useRef trong vòng lặp (rules-of-hooks)
+  const r0 = useRef(null), r1 = useRef(null), r2 = useRef(null)
+  const r3 = useRef(null), r4 = useRef(null), r5 = useRef(null)
+  const refs = [r0, r1, r2, r3, r4, r5]
   const digits = value.split('')
   useEffect(() => { if (autoFocus) refs[0].current?.focus() }, [])
 

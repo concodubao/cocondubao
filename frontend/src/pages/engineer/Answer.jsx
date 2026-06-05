@@ -37,13 +37,14 @@ export default function Answer() {
   const location = useLocation()
   const item     = location.state?.queueItem
 
-  if (!item) return <Navigate to="/engineer/queue" replace />
-
   const [answer,         setAnswer]         = useState('')
   const [addToKnowledge, setAddToKnowledge] = useState(false)
   const [loading,        setLoading]        = useState(false)
   const [error,          setError]          = useState('')
   const [lightbox,       setLightbox]       = useState(false)
+
+  // Hooks phải chạy trước mọi return có điều kiện (rules-of-hooks)
+  if (!item) return <Navigate to="/engineer/queue" replace />
 
   const msg  = item?.messages
   const user = msg?.chat_sessions?.users
