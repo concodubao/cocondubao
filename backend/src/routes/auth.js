@@ -31,6 +31,27 @@ function normalizePhone(raw) {
   return '+84' + digits
 }
 
+// ─── Khoá chống dò PIN (in-memory; backstop cùng rate-limit theo IP) ──────────
+// PIN 6 số (1 triệu tổ hợp) nên cần chặn dò: sai 5 lần/1 số → khoá 10 phút.
+const MAX_ATTEMPTS = 5
+const LOCK_MS      = 10 * 60 * 1000
+const _loginAttempts = new Map() // phone → { count, lockedUntil }
+
+function lockMinutesLeft(phone) {
+  const a = _loginAttempts.get(phone)
+  if (a?.lockedUntil && Date.now() < a.lockedUntil) {
+    return Math.ceil((a.lockedUntil - Date.now()) / 60000)
+  }
+  return 0
+}
+function recordFail(phone) {
+  const a = _loginAttempts.get(phone) || { count: 0, lockedUntil: 0 }
+  a.count += 1
+  if (a.count >= MAX_ATTEMPTS) { a.lockedUntil = Date.now() + LOCK_MS; a.count = 0 }
+  _loginAttempts.set(phone, a)
+}
+function clearFail(phone) { _loginAttempts.delete(phone) }
+
 // ─── POST /auth/request-otp ───────────────────────────────────────────────────
 router.post('/request-otp', otpLimiter, async (req, res) => {
   const { phone } = req.body
@@ -159,7 +180,50 @@ router.post('/login-email', async (req, res) => {
   }
 })
 
-// ─── POST /auth/login-phone — farmer đăng nhập bằng SĐT + mật khẩu ─────────
+// ─── POST /auth/register-phone — đăng ký nông dân bằng SĐT + PIN 6 số ─────────
+router.post('/register-phone', async (req, res) => {
+  const { phone, password } = req.body
+  if (!phone || !password) return res.status(400).json({ error: 'Vui lòng nhập số điện thoại và mã PIN.' })
+
+  const normalized = normalizePhone(phone)
+  if (!isValidPhone(normalized))   return res.status(400).json({ error: 'Số điện thoại không hợp lệ.' })
+  if (!/^\d{6}$/.test(password))    return res.status(400).json({ error: 'Mã PIN phải gồm đúng 6 chữ số.' })
+
+  try {
+    const { data: existing } = await supabase.from('users').select('id, password_hash').eq('phone', normalized).single()
+    if (existing?.password_hash) return res.status(400).json({ error: 'Số điện thoại này đã đăng ký. Vui lòng đăng nhập.' })
+
+    const password_hash = await bcrypt.hash(password, 10)
+    // Nếu đã có user (vd tạo qua OTP trước đây) nhưng chưa có PIN → gán PIN; nếu chưa có → tạo mới
+    let user
+    if (existing) {
+      const { data, error } = await supabase.from('users')
+        .update({ password_hash, is_active: true }).eq('id', existing.id).select().single()
+      if (error) throw error
+      user = data
+    } else {
+      const { data, error } = await supabase.from('users')
+        .insert({ phone: normalized, role: 'farmer', is_active: true, password_hash }).select().single()
+      if (error) throw error
+      user = data
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, phone: user.phone, role: user.role, name: user.name },
+      process.env.JWT_SECRET, { expiresIn: '30d' }
+    )
+    res.json({
+      success: true, token,
+      user: { id: user.id, phone: user.phone, role: user.role, name: user.name, village: user.village, crops: user.crops, hasPassword: true },
+      isNewUser: !user.name,
+    })
+  } catch (err) {
+    console.error('[AUTH] register-phone:', err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── POST /auth/login-phone — đăng nhập bằng SĐT + mã PIN (có khoá chống dò) ──
 router.post('/login-phone', async (req, res) => {
   const { phone, password } = req.body
   if (!phone || !password) return res.status(400).json({ error: 'Vui lòng nhập đầy đủ.' })
@@ -167,15 +231,22 @@ router.post('/login-phone', async (req, res) => {
   const normalized = normalizePhone(phone)
   if (!isValidPhone(normalized)) return res.status(400).json({ error: 'Số điện thoại không hợp lệ.' })
 
+  const lockMin = lockMinutesLeft(normalized)
+  if (lockMin > 0) return res.status(429).json({ error: `Nhập sai mã PIN nhiều lần. Thử lại sau ${lockMin} phút, hoặc dùng "Quên mã PIN".` })
+
   try {
     const { data: user } = await supabase.from('users').select('*').eq('phone', normalized).single()
     if (!user) return res.status(401).json({ error: 'Số điện thoại chưa đăng ký.' })
-    if (!user.password_hash) return res.status(401).json({ error: 'Tài khoản này chưa đặt mật khẩu. Vui lòng đăng nhập bằng OTP.' })
+    if (!user.password_hash) return res.status(401).json({ error: 'Tài khoản chưa đặt mã PIN. Hãy dùng "Quên mã PIN" để đặt lại.' })
 
     const valid = await bcrypt.compare(password, user.password_hash)
-    if (!valid) return res.status(401).json({ error: 'Mật khẩu không đúng.' })
+    if (!valid) {
+      recordFail(normalized)
+      return res.status(401).json({ error: 'Mã PIN không đúng.' })
+    }
     if (!user.is_active) return res.status(403).json({ error: 'Tài khoản đã bị khoá.' })
 
+    clearFail(normalized)
     const token = jwt.sign(
       { userId: user.id, phone: user.phone, role: user.role, name: user.name },
       process.env.JWT_SECRET, { expiresIn: '30d' }
@@ -223,6 +294,22 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
 
     const hash = await bcrypt.hash(newPassword, 12)
     await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ─── PATCH /auth/reset-pin — đặt lại PIN sau khi xác thực OTP (quên PIN) ──────
+// Chỉ gọi được khi đã có JWT (lấy qua verify-otp → đã chứng minh sở hữu SĐT),
+// nên không cần PIN cũ.
+router.patch('/reset-pin', verifyJWT, async (req, res) => {
+  const { password } = req.body
+  if (!/^\d{6}$/.test(password || '')) return res.status(400).json({ error: 'Mã PIN phải gồm đúng 6 chữ số.' })
+  try {
+    const hash = await bcrypt.hash(password, 10)
+    await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    if (req.user.phone) clearFail(req.user.phone)  // gỡ khoá nếu đang bị
     res.json({ success: true })
   } catch (err) {
     res.status(500).json({ error: err.message })
