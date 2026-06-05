@@ -99,6 +99,7 @@ export const adminAPI = {
     params: reviewed !== undefined ? { reviewed } : {}
   }),
   reviewError: (id)             => api.patch(`/admin/ai-errors/${id}`),
+  errorToKnowledge: (id, data)  => api.post(`/admin/ai-errors/${id}/to-knowledge`, data),
 }
  
 export default api

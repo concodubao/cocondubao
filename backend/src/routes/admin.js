@@ -10,6 +10,7 @@ import express from 'express'
 import bcrypt  from 'bcrypt'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
+import { embedAndStoreDoc } from '../services/rag.js'
 
 const router = express.Router()
 
@@ -179,7 +180,7 @@ router.get('/ai-errors', verifyJWT, requireRole('admin'), async (req, res) => {
     .from('ai_error_reports')
     .select(`
       id, error_type, note, created_at, reviewed_by,
-      messages ( content, confidence, source ),
+      messages ( content, confidence, source, session_id, created_at ),
       users!ai_error_reports_user_id_fkey ( name, phone )
     `)
     .order('created_at', { ascending: false })
@@ -190,7 +191,64 @@ router.get('/ai-errors', verifyJWT, requireRole('admin'), async (req, res) => {
 
   const { data, error } = await query
   if (error) return res.status(500).json({ error: error.message })
-  res.json({ errors: data })
+
+  // Gắn câu hỏi gốc (user message ngay trước câu trả lời bị báo lỗi) để admin có ngữ cảnh khi biên soạn lại
+  const errors = data || []
+  const sessionIds = [...new Set(errors.map(e => e.messages?.session_id).filter(Boolean))]
+  let userMsgs = []
+  if (sessionIds.length) {
+    const { data: um } = await supabase
+      .from('messages')
+      .select('session_id, content, created_at')
+      .in('session_id', sessionIds)
+      .eq('role', 'user')
+      .order('created_at', { ascending: true })
+    userMsgs = um || []
+  }
+  const withQuestion = errors.map(e => {
+    const ans = e.messages
+    let question = null
+    if (ans?.session_id) {
+      const before = userMsgs.filter(m => m.session_id === ans.session_id && m.created_at <= ans.created_at)
+      question = before.length ? before[before.length - 1].content : null
+    }
+    return { ...e, question }
+  })
+  res.json({ errors: withQuestion })
+})
+
+// ── POST /admin/ai-errors/:id/to-knowledge — biên soạn lại + thêm vào kho tri thức ──
+router.post('/ai-errors/:id/to-knowledge', verifyJWT, requireRole('admin'), async (req, res) => {
+  const { question, answer } = req.body
+  if (!question?.trim() || !answer?.trim()) {
+    return res.status(400).json({ error: 'Cần cả câu hỏi và câu trả lời đúng.' })
+  }
+
+  try {
+    const { data: doc, error } = await supabase
+      .from('knowledge_docs')
+      .insert({
+        title:       `QA: ${question.trim().slice(0, 60)}`,
+        source:      'ai_error_fix',
+        content:     `Câu hỏi: ${question.trim()}\n\nCâu trả lời: ${answer.trim()}`,
+        status:      'embedding',
+        uploaded_by: req.user.userId,
+      })
+      .select('id')
+      .single()
+    if (error) throw error
+
+    // Đồng thời đánh dấu báo lỗi đã xử lý
+    await supabase.from('ai_error_reports').update({ reviewed_by: req.user.userId }).eq('id', req.params.id)
+
+    // Embed nền — không chặn phản hồi
+    embedAndStoreDoc(doc.id).catch(e => console.warn('[ADMIN] embed QA fix failed:', e.message))
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[ADMIN] to-knowledge error:', err)
+    res.status(500).json({ error: 'Không thêm được vào kho tri thức.' })
+  }
 })
 
 // ── PATCH /admin/ai-errors/:id ────────────────────────────────────────────────
