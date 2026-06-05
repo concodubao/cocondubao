@@ -175,10 +175,6 @@ export default function Queue() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
-        <button onClick={() => navigate('/home')} aria-label="Quay lại"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
-          <span className="material-symbols-outlined text-[22px]">arrow_back</span>
-        </button>
         <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">Hàng đợi câu hỏi</h1>
         <button onClick={() => navigate('/engineer/history')} aria-label="Lịch sử"
           className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">

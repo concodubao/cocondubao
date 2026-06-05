@@ -4,7 +4,7 @@ import { adminAPI, engineerAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase }    from '../../services/supabase'
 import { useEffect }   from 'react'
-import { ChevronLeft, Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
+import { Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
 
 function BarChart({ data }) {
   if (!data?.length) return null
@@ -156,9 +156,6 @@ export default function Dashboard() {
   return (
     <div style={s.page}>
       <header style={s.header}>
-        <button onClick={() => navigate('/home')} style={s.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
-        </button>
         <h1 style={s.title}>Dashboard</h1>
         <button onClick={() => navigate('/admin/users')} style={s.iconBtn} aria-label="Quản lý tài khoản">
           <Users size={20} />
