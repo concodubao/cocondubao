@@ -183,47 +183,26 @@ export default function Home() {
             <span className="material-symbols-outlined text-[20px] text-[#d4b8a8]">chevron_right</span>
           </button>
 
-          {/* ── Theo dõi mùa vụ: Thời tiết + Giá nông sản ─────────── */}
-          <div>
-            <p className="text-[12px] font-bold text-[#7a6358] uppercase tracking-wider mb-2 px-1">
-              Theo dõi mùa vụ
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {/* Thời tiết */}
-              <button
-                onClick={() => navigate('/weather')}
-                className="flex flex-col gap-2 bg-white rounded-[20px] p-4 shadow-sm border border-[#f0e0d0]
-                           active:scale-95 transition-transform text-left"
-              >
-                <div className="w-10 h-10 rounded-xl bg-[#e0f2fe] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[22px] ms-fill" style={{ color: wmo.color }}>
-                    {weatherLoading ? 'wb_sunny' : wmo.icon}
-                  </span>
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold text-[#7a6358] uppercase tracking-wide">Thời tiết</div>
-                  <div className="text-[20px] font-extrabold text-[#0b1c30] leading-none mt-1">
-                    {weatherLoading ? '...' : `${currentTemp}°C`}
-                  </div>
-                  <div className="text-[12px] text-[#7a6358] mt-0.5 truncate">
-                    {weatherLoading ? 'Đang tải...' : wmo.label}
-                  </div>
-                </div>
-              </button>
-
-              {/* Giá nông sản — placeholder (chưa có nguồn dữ liệu) */}
-              <div className="flex flex-col gap-2 bg-white rounded-[20px] p-4 shadow-sm border border-[#f0e0d0]">
-                <div className="w-10 h-10 rounded-xl bg-[#fff8e8] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[22px] text-[#855300] ms-fill">payments</span>
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold text-[#7a6358] uppercase tracking-wide">Giá nông sản</div>
-                  <div className="text-[15px] font-extrabold text-[#0b1c30] leading-tight mt-1">Sắp có</div>
-                  <div className="text-[12px] text-[#7a6358] mt-0.5">Giá lúa, rau theo ngày</div>
-                </div>
+          {/* ── Thời tiết (hàng) ──────────────────────────────────── */}
+          <button
+            onClick={() => navigate('/weather')}
+            aria-label="Thời tiết"
+            className="flex items-center gap-4 bg-white rounded-[20px] px-5 py-4 shadow-sm border border-[#f0e0d0]
+                       active:scale-[0.98] transition-transform text-left w-full"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-[#e0f2fe] flex items-center justify-center flex-shrink-0">
+              <span className="material-symbols-outlined text-[26px] ms-fill" style={{ color: wmo.color }}>
+                {weatherLoading ? 'wb_sunny' : wmo.icon}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[16px] font-bold text-[#0b1c30]">Thời tiết hôm nay</div>
+              <div className="text-[13px] text-[#7a6358] mt-0.5 truncate">
+                {weatherLoading ? 'Đang tải...' : `${currentTemp}°C · ${wmo.label}`}
               </div>
             </div>
-          </div>
+            <span className="material-symbols-outlined text-[20px] text-[#d4b8a8]">chevron_right</span>
+          </button>
 
           {/* ── Mẹo hôm nay ───────────────────────────────────────── */}
           <div className="flex items-start gap-3 bg-[#fff8e8] border border-[#fde68a] rounded-[20px] p-4">
