@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
@@ -5,6 +6,11 @@ import { chatAPI } from '../../services/api'
 
 const CROP_ICON  = { rice: 'grass', veggie: 'eco', fruit: 'forest', other: 'more_horiz' }
 const CROP_LABEL = { rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }
+
+// Bỏ dấu + thường hoá để tìm kiếm không phân biệt dấu ("lua" khớp "lúa")
+function normalize(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+}
 
 function formatDate(dateStr) {
   const d    = new Date(dateStr)
@@ -71,6 +77,7 @@ function SessionCard({ session, onClick }) {
 export default function ChatHistory() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const [search, setSearch] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey:  ['chat-sessions', user?.id],
@@ -80,6 +87,10 @@ export default function ChatHistory() {
   })
 
   const sessions = data || []
+  const q = normalize(search.trim())
+  const filtered = q
+    ? sessions.filter(s => normalize(`${s.preview || ''} ${CROP_LABEL[s.crop_type] || ''}`).includes(q))
+    : sessions
 
   function openSession(session) {
     navigate('/chat', { state: { sessionId: session.id } })
@@ -104,6 +115,28 @@ export default function ChatHistory() {
         </button>
       </header>
 
+      {/* Ô tìm kiếm — chỉ hiện khi có lịch sử */}
+      {!isLoading && sessions.length > 0 && (
+        <div className="px-4 pt-3 pb-1 bg-[#fdf8f5]">
+          <div className="flex items-center gap-2 bg-white border border-[#f0e0d0] rounded-2xl px-4 h-11
+                          focus-within:border-[#4B230A] transition-colors">
+            <span className="material-symbols-outlined text-[20px] text-[#c4a898]">search</span>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Tìm trong lịch sử (vd: lúa, vàng lá...)"
+              className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#0b1c30] placeholder:text-[#c4a898]"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} aria-label="Xoá tìm kiếm"
+                className="w-6 h-6 flex items-center justify-center text-[#c4a898] flex-shrink-0">
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <main className="flex-1 flex flex-col gap-3 px-4 py-4">
 
         {isLoading && (
@@ -127,13 +160,22 @@ export default function ChatHistory() {
           </div>
         )}
 
-        {sessions.map(session => (
+        {!isLoading && sessions.length > 0 && filtered.length === 0 && (
+          <div className="flex flex-col items-center gap-2 pt-12 text-center">
+            <span className="material-symbols-outlined text-[44px] text-[#e2e8f0]">search_off</span>
+            <p className="text-[14px] text-[#7a6358]">Không tìm thấy cuộc hội thoại nào khớp "{search}"</p>
+          </div>
+        )}
+
+        {filtered.map(session => (
           <SessionCard key={session.id} session={session} onClick={() => openSession(session)} />
         ))}
 
-        {sessions.length > 0 && (
+        {sessions.length > 0 && filtered.length > 0 && (
           <p className="text-center text-[12px] text-[#c4a898] pb-2 pt-1">
-            Hiển thị {sessions.length} cuộc hội thoại gần nhất
+            {q
+              ? `${filtered.length} kết quả khớp "${search}"`
+              : `Hiển thị ${sessions.length} cuộc hội thoại gần nhất`}
           </p>
         )}
       </main>
