@@ -82,7 +82,7 @@ export default function Weather() {
   const tip = farmingTip(today)
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto overflow-x-hidden">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
@@ -122,17 +122,17 @@ export default function Weather() {
                 {location ?? 'Sóc Trăng'}
               </div>
 
-              <div className="flex items-end justify-between">
-                <div>
-                  <div className="text-[72px] font-black leading-none">{currentTemp}°</div>
-                  <div className="text-[18px] font-bold mt-1">{wmo.label}</div>
+              <div className="flex items-end justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-black leading-none text-[clamp(3.25rem,17vw,4.5rem)]">{currentTemp}°</div>
+                  <div className="font-bold mt-1 text-[clamp(15px,4.5vw,18px)]">{wmo.label}</div>
                   <div className="text-white/75 text-[13px] mt-1">
                     {today.tmin}° – {today.tmax}°  ·  Mưa {today.rainProb}%
                     {current && <>{'  '}·  Cảm giác {current.feelsLike}°</>}
                   </div>
                 </div>
-                <span className="material-symbols-outlined ms-fill"
-                      style={{ fontSize: 80, color: 'rgba(255,255,255,0.9)' }}>
+                <span className="material-symbols-outlined ms-fill flex-shrink-0"
+                      style={{ fontSize: 'clamp(56px, 16vw, 80px)', color: 'rgba(255,255,255,0.9)' }}>
                   {wmo.icon}
                 </span>
               </div>
