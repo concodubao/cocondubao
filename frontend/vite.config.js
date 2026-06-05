@@ -25,14 +25,39 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,ico}'],
+        globPatterns: ['**/*.{js,css,html,svg,ico,png}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*\.railway\.app\//,
+            // API: NetworkFirst — online lấy mới; offline/sóng yếu rơi về bản cache
+            // gần nhất sau 4s thay vì treo. Giữ 1 ngày để nông dân đọc lại offline.
+            urlPattern: /^https:\/\/.*\.railway\.app\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
-              expiration: { maxEntries: 50, maxAgeSeconds: 300 }
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            }
+          },
+          {
+            // Ảnh trên Supabase Storage (sâu bệnh, cộng đồng, thông báo) — bất biến
+            // theo tên file nên CacheFirst, giữ 30 ngày để xem offline.
+            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'image-cache',
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            }
+          },
+          {
+            // Google Fonts (Material Symbols + Noto Sans) để icon/chữ không vỡ offline
+            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'google-fonts',
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
             }
           }
         ]
