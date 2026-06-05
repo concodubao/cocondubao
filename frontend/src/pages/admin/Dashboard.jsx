@@ -144,6 +144,40 @@ function QueueSection({ navigate, currentUserId }) {
   )
 }
 
+function KnowledgeGapsSection({ navigate }) {
+  const { data } = useQuery({
+    queryKey: ['knowledge-gaps'],
+    queryFn:  () => adminAPI.getKnowledgeGaps().then(r => r.data.gaps),
+    refetchInterval: 60_000,
+  })
+  const gaps = data || []
+  if (gaps.length === 0) return null
+
+  return (
+    <div style={s.card}>
+      <div style={s.cardHead}>
+        <span style={s.cardTitle}>AI trả lời yếu gần đây</span>
+        <button onClick={() => navigate('/engineer/knowledge')} style={s.viewAllBtn}>
+          Bổ sung tài liệu <ChevronRight size={13} strokeWidth={2} />
+        </button>
+      </div>
+      <p style={s.cardSub}>Câu hỏi AI trả lời với độ tin cậy thấp — nên thêm tài liệu để cải thiện.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {gaps.map((g, i) => (
+          <div key={i} style={s.gapRow}>
+            <p style={{ fontSize: 13, color: '#475569', margin: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {g.question}
+            </p>
+            <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#ef4444', background: '#fef2f2', padding: '2px 8px', borderRadius: 99 }}>
+              {Math.round(g.confidence * 100)}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
@@ -196,6 +230,8 @@ export default function Dashboard() {
 
             <QueueSection navigate={navigate} currentUserId={user?.id} />
 
+            <KnowledgeGapsSection navigate={navigate} />
+
             <div style={s.grid2}>
               <button onClick={() => navigate('/admin/notifications/send')} style={s.actionBtn}>
                 <Send size={20} color="#4B230A" strokeWidth={1.5} />
@@ -240,6 +276,7 @@ const s = {
   actionBtn:    { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: '#0f172a' },
   viewAllBtn:   { display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 12, color: '#4B230A', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0 },
   queueRow:     { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#fdf8f5', borderRadius: 10, border: '1px solid #e2e8f0' },
+  gapRow:       { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: '#fdf8f5', borderRadius: 10, border: '1px solid #e2e8f0' },
   takeBtn:      { flexShrink: 0, padding: '6px 14px', background: '#4B230A', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   processingTag:{ flexShrink: 0, padding: '5px 10px', background: '#f1f5f9', color: '#64748b', borderRadius: 8, fontSize: 12, fontWeight: 500 },
 }

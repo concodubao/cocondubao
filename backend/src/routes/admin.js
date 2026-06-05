@@ -113,6 +113,50 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
   }
 })
 
+// ── GET /admin/knowledge-gaps — câu hỏi AI tự trả lời nhưng confidence thấp ────
+// (Không qua kỹ sư, không bị báo lỗi → "lỗ hổng âm thầm" admin nên bổ sung tài liệu)
+router.get('/knowledge-gaps', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString()
+    const { data: weak } = await supabase
+      .from('messages')
+      .select('content, confidence, session_id, created_at')
+      .eq('role', 'assistant')
+      .not('confidence', 'is', null)
+      .lt('confidence', 0.5)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(15)
+
+    const answers    = weak || []
+    const sessionIds = [...new Set(answers.map(a => a.session_id).filter(Boolean))]
+    let userMsgs = []
+    if (sessionIds.length) {
+      const { data: um } = await supabase
+        .from('messages')
+        .select('session_id, content, created_at')
+        .in('session_id', sessionIds)
+        .eq('role', 'user')
+        .order('created_at', { ascending: true })
+      userMsgs = um || []
+    }
+
+    const gaps = answers.map(a => {
+      const before = userMsgs.filter(m => m.session_id === a.session_id && m.created_at <= a.created_at)
+      return {
+        question:   before.length ? before[before.length - 1].content : null,
+        confidence: a.confidence,
+        created_at: a.created_at,
+      }
+    }).filter(g => g.question)
+
+    res.json({ gaps })
+  } catch (err) {
+    console.error('[ADMIN] knowledge-gaps error:', err)
+    res.status(500).json({ error: 'Không lấy được dữ liệu.' })
+  }
+})
+
 // ── GET /admin/users ──────────────────────────────────────────────────────────
 router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
   const { role, search, limit = 50, offset = 0 } = req.query

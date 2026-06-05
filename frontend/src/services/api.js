@@ -92,6 +92,7 @@ export const communityAPI = {
 export const adminAPI = {
   createEngineer: (data)         => api.post('/admin/engineers', data),
   getStats:       ()             => api.get('/admin/stats'),
+  getKnowledgeGaps: ()           => api.get('/admin/knowledge-gaps'),
   getUsers:       (params = {}) => api.get('/admin/users', { params }),
   updateUser:     (id, updates) => api.patch(`/admin/users/${id}`, updates),
   resetUserPin:   (id)          => api.patch(`/admin/users/${id}/reset-pin`),
