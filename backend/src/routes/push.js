@@ -210,8 +210,10 @@ router.get('/notifications/:userId', verifyJWT, async (req, res) => {
       .limit(50)
 
     if (!isStaff) {
-      const cropFilter = userCrops.length > 0
-        ? `crop_tags.eq.{},${userCrops.map(c => `crop_tags.cs.{${c}}`).join(',')}`
+      // Chỉ nhận crop dạng chữ/gạch dưới — chặn nội suy ký tự lạ vào filter .or()
+      const safeCrops = userCrops.filter(c => typeof c === 'string' && /^[a-z_]+$/i.test(c))
+      const cropFilter = safeCrops.length > 0
+        ? `crop_tags.eq.{},${safeCrops.map(c => `crop_tags.cs.{${c}}`).join(',')}`
         : 'crop_tags.eq.{}'
       notifQuery = notifQuery.or(cropFilter)
     }

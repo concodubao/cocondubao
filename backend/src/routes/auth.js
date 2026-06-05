@@ -31,6 +31,17 @@ function normalizePhone(raw) {
   return '+84' + digits
 }
 
+// Loại cây trồng hợp lệ — whitelist để chặn dữ liệu rác bị nội suy vào filter
+// PostgREST ở chỗ khác (vd push.js lọc thông báo theo crop).
+const VALID_CROPS = ['rice', 'veggie', 'fruit', 'other']
+
+// Phản hồi 500 thống nhất: log chi tiết ở server, trả thông báo chung cho client
+// (tránh rò rỉ message lỗi DB / cấu trúc bảng).
+function serverError(res, where, err) {
+  console.error(`[AUTH] ${where}:`, err?.message || err)
+  return res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại sau.' })
+}
+
 // ─── Khoá chống dò PIN (in-memory; backstop cùng rate-limit theo IP) ──────────
 // PIN 6 số (1 triệu tổ hợp) nên cần chặn dò: sai 5 lần/1 số → khoá 10 phút.
 const MAX_ATTEMPTS = 5
@@ -127,7 +138,7 @@ router.post('/verify-otp', otpLimiter, async (req, res) => {
     })
   } catch (err) {
     console.error('[AUTH]', err.message)
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -149,7 +160,7 @@ router.post('/register-email', verifyJWT, requireRole('admin'), async (req, res)
     if (error) throw error
     res.json({ success: true, pending: !is_active })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -176,7 +187,7 @@ router.post('/login-email', async (req, res) => {
       isNewUser: !user.name,
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -219,7 +230,7 @@ router.post('/register-phone', async (req, res) => {
     })
   } catch (err) {
     console.error('[AUTH] register-phone:', err.message)
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -257,7 +268,7 @@ router.post('/login-phone', async (req, res) => {
       isNewUser: !user.name,
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -274,7 +285,7 @@ router.patch('/set-password', verifyJWT, async (req, res) => {
     await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -296,7 +307,7 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
     await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -312,7 +323,7 @@ router.delete('/account', verifyJWT, async (req, res) => {
       .eq('user_id', req.user.userId)
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -328,7 +339,7 @@ router.get('/me', verifyJWT, async (req, res) => {
     const { password_hash, ...safeUser } = user
     res.json({ user: { ...safeUser, hasPassword: !!password_hash } })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'auth', err)
   }
 })
 
@@ -339,7 +350,7 @@ router.patch('/profile', verifyJWT, async (req, res) => {
     const updates = {}
     if (name)                 updates.name    = name.trim()
     if (village !== undefined) updates.village = (village ?? '').trim()
-    if (Array.isArray(crops)) updates.crops   = crops
+    if (Array.isArray(crops)) updates.crops   = crops.filter(c => VALID_CROPS.includes(c))
 
     console.log('[PROFILE] userId:', req.user.userId, '| updates:', updates)
 
@@ -350,12 +361,11 @@ router.patch('/profile', verifyJWT, async (req, res) => {
 
     if (error) {
       console.error('[PROFILE] Supabase error:', error)
-      return res.status(500).json({ error: error.message, detail: error.details, hint: error.hint })
+      return res.status(500).json({ error: 'Không cập nhật được hồ sơ.' })
     }
     res.json({ success: true, user })
   } catch (err) {
-    console.error('[PROFILE] catch:', err)
-    res.status(500).json({ error: err.message })
+    return serverError(res, 'profile', err)
   }
 })
 

@@ -299,6 +299,17 @@ router.post('/report-error', verifyJWT, async (req, res) => {
   if (!VALID_TYPES.includes(errorType))  return res.status(400).json({ error: 'Loại lỗi không hợp lệ.' })
 
   try {
+    // Chỉ cho báo lỗi trên message thuộc session của chính mình (chặn báo lỗi message bất kỳ)
+    const { data: msg } = await supabase
+      .from('messages')
+      .select('id, chat_sessions ( user_id )')
+      .eq('id', messageId)
+      .single()
+    if (!msg) return res.status(404).json({ error: 'Không tìm thấy câu trả lời.' })
+    if (msg.chat_sessions?.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Không có quyền báo lỗi tin nhắn này.' })
+    }
+
     await supabase.from('ai_error_reports').insert({
       message_id: messageId,
       user_id:    req.user.userId,

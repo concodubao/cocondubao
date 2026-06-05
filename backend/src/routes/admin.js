@@ -123,7 +123,11 @@ router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
     .range(Number(offset), Number(offset) + Number(limit) - 1)
 
   if (role)   query = query.eq('role', role)
-  if (search) query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%`)
+  if (search) {
+    // Bỏ ký tự có ý nghĩa trong cú pháp filter PostgREST để chặn .or() injection
+    const safe = String(search).replace(/[,()*]/g, '').trim()
+    if (safe) query = query.or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`)
+  }
 
   const { data, error } = await query
   if (error) return res.status(500).json({ error: error.message })
