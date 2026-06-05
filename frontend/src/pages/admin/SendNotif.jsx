@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { pushAPI } from '../../services/api'
-import { ChevronLeft, AlertTriangle, Tag, Cloud, Bell, Send, Clock, CheckCircle } from 'lucide-react'
+import { ChevronLeft, AlertTriangle, Tag, Cloud, Send, Clock, CheckCircle } from 'lucide-react'
 
 const TYPE_OPTIONS = [
   { id: 'alert',     Icon: AlertTriangle, label: 'Cảnh báo dịch bệnh', desc: 'Ưu tiên cao — hiển thị nổi bật', color: '#ef4444', bg: '#fef2f2' },

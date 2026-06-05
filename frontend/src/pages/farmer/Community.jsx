@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
 import { communityAPI } from '../../services/api'
-import { toast } from '../../components/Toast'
+import { toast } from '../../stores/toastStore'
 import BottomNav from '../../components/BottomNav'
 
 const CROP_OPTIONS = [
@@ -30,7 +30,7 @@ function timeAgo(dateStr) {
   return new Date(dateStr).toLocaleDateString('vi-VN')
 }
 
-function Avatar({ name, role, size = 40 }) {
+function Avatar({ name, size = 40 }) {
   const initials = (name || 'N')
     .split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   const colors = ['#4B230A', '#0369a1', '#7c3aed', '#b45309', '#be123c']
@@ -335,10 +335,6 @@ export default function Community() {
   })
 
   const posts = data?.pages.flatMap(p => p.posts) ?? []
-
-  const likeMutation = useMutation({
-    mutationFn: id => communityAPI.toggleLike(id).then(r => r.data),
-  })
 
   const deleteMutation = useMutation({
     mutationFn: id => communityAPI.deletePost(id),

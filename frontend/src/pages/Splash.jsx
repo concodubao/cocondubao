@@ -43,7 +43,7 @@ function AppLogo({ size = 72 }) {
 
 export default function Splash() {
   const navigate = useNavigate()
-  const { token, user, setUser, logout } = useAuthStore()
+  const { token, setUser, logout } = useAuthStore()
   const [loading, setLoading] = useState(true)
   const [step,    setStep]    = useState(0)
 

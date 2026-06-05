@@ -4,15 +4,15 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 
 export function useTTS() {
-  const [isSpeaking,  setIsSpeaking]  = useState(false)
-  const [voices,      setVoices]      = useState([])
-  const [isSupported, setIsSupported] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [voices,     setVoices]     = useState([])
+  // Khả năng trình duyệt — cố định lúc mount, không đổi khi chạy
+  const [isSupported] = useState(() => typeof window !== 'undefined' && 'speechSynthesis' in window)
   const utteranceRef = useRef(null)
 
   // Load danh sách giọng đọc — Chrome load async, Safari load sync
   useEffect(() => {
-    if (!('speechSynthesis' in window)) return
-    setIsSupported(true)
+    if (!isSupported) return
 
     function loadVoices() {
       const v = window.speechSynthesis.getVoices()
@@ -23,7 +23,7 @@ export function useTTS() {
     // Chrome cần event này vì voices load async
     window.speechSynthesis.addEventListener('voiceschanged', loadVoices)
     return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices)
-  }, [])
+  }, [isSupported])
 
   function pickVoice(voices) {
     return (

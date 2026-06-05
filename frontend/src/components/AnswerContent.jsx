@@ -4,10 +4,10 @@
 //  - tự gắn dòng "Thông tin tham khảo..." cho câu trả lời kỹ thuật (showDisclaimer)
 // Màu lấy từ bảng màu thương hiệu: secondary #855300 (dấu mục), muted #6b7280 (ghi chú).
 
-export const DISCLAIMER = 'Thông tin mang tính tham khảo, nên xác nhận thêm với kỹ sư địa phương.'
+const DISCLAIMER = 'Thông tin mang tính tham khảo, nên xác nhận thêm với kỹ sư địa phương.'
 
 // Bỏ phần ghi chú mà LLM có thể đã tự thêm vào nội dung (ta hiển thị riêng cho đồng nhất)
-export function stripDisclaimer(text = '') {
+function stripDisclaimer(text = '') {
   return text
     .replace(/_?\(\s*⚠️[^)]*\)_?/g, '')                          // dạng _(⚠️ ...)_
     .replace(/⚠️?\s*Thông tin mang tính tham khảo[^\n]*/gi, '')   // dạng chữ thường

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
 import { communityAPI } from '../../services/api'
-import { toast } from '../../components/Toast'
+import { toast } from '../../stores/toastStore'
 
 const ROLE_BADGE = {
   engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#2e1505' },

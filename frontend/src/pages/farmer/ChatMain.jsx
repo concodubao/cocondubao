@@ -4,8 +4,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { chatAPI } from '../../services/api'
 import { useSTT } from '../../hooks/useSTT'
 import { useTTS } from '../../hooks/useTTS'
-import { toast } from '../../components/Toast'
-import BottomNav from '../../components/BottomNav'
+import { toast } from '../../stores/toastStore'
 import AnswerContent from '../../components/AnswerContent'
 
 const CROP_OPTIONS = [
