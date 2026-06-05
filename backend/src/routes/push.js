@@ -156,6 +156,32 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
 // NOTIFICATIONS — XEM VÀ ĐỌC
 // ══════════════════════════════════════════════════════════════════════════════
 
+// ⚠️ Route tĩnh '/notifications/settings' PHẢI đứng trước '/notifications/:userId',
+// nếu không Express khớp :userId="settings" và route settings bị che (farmer 403).
+
+// GET /notifications/settings — lấy cài đặt thông báo đã lưu (để form hiển thị đúng)
+router.get('/notifications/settings', verifyJWT, async (req, res) => {
+  try {
+    const { data } = await supabase
+      .from('push_subscriptions')
+      .select('notif_types, quiet_start, quiet_end, crops_filter')
+      .eq('user_id', req.user.userId)
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    res.json({
+      notifTypes:  data?.notif_types  ?? ['alert', 'promotion', 'weather'],
+      quietStart:  data?.quiet_start?.slice(0, 5) ?? '22:00',
+      quietEnd:    data?.quiet_end?.slice(0, 5)   ?? '06:00',
+      cropsFilter: data?.crops_filter ?? [],
+    })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET /notifications/:userId — danh sách thông báo của user
 router.get('/notifications/:userId', verifyJWT, async (req, res) => {
   const { userId } = req.params
@@ -216,29 +242,6 @@ router.patch('/notifications/:id/read', verifyJWT, async (req, res) => {
       }, { onConflict: 'notification_id,user_id' })
 
     res.json({ success: true })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
-// GET /notifications/settings — lấy cài đặt thông báo đã lưu (để form hiển thị đúng)
-router.get('/notifications/settings', verifyJWT, async (req, res) => {
-  try {
-    const { data } = await supabase
-      .from('push_subscriptions')
-      .select('notif_types, quiet_start, quiet_end, crops_filter')
-      .eq('user_id', req.user.userId)
-      .eq('active', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    res.json({
-      notifTypes:  data?.notif_types  ?? ['alert', 'promotion', 'weather'],
-      quietStart:  data?.quiet_start?.slice(0, 5) ?? '22:00',
-      quietEnd:    data?.quiet_end?.slice(0, 5)   ?? '06:00',
-      cropsFilter: data?.crops_filter ?? [],
-    })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
