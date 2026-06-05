@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminAPI } from '../../services/api'
-import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X } from 'lucide-react'
+import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound } from 'lucide-react'
 
 const ROLE_MAP = {
   farmer:   { label: 'Nông dân',  color: '#4B230A', bg: '#fdf6f0' },
@@ -10,7 +10,7 @@ const ROLE_MAP = {
   admin:    { label: 'Admin',     color: '#8b5cf6', bg: '#f5f3ff' },
 }
 
-function UserCard({ user, onToggle, onApprove, onChangeRole }) {
+function UserCard({ user, onToggle, onApprove, onChangeRole, onResetPin }) {
   const role    = ROLE_MAP[user.role] || ROLE_MAP.farmer
   const waiting = user.role === 'engineer' && !user.is_active
 
@@ -48,6 +48,11 @@ function UserCard({ user, onToggle, onApprove, onChangeRole }) {
           <button onClick={() => onToggle(user.id, !user.is_active)}
             style={user.is_active ? s.btnLock : s.btnUnlock}>
             {user.is_active ? <><Lock size={13} strokeWidth={2} /> Khóa</> : <><Unlock size={13} strokeWidth={2} /> Mở khóa</>}
+          </button>
+        )}
+        {user.role === 'farmer' && user.phone && (
+          <button onClick={() => onResetPin(user)} style={s.btnResetPin}>
+            <KeyRound size={13} strokeWidth={2} /> Đặt lại PIN
           </button>
         )}
         <select value={user.role} onChange={e => onChangeRole(user.id, e.target.value)}
@@ -166,6 +171,15 @@ export default function Users() {
     onError:    () => alert('Cập nhật thất bại. Thử lại nhé.'),
   })
 
+  const resetPin = useMutation({
+    mutationFn: id => adminAPI.resetUserPin(id).then(r => r.data),
+    onSuccess:  d  => alert(`Mã PIN mới của ${d.user?.name || d.user?.phone || 'nông dân'}: ${d.pin}\n\nHãy báo lại mã này cho nông dân. Họ có thể tự đổi trong mục Hồ sơ.`),
+    onError:    () => alert('Không đặt lại được PIN. Thử lại nhé.'),
+  })
+  function handleResetPin(user) {
+    if (confirm(`Đặt lại mã PIN cho ${user.name || user.phone}?\nMã PIN cũ sẽ không dùng được nữa.`)) resetPin.mutate(user.id)
+  }
+
   const users   = data || []
   const pending = users.filter(u => u.role === 'engineer' && !u.is_active).length
 
@@ -217,7 +231,8 @@ export default function Users() {
             <UserCard key={user.id} user={user}
               onToggle={(id, active) => updateUser.mutate({ id, updates: { is_active: active } })}
               onApprove={id => updateUser.mutate({ id, updates: { is_active: true } })}
-              onChangeRole={(id, role) => { if (confirm(`Đổi vai trò thành ${role}?`)) updateUser.mutate({ id, updates: { role } }) }} />
+              onChangeRole={(id, role) => { if (confirm(`Đổi vai trò thành ${role}?`)) updateUser.mutate({ id, updates: { role } }) }}
+              onResetPin={handleResetPin} />
           ))
         )}
       </main>
@@ -257,5 +272,6 @@ const s = {
   btnApprove:  { padding: '7px 12px', background: '#4B230A', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 },
   btnLock:     { padding: '7px 12px', background: 'transparent', color: '#ef4444', border: '1px solid #fecaca', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
   btnUnlock:   { padding: '7px 12px', background: '#fdf6f0', color: '#4B230A', border: '1px solid #f5d5b0', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
+  btnResetPin: { padding: '7px 12px', background: '#fff8e8', color: '#855300', border: '1px solid #fde68a', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
   roleSelect:  { padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#0f172a', cursor: 'pointer' },
 }

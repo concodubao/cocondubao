@@ -29,7 +29,6 @@ export const authAPI = {
   loginEmail:      (email, password)        => api.post('/auth/login-email', { email, password }),
   loginPhone:      (phone, password)        => api.post('/auth/login-phone', { phone, password }),
   registerPhone:   (phone, password)        => api.post('/auth/register-phone', { phone, password }),
-  resetPin:        (password)               => api.patch('/auth/reset-pin', { password }),
   registerEmail:   (email, password, role)  => api.post('/auth/register-email', { email, password, role }),
   me:              ()                       => api.get('/auth/me'),
   updateProfile:   (data)                   => api.patch('/auth/profile', data),
@@ -95,6 +94,7 @@ export const adminAPI = {
   getStats:       ()             => api.get('/admin/stats'),
   getUsers:       (params = {}) => api.get('/admin/users', { params }),
   updateUser:     (id, updates) => api.patch(`/admin/users/${id}`, updates),
+  resetUserPin:   (id)          => api.patch(`/admin/users/${id}/reset-pin`),
   getAIErrors: (reviewed)       => api.get('/admin/ai-errors', {
     params: reviewed !== undefined ? { reviewed } : {}
   }),

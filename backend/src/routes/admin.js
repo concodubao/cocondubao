@@ -149,6 +149,24 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
   res.json({ success: true, user: data })
 })
 
+// ── PATCH /admin/users/:id/reset-pin — đặt lại mã PIN cho nông dân (quên PIN) ──
+router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const pin  = String(Math.floor(100000 + Math.random() * 900000)) // PIN 6 số ngẫu nhiên
+    const hash = await bcrypt.hash(pin, 10)
+    const { data, error } = await supabase
+      .from('users')
+      .update({ password_hash: hash, is_active: true })
+      .eq('id', req.params.id)
+      .select('id, phone, name, role')
+      .single()
+    if (error) throw error
+    res.json({ success: true, pin, user: data }) // trả PIN để admin báo lại cho nông dân
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── GET /admin/ai-errors ──────────────────────────────────────────────────────
 router.get('/ai-errors', verifyJWT, requireRole('admin'), async (req, res) => {
   const { reviewed, limit = 30, offset = 0 } = req.query

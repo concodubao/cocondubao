@@ -88,7 +88,7 @@ const PRIMARY_BTN =
   'disabled:opacity-60 disabled:cursor-not-allowed transition-all'
 
 // ─── Nông dân: SĐT + PIN (Đăng nhập / Đăng ký) ──────────────
-function StepPhonePin({ onForgot }) {
+function StepPhonePin() {
   const [mode,     setMode]     = useState('login') // 'login' | 'register'
   const [phone,    setPhone]    = useState('')
   const [pin,      setPin]      = useState('')
@@ -159,95 +159,9 @@ function StepPhonePin({ onForgot }) {
           : <>{mode === 'register' ? 'Đăng ký' : 'Đăng nhập'}<span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
 
-      <button type="button" onClick={onForgot} className="text-center text-[14px] text-[#4B230A] font-semibold py-1">
-        Quên mã PIN?
-      </button>
-    </div>
-  )
-}
-
-// ─── Quên mã PIN: SĐT → OTP → PIN mới ───────────────────────
-function ForgotPin() {
-  const [sub,     setSub]     = useState('phone') // 'phone' | 'otp' | 'newpin'
-  const [phone,   setPhone]   = useState('')
-  const [role,    setRole]    = useState('farmer')
-  const [otp,     setOtp]     = useState('')
-  const [pin,     setPin]     = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState('')
-  const { setUser, setToken } = useAuthStore()
-
-  async function sendOtp() {
-    if (!phone.trim()) return setError('Vui lòng nhập số điện thoại.')
-    setError(''); setLoading(true)
-    try {
-      const res = await authAPI.requestOTP(phone.trim())
-      setRole(res.data.existingRole || 'farmer')
-      setSub('otp')
-    } catch (err) { setError(err.response?.data?.error || 'Không gửi được OTP. Thử lại nhé.') }
-    finally { setLoading(false) }
-  }
-  async function verifyOtp() {
-    if (otp.length !== 6) return setError('OTP gồm 6 chữ số.')
-    setError(''); setLoading(true)
-    try {
-      const res = await authAPI.verifyOTP(phone.trim(), otp, role)
-      setToken(res.data.token); setUser(res.data.user)
-      setSub('newpin')
-    } catch (err) { setError(err.response?.data?.error || 'OTP không đúng. Thử lại nhé.'); setLoading(false) }
-  }
-  async function saveNewPin() {
-    if (pin.length !== 6) return setError('Mã PIN gồm 6 chữ số.')
-    setError(''); setLoading(true)
-    try {
-      await authAPI.resetPin(pin)
-      window.location.href = '/home'
-    } catch (err) { setError(err.response?.data?.error || 'Không đặt được mã PIN.'); setLoading(false) }
-  }
-
-  return (
-    <div className="flex flex-col gap-4 fade-up">
-      {sub === 'phone' && (
-        <>
-          <p className="text-[15px] text-[#4a3328] leading-relaxed">
-            Nhập số điện thoại đã đăng ký để nhận mã OTP đặt lại mã PIN.
-          </p>
-          <div className="relative">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#7a6358]">call</span>
-            <input type="tel" inputMode="numeric" autoFocus placeholder="Số điện thoại"
-              value={phone} onChange={e => setPhone(e.target.value)}
-              className="w-full h-[54px] pl-12 pr-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px] font-bold" />
-          </div>
-          {error && <ErrorBox msg={error} />}
-          <button onClick={sendOtp} disabled={loading} className={PRIMARY_BTN}>
-            {loading ? <><Spinner /> Đang gửi...</> : 'Nhận mã OTP'}
-          </button>
-        </>
-      )}
-
-      {sub === 'otp' && (
-        <>
-          <p className="text-center text-[15px] text-[#4a3328]">
-            Mã đã gửi đến <strong className="text-[#0b1c30]">{phone}</strong>
-          </p>
-          <DigitBoxes value={otp} onChange={setOtp} />
-          {error && <ErrorBox msg={error} />}
-          <button onClick={verifyOtp} disabled={loading || otp.length !== 6} className={PRIMARY_BTN}>
-            {loading ? <><Spinner /> Đang xác nhận...</> : 'Xác nhận OTP'}
-          </button>
-        </>
-      )}
-
-      {sub === 'newpin' && (
-        <>
-          <p className="text-[15px] text-[#4a3328]">Đặt mã PIN mới (6 số) để đăng nhập lần sau.</p>
-          <DigitBoxes value={pin} onChange={setPin} />
-          {error && <ErrorBox msg={error} />}
-          <button onClick={saveNewPin} disabled={loading || pin.length !== 6} className={PRIMARY_BTN}>
-            {loading ? <><Spinner /> Đang lưu...</> : 'Lưu mã PIN'}
-          </button>
-        </>
-      )}
+      <p className="text-center text-[13px] text-[#7a6358] leading-relaxed px-2">
+        Quên mã PIN? Nhờ kỹ sư hoặc quản trị viên ở xã đặt lại giúp bạn.
+      </p>
     </div>
   )
 }
@@ -327,11 +241,10 @@ export default function Login() {
     role:         { title: 'Cò Con Dự Báo', sub: 'Trợ lý nông nghiệp của bà con' },
     'phone-pin':  { title: 'Nông dân',       sub: 'Đăng nhập hoặc đăng ký bằng số điện thoại' },
     email:        { title: 'Kỹ sư & Admin',  sub: 'Đăng nhập bằng email được cấp' },
-    forgot:       { title: 'Quên mã PIN',    sub: 'Lấy lại mã PIN qua OTP' },
   }[step]
 
   function handleBack() {
-    setStep(step === 'forgot' ? 'phone-pin' : 'role')
+    setStep('role')
   }
 
   return (
@@ -357,9 +270,8 @@ export default function Login() {
         )}
 
         {step === 'role'      && <StepRole onNext={r => setStep(r === 'farmer' ? 'phone-pin' : 'email')} />}
-        {step === 'phone-pin' && <StepPhonePin onForgot={() => setStep('forgot')} />}
+        {step === 'phone-pin' && <StepPhonePin />}
         {step === 'email'     && <StepEmailPassword />}
-        {step === 'forgot'    && <ForgotPin />}
 
         <p className="text-center text-[#7a6358] text-[13px] mt-8">
           Bằng cách tiếp tục, bạn đồng ý với{' '}

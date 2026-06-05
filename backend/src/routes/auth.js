@@ -300,22 +300,6 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
   }
 })
 
-// ─── PATCH /auth/reset-pin — đặt lại PIN sau khi xác thực OTP (quên PIN) ──────
-// Chỉ gọi được khi đã có JWT (lấy qua verify-otp → đã chứng minh sở hữu SĐT),
-// nên không cần PIN cũ.
-router.patch('/reset-pin', verifyJWT, async (req, res) => {
-  const { password } = req.body
-  if (!/^\d{6}$/.test(password || '')) return res.status(400).json({ error: 'Mã PIN phải gồm đúng 6 chữ số.' })
-  try {
-    const hash = await bcrypt.hash(password, 10)
-    await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
-    if (req.user.phone) clearFail(req.user.phone)  // gỡ khoá nếu đang bị
-    res.json({ success: true })
-  } catch (err) {
-    res.status(500).json({ error: err.message })
-  }
-})
-
 // ─── DELETE /auth/account — người dùng tự xoá tài khoản (vô hiệu hoá + xoá PII) ──
 // Dùng update (không hard-delete) để không vỡ FK của lịch sử chat/báo lỗi.
 router.delete('/account', verifyJWT, async (req, res) => {
