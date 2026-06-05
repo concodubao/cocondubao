@@ -53,7 +53,8 @@ export default function Splash() {
       try {
         const res = await authAPI.me()
         setUser(res.data.user)
-        navigate('/home', { replace: true })
+        const r = res.data.user?.role
+        navigate(r === 'admin' ? '/admin' : r === 'engineer' ? '/engineer/queue' : '/home', { replace: true })
       } catch (err) {
         if (err.response?.status === 401) { logout(); setLoading(false) }
         else navigate('/home', { replace: true })

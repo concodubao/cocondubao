@@ -7,39 +7,6 @@ import { usePush } from '../hooks/usePush'
 import { useWeather, getWMO } from '../hooks/useWeather'
 import BottomNav from '../components/BottomNav'
 
-const ENGINEER_LINKS = [
-  { path: '/engineer/queue',     icon: 'assignment',  iconBg: 'bg-[#fdf6f0]', iconColor: 'text-[#4B230A]', title: 'Hàng đợi câu hỏi',   desc: 'Xem và trả lời câu hỏi từ nông dân' },
-  { path: '/engineer/history',   icon: 'history',     iconBg: 'bg-[#f0e0d0]', iconColor: 'text-[#00628d]', title: 'Lịch sử trả lời',     desc: 'Xem lại các câu hỏi đã trả lời' },
-  { path: '/engineer/knowledge', icon: 'menu_book',   iconBg: 'bg-[#fffbeb]', iconColor: 'text-[#855300]', title: 'Kiến thức AI',        desc: 'Quản lý tài liệu và cơ sở kiến thức' },
-  { path: '/engineer/test-ai',   icon: 'science',     iconBg: 'bg-[#fdf6f0]', iconColor: 'text-[#4B230A]', title: 'Kiểm thử AI',         desc: 'Thử câu hỏi trực tiếp với mô hình AI' },
-]
-
-const ADMIN_LINKS = [
-  { path: '/admin',                       icon: 'bar_chart',         iconBg: 'bg-[#fdf6f0]', iconColor: 'text-[#4B230A]', title: 'Dashboard quản trị',    desc: 'Thống kê và quản lý hệ thống' },
-  { path: '/admin/users',                 icon: 'group',             iconBg: 'bg-[#f0e0d0]', iconColor: 'text-[#00628d]', title: 'Quản lý người dùng',    desc: 'Xem và phân quyền tài khoản' },
-  { path: '/admin/notifications/send',    icon: 'campaign',          iconBg: 'bg-[#fffbeb]', iconColor: 'text-[#855300]', title: 'Gửi thông báo',         desc: 'Đẩy thông báo đến nông dân' },
-  { path: '/admin/ai-errors',             icon: 'bug_report',        iconBg: 'bg-[#fef2f2]', iconColor: 'text-[#ba1a1a]', title: 'Lỗi AI',                desc: 'Xem câu hỏi AI trả lời sai' },
-]
-
-function NavCard({ icon, iconBg, iconColor, title, desc, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex items-center gap-4 bg-white border border-[#f0e0d0] rounded-3xl px-5 py-4
-                 shadow-sm active:scale-[0.98] transition-transform text-left w-full"
-    >
-      <div className={`w-12 h-12 rounded-2xl ${iconBg} flex items-center justify-center flex-shrink-0`}>
-        <span className={`material-symbols-outlined text-[26px] ${iconColor}`}>{icon}</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[17px] font-bold text-[#0b1c30]">{title}</div>
-        <div className="text-[13px] text-[#7a6358] mt-0.5">{desc}</div>
-      </div>
-      <span className="material-symbols-outlined text-[20px] text-[#d4b8a8]">chevron_right</span>
-    </button>
-  )
-}
-
 function AlertBanner({ notifications }) {
   const alert = notifications?.find(n => n.type === 'alert' && !n.is_read)
   if (!alert) return null
@@ -96,7 +63,7 @@ function PushBanner({ permission, isSubscribed, pushError, subscribe }) {
 
 export default function Home() {
   const navigate         = useNavigate()
-  const { user, logout } = useAuthStore()
+  const { user } = useAuthStore()
   const { permission, isSubscribed, error: pushError, subscribe } = usePush(user?.id)
 
   useEffect(() => {
@@ -113,6 +80,9 @@ export default function Home() {
     staleTime: 60_000,
   })
 
+  // Admin/kỹ sư vào thẳng khu làm việc, không qua trang chủ nông dân
+  if (user?.role === 'admin')    return <Navigate to="/admin" replace />
+  if (user?.role === 'engineer') return <Navigate to="/engineer/queue" replace />
   if (user?.role === 'farmer' && !user.name) {
     return <Navigate to="/profile?onboard=true" replace />
   }
@@ -267,34 +237,6 @@ export default function Home() {
               </p>
             </div>
           </div>
-        </main>
-      )}
-
-      {/* ── Dashboard links for engineer / admin ─────────────────── */}
-      {!isFarmer && (
-        <main className="flex-1 flex flex-col gap-3 px-5 py-4 overflow-y-auto">
-          <p className="text-[12px] text-[#7a6358] font-semibold uppercase tracking-wider mb-1">
-            Truy cập nhanh
-          </p>
-
-          {/* ── Kỹ sư ── */}
-          {user?.role === 'engineer' && ENGINEER_LINKS.map(link => (
-            <NavCard key={link.path} {...link} onClick={() => navigate(link.path)} />
-          ))}
-
-          {/* ── Admin ── */}
-          {user?.role === 'admin' && ADMIN_LINKS.map(link => (
-            <NavCard key={link.path} {...link} onClick={() => navigate(link.path)} />
-          ))}
-
-          <button
-            onClick={logout}
-            className="mt-2 flex items-center justify-center gap-2
-                       text-[13px] text-[#7a6358] font-semibold py-3"
-          >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-            Đăng xuất
-          </button>
         </main>
       )}
 

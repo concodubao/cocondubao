@@ -201,7 +201,10 @@ function StepEmailPassword() {
       const res = await authAPI.loginEmail(email, password)
       const { token, user, isNewUser } = res.data
       setToken(token); setUser(user)
-      window.location.href = isNewUser ? '/profile?onboard=true' : '/home'
+      window.location.href = isNewUser ? '/profile?onboard=true'
+        : user.role === 'admin'    ? '/admin'
+        : user.role === 'engineer' ? '/engineer/queue'
+        : '/home'
     } catch (err) {
       setError(err.response?.data?.error || 'Đăng nhập thất bại.')
       setLoading(false)

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
-import { ClipboardList, BookOpen, BarChart2, Users, Send, AlertTriangle, Home, LogOut, FlaskConical, Leaf, ChevronRight, CloudSun } from 'lucide-react'
+import { ClipboardList, BookOpen, BarChart2, Users, Send, AlertTriangle, LogOut, FlaskConical, ChevronRight, CloudSun, Menu, X } from 'lucide-react'
 
 function useIsDesktop() {
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
@@ -61,8 +61,7 @@ export default function DesktopLayout({ children }) {
   const navigate  = useNavigate()
   const location  = useLocation()
   const { user, logout } = useAuthStore()
-
-  if (!isDesktop) return children
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const nav = user?.role === 'admin' ? ADMIN_NAV : ENGINEER_NAV
 
@@ -74,6 +73,51 @@ export default function DesktopLayout({ children }) {
   const initials = user?.name
     ? user.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
     : (user?.phone || '?').slice(-2)
+
+  // ── Mobile: nút menu nổi + drawer điều hướng (không có sidebar cố định) ──
+  if (!isDesktop) {
+    return (
+      <>
+        {children}
+        <button onClick={() => setDrawerOpen(true)} aria-label="Mở menu" style={s.mobileFab}>
+          <Menu size={22} color="#fff" />
+        </button>
+        {drawerOpen && (
+          <div style={s.drawerOverlay} onClick={e => e.target === e.currentTarget && setDrawerOpen(false)}>
+            <aside style={s.drawerPanel}>
+              <div style={s.logo}>
+                <img src="/cocon-icon-bg.png" alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={s.logoTitle}>Cò Con</div>
+                  <div style={s.logoRole}>{user?.role === 'admin' ? 'Quản trị viên' : 'Kỹ sư nông nghiệp'}</div>
+                </div>
+                <button onClick={() => setDrawerOpen(false)} aria-label="Đóng" style={s.drawerClose}><X size={20} /></button>
+              </div>
+              <nav style={s.nav}>
+                {nav.map(item => (
+                  <NavButton key={item.path} item={item} active={isActive(item)}
+                    onClick={() => { navigate(item.path); setDrawerOpen(false) }} />
+                ))}
+              </nav>
+              <div style={s.footer}>
+                <div style={s.userRow}>
+                  <div style={s.userAvatar}>{initials}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={s.userName}>{user?.name || 'Người dùng'}</div>
+                    <div style={s.userSub}>{user?.phone || user?.email || ''}</div>
+                  </div>
+                </div>
+                <button onClick={() => { logout(); navigate('/login') }} style={s.logoutBtn}>
+                  <LogOut size={13} strokeWidth={2} /> Đăng xuất
+                </button>
+              </div>
+            </aside>
+            <style>{`@keyframes drawerIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}`}</style>
+          </div>
+        )}
+      </>
+    )
+  }
 
   return (
     <div style={s.wrapper}>
@@ -97,14 +141,6 @@ export default function DesktopLayout({ children }) {
             <NavButton key={item.path} item={item} active={isActive(item)}
               onClick={() => navigate(item.path)} />
           ))}
-
-          <div style={s.divider} />
-
-          <NavButton
-            item={{ path: '/home', Icon: Home, label: 'Trang chủ' }}
-            active={false}
-            onClick={() => navigate('/home')}
-          />
         </nav>
 
         {/* User footer */}
@@ -147,4 +183,8 @@ const s = {
   userSub:   { fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 },
   logoutBtn: { fontSize: 12, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 5, fontFamily: "'Noto Sans', sans-serif" },
   main:      { flex: 1, overflow: 'auto', minWidth: 0 },
+  mobileFab:     { position: 'fixed', right: 16, bottom: 'max(16px, env(safe-area-inset-bottom))', width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg,#6b3410,#4B230A)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(75,35,10,0.4)', cursor: 'pointer', zIndex: 40 },
+  drawerOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 50, display: 'flex' },
+  drawerPanel:   { width: 260, maxWidth: '82%', background: '#fff', height: '100dvh', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 16px rgba(0,0,0,0.15)', animation: 'drawerIn 0.22s ease' },
+  drawerClose:   { background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
 }
