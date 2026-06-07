@@ -200,11 +200,13 @@ export default function AIErrors() {
             </p>
           </div>
         ) : (
-          errors.map(item => (
-            <ErrorCard key={item.id} item={item}
-              onReview={(id) => review.mutate(id)}
-              onCompose={setComposing} />
-          ))
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10, alignItems: 'start' }}>
+            {errors.map(item => (
+              <ErrorCard key={item.id} item={item}
+                onReview={(id) => review.mutate(id)}
+                onCompose={setComposing} />
+            ))}
+          </div>
         )}
       </main>
 
@@ -221,7 +223,7 @@ export default function AIErrors() {
 }
 
 const s = {
-  page:          { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
+  page:          { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 1080, margin: '0 auto', width: '100%' },
   header:        { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:       { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   title:         { fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },

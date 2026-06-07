@@ -258,13 +258,14 @@ export default function Dashboard() {
 }
 
 const s = {
-  page:      { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 520, margin: '0 auto' },
+  page:      { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 1000, margin: '0 auto', width: '100%' },
   header:    { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
   iconBtn:   { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
   title:     { flex: 1, fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
-  main:      { flex: 1, padding: '14px', display: 'flex', flexDirection: 'column', gap: 12 },
-  grid4:     { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 },
-  grid2:     { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
+  // Desktop: card tự xếp 2 cột (auto-fit); hàng chỉ số & nút thao tác trải full
+  main:      { flex: 1, padding: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: 12, alignContent: 'start' },
+  grid4:     { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 },
+  grid2:     { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 },
   statCard:  { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
   statLabel: { fontSize: 11, color: '#64748b', textAlign: 'center' },
   statSub:   { fontSize: 10, color: '#e2e8f0' },

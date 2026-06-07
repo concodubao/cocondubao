@@ -170,7 +170,7 @@ export default function Queue() {
   ]
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[1080px] mx-auto w-full">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
@@ -206,15 +206,15 @@ export default function Queue() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 p-4 flex flex-col gap-3" aria-live="polite">
+      <main className="flex-1 p-4" aria-live="polite">
         {loading ? (
-          <div className="flex-1 flex flex-col gap-3">
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))]">
             {[1, 2, 3].map(i => (
               <div key={i} className="skeleton h-40 rounded-[20px]" />
             ))}
           </div>
         ) : queue.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center gap-4 py-16">
+          <div className="flex flex-col items-center justify-center gap-4 py-16">
             <div className="w-20 h-20 rounded-[24px] bg-[#fdf6f0] flex items-center justify-center">
               <span className="material-symbols-outlined text-[44px] text-[#f5d5b0] ms-fill">check_circle</span>
             </div>
@@ -223,16 +223,18 @@ export default function Queue() {
             </p>
           </div>
         ) : (
-          queue.map(item => (
-            <QueueCard
-              key={item.id}
-              item={item}
-              onTake={handleTake}
-              onDelete={handleDelete}
-              currentUserId={user?.id}
-              deleting={deleting}
-            />
-          ))
+          <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] items-start">
+            {queue.map(item => (
+              <QueueCard
+                key={item.id}
+                item={item}
+                onTake={handleTake}
+                onDelete={handleDelete}
+                currentUserId={user?.id}
+                deleting={deleting}
+              />
+            ))}
+          </div>
         )}
       </main>
     </div>

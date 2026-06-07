@@ -148,7 +148,7 @@ export default function History() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[1080px] mx-auto w-full">
 
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white border-b border-[#f1f5f9]
@@ -245,9 +245,11 @@ export default function History() {
             <p className="text-[13px] text-[#7a6358] m-0">
               {filtered.length} câu hỏi{search ? ' tìm thấy' : ' đã trả lời'}
             </p>
-            {filtered.map(item => (
-              <HistoryCard key={item.id} item={item} onEdit={handleEdit} />
-            ))}
+            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(320px,1fr))] items-start">
+              {filtered.map(item => (
+                <HistoryCard key={item.id} item={item} onEdit={handleEdit} />
+              ))}
+            </div>
           </>
         )}
       </main>
