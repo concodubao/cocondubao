@@ -36,8 +36,8 @@ function StepRole({ onNext }) {
   )
 }
 
-// ─── Ô nhập 6 chữ số (dùng cho cả PIN lẫn OTP) ──────────────
-function DigitBoxes({ value, onChange, autoFocus = true }) {
+// ─── Ô nhập 6 chữ số (dùng cho cả PIN lẫn OTP). mask=true → che như mật khẩu ──
+function DigitBoxes({ value, onChange, autoFocus = true, mask = false }) {
   // 6 ref tường minh — không gọi useRef trong vòng lặp (rules-of-hooks)
   const r0 = useRef(null), r1 = useRef(null), r2 = useRef(null)
   const r3 = useRef(null), r4 = useRef(null), r5 = useRef(null)
@@ -70,8 +70,8 @@ function DigitBoxes({ value, onChange, autoFocus = true }) {
   return (
     <div className="flex gap-2 justify-center">
       {Array.from({ length: 6 }).map((_, i) => (
-        <input key={i} ref={refs[i]} type="tel" inputMode="numeric" maxLength={1}
-          autoComplete={i === 0 ? 'one-time-code' : 'off'}
+        <input key={i} ref={refs[i]} type={mask ? 'password' : 'tel'} inputMode="numeric" maxLength={1}
+          autoComplete={mask ? 'off' : (i === 0 ? 'one-time-code' : 'off')}
           value={digits[i] || ''}
           onChange={e => handleInput(i, e.target.value)}
           onKeyDown={e => handleKeyDown(i, e)}
@@ -161,7 +161,7 @@ function StepPhonePin() {
             onKeyDown={e => e.key === 'Enter' && submit()}
             className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
         ) : (
-          <DigitBoxes value={pin} onChange={setPin} autoFocus={false} />
+          <DigitBoxes value={pin} onChange={setPin} autoFocus={false} mask />
         )}
         {mode === 'register' && (
           <p className="text-[12.5px] text-[#7a6358] text-center">Nhớ kỹ mã PIN này để đăng nhập lần sau nhé.</p>
