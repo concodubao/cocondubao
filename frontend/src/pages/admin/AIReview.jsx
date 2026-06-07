@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { adminAPI } from '../../services/api'
 import { toast } from '../../stores/toastStore'
+import { useAuthStore } from '../../stores/authStore'
 import { ChevronLeft, BookOpen, X } from 'lucide-react'
 
 const SOURCE_LABEL = {
@@ -96,6 +97,8 @@ const FILTERS = [
 
 export default function AIReview() {
   const navigate = useNavigate()
+  const { user } = useAuthStore()
+  const backTo = user?.role === 'admin' ? '/admin' : '/engineer/queue'
   const [filter, setFilter] = useState('all')
   const [composing, setComposing] = useState(null)
 
@@ -116,7 +119,7 @@ export default function AIReview() {
   return (
     <div style={s.page}>
       <header style={s.header}>
-        <button onClick={() => navigate('/admin')} style={s.iconBtn} aria-label="Quay lại">
+        <button onClick={() => navigate(backTo)} style={s.iconBtn} aria-label="Quay lại">
           <ChevronLeft size={22} />
         </button>
         <h1 style={s.title}>Soát chất lượng AI</h1>
@@ -161,9 +164,9 @@ export default function AIReview() {
 
 const s = {
   page:       { minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: '#fdf8f5', fontFamily: "'Noto Sans', sans-serif", maxWidth: 1080, margin: '0 auto', width: '100%' },
-  header:     { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10 },
+  header:     { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#fff', borderBottom: '1px solid #f1f5f9', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 1px 6px rgba(0,0,0,0.04)' },
   iconBtn:    { width: 40, height: 40, background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  title:      { fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0 },
+  title:      { fontSize: 18, fontWeight: 800, color: '#0b1c30', margin: 0 },
   intro:      { fontSize: 13, color: '#64748b', margin: 0, padding: '12px 16px 0', lineHeight: 1.5 },
   tabs:       { display: 'flex', padding: '10px 12px', gap: 6, flexWrap: 'wrap' },
   tab:        { padding: '6px 14px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: 13 },

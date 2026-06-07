@@ -159,7 +159,8 @@ router.get('/knowledge-gaps', verifyJWT, requireRole('admin'), async (req, res) 
 
 // ── GET /admin/ai-review — soát chất lượng: câu trả lời AI gần đây + confidence ──
 // Ít PII (không kèm tên/SĐT nông dân) — chỉ để đánh giá AI đúng/sai.
-router.get('/ai-review', verifyJWT, requireRole('admin'), async (req, res) => {
+// Mở cho cả kỹ sư: họ là người hiểu chuyên môn để bắt câu AI trả lời sai.
+router.get('/ai-review', verifyJWT, requireRole('admin', 'engineer'), async (req, res) => {
   const { filter = 'all', limit = 40 } = req.query
   try {
     const since = new Date(Date.now() - 30 * 86400000).toISOString()
@@ -205,7 +206,8 @@ router.get('/ai-review', verifyJWT, requireRole('admin'), async (req, res) => {
 })
 
 // ── POST /admin/knowledge-qa — thêm 1 QA chuẩn vào kho tri thức (từ màn soát) ──
-router.post('/knowledge-qa', verifyJWT, requireRole('admin'), async (req, res) => {
+// Kỹ sư cũng được phép: soạn câu trả lời đúng từ màn "Soát chất lượng AI".
+router.post('/knowledge-qa', verifyJWT, requireRole('admin', 'engineer'), async (req, res) => {
   const { question, answer } = req.body
   if (!question?.trim() || !answer?.trim()) {
     return res.status(400).json({ error: 'Cần cả câu hỏi và câu trả lời đúng.' })

@@ -41,10 +41,12 @@ beforeEach(() => { sb.reset() })
 
 // ══════════════════════════════════════════════════════════════════════════════
 describe('POST /admin/knowledge-qa', () => {
-  it('403 với kỹ sư (chỉ admin)', async () => {
+  it('200 cho kỹ sư (được cấp quyền soát chất lượng AI)', async () => {
+    sb.enqueue({ data: { id: 'd1' }, error: null }) // insert knowledge_docs
     const res = await request(app).post('/api/v1/admin/knowledge-qa').set(eng())
-      .send({ question: 'q', answer: 'a' })
-    expect(res.status).toBe(403)
+      .send({ question: 'Lúa vàng lá?', answer: 'Bón đạm cân đối.' })
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
   })
 
   it('400 khi thiếu câu hỏi hoặc câu trả lời', async () => {
@@ -64,9 +66,11 @@ describe('POST /admin/knowledge-qa', () => {
 
 // ══════════════════════════════════════════════════════════════════════════════
 describe('GET /admin/ai-review', () => {
-  it('403 với kỹ sư', async () => {
+  it('200 cho kỹ sư (được cấp quyền soát chất lượng AI)', async () => {
+    sb.enqueue({ data: [], error: null }) // không có câu trả lời nào → items rỗng
     const res = await request(app).get('/api/v1/admin/ai-review').set(eng())
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(200)
+    expect(res.body.items).toEqual([])
   })
 
   it('200 trả câu trả lời AI kèm câu hỏi gốc', async () => {

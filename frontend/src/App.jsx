@@ -180,7 +180,7 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/admin/ai-review" element={
-            <ProtectedRoute allowedRoles={['admin']}>
+            <ProtectedRoute allowedRoles={['engineer','admin']}>
               <DesktopLayout>
                 <Suspense fallback={<PageLoader />}><AIReview /></Suspense>
               </DesktopLayout>

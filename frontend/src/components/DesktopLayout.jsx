@@ -18,6 +18,7 @@ const ENGINEER_NAV = [
   { path: '/engineer/knowledge', Icon: BookOpen,      label: 'Kho tri thức', short: 'Tri thức' },
   { path: '/engineer/test-ai',   Icon: FlaskConical,  label: 'Test AI',      short: 'Test AI' },
   { path: '/weather',            Icon: CloudSun,      label: 'Thời tiết',    short: 'Thời tiết' },
+  { path: '/admin/ai-review',    Icon: ShieldCheck,   label: 'Soát chất lượng AI', short: 'Soát AI' },
 ]
 
 const ADMIN_NAV = [
