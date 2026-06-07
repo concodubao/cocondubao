@@ -35,6 +35,7 @@ const Dashboard = lazy(() => import('./pages/admin/Dashboard'))
 const Users     = lazy(() => import('./pages/admin/Users'))
 const SendNotif = lazy(() => import('./pages/admin/SendNotif'))
 const AIErrors  = lazy(() => import('./pages/admin/AIErrors'))
+const AIReview  = lazy(() => import('./pages/admin/AIReview'))
 
 // ─── Fallback khi lazy page đang tải ─────────────────────────────────────────
 function PageLoader() {
@@ -175,6 +176,13 @@ export default function App() {
             <ProtectedRoute allowedRoles={['admin']}>
               <DesktopLayout>
                 <Suspense fallback={<PageLoader />}><AIErrors /></Suspense>
+              </DesktopLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/ai-review" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <DesktopLayout>
+                <Suspense fallback={<PageLoader />}><AIReview /></Suspense>
               </DesktopLayout>
             </ProtectedRoute>
           } />

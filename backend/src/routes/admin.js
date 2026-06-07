@@ -157,6 +157,80 @@ router.get('/knowledge-gaps', verifyJWT, requireRole('admin'), async (req, res) 
   }
 })
 
+// ── GET /admin/ai-review — soát chất lượng: câu trả lời AI gần đây + confidence ──
+// Ít PII (không kèm tên/SĐT nông dân) — chỉ để đánh giá AI đúng/sai.
+router.get('/ai-review', verifyJWT, requireRole('admin'), async (req, res) => {
+  const { filter = 'all', limit = 40 } = req.query
+  try {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString()
+    let q = supabase
+      .from('messages')
+      .select('content, confidence, source, session_id, created_at')
+      .eq('role', 'assistant')
+      .not('confidence', 'is', null)
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(Number(limit))
+    if (filter === 'low')      q = q.lt('confidence', 0.5)
+    else if (filter === 'mid') q = q.gte('confidence', 0.5).lt('confidence', 0.7)
+
+    const { data: ans } = await q
+    const answers    = ans || []
+    const sessionIds = [...new Set(answers.map(a => a.session_id).filter(Boolean))]
+    let userMsgs = []
+    if (sessionIds.length) {
+      const { data: um } = await supabase
+        .from('messages')
+        .select('session_id, content, created_at')
+        .in('session_id', sessionIds)
+        .eq('role', 'user')
+        .order('created_at', { ascending: true })
+      userMsgs = um || []
+    }
+    const items = answers.map(a => {
+      const before = userMsgs.filter(m => m.session_id === a.session_id && m.created_at <= a.created_at)
+      return {
+        question:   before.length ? before[before.length - 1].content : null,
+        answer:     a.content,
+        confidence: a.confidence,
+        source:     a.source,
+        created_at: a.created_at,
+      }
+    })
+    res.json({ items })
+  } catch (err) {
+    console.error('[ADMIN] ai-review error:', err)
+    res.status(500).json({ error: 'Không lấy được dữ liệu.' })
+  }
+})
+
+// ── POST /admin/knowledge-qa — thêm 1 QA chuẩn vào kho tri thức (từ màn soát) ──
+router.post('/knowledge-qa', verifyJWT, requireRole('admin'), async (req, res) => {
+  const { question, answer } = req.body
+  if (!question?.trim() || !answer?.trim()) {
+    return res.status(400).json({ error: 'Cần cả câu hỏi và câu trả lời đúng.' })
+  }
+  try {
+    const { data: doc, error } = await supabase
+      .from('knowledge_docs')
+      .insert({
+        title:       `QA: ${question.trim().slice(0, 60)}`,
+        source:      'ai_review',
+        content:     `Câu hỏi: ${question.trim()}\n\nCâu trả lời: ${answer.trim()}`,
+        status:      'embedding',
+        uploaded_by: req.user.userId,
+      })
+      .select('id')
+      .single()
+    if (error) throw error
+    embedAndStoreDoc(doc.id).catch(e => console.warn('[ADMIN] embed QA failed:', e.message))
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[ADMIN] knowledge-qa error:', err)
+    res.status(500).json({ error: 'Không thêm được vào kho tri thức.' })
+  }
+})
+
 // ── GET /admin/users ──────────────────────────────────────────────────────────
 router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
   const { role, search, limit = 50, offset = 0 } = req.query

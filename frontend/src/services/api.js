@@ -93,6 +93,8 @@ export const adminAPI = {
   createEngineer: (data)         => api.post('/admin/engineers', data),
   getStats:       ()             => api.get('/admin/stats'),
   getKnowledgeGaps: ()           => api.get('/admin/knowledge-gaps'),
+  getAIReview:    (filter)       => api.get('/admin/ai-review', { params: filter ? { filter } : {} }),
+  addKnowledgeQA: (data)         => api.post('/admin/knowledge-qa', data),
   getUsers:       (params = {}) => api.get('/admin/users', { params }),
   updateUser:     (id, updates) => api.patch(`/admin/users/${id}`, updates),
   resetUserPin:   (id)          => api.patch(`/admin/users/${id}/reset-pin`),

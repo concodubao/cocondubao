@@ -4,7 +4,7 @@ import { adminAPI, engineerAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase }    from '../../services/supabase'
 import { useEffect }   from 'react'
-import { Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
+import { Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight, ShieldCheck } from 'lucide-react'
 
 function BarChart({ data }) {
   if (!data?.length) return null
@@ -244,6 +244,10 @@ export default function Dashboard() {
               <button onClick={() => navigate('/admin/ai-errors')} style={s.actionBtn}>
                 <AlertTriangle size={20} color="#f59e0b" strokeWidth={1.5} />
                 <span>Báo lỗi AI</span>
+              </button>
+              <button onClick={() => navigate('/admin/ai-review')} style={s.actionBtn}>
+                <ShieldCheck size={20} color="#4B230A" strokeWidth={1.5} />
+                <span>Soát chất lượng AI</span>
               </button>
               <button onClick={() => navigate('/admin/users')} style={s.actionBtn}>
                 <Users size={20} color="#3b82f6" strokeWidth={1.5} />
