@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, Shield, FileText, Mail } from 'lucide-react'
 
 const CONTACT_EMAIL = 'conconongnghiep@gmail.com'
-const UPDATED = '04/06/2026'
+const UPDATED = '08/06/2026'
 
 // Mỗi mục: tiêu đề + danh sách đoạn (chuỗi). **đậm** được tô đậm đơn giản.
 const PRIVACY = [
@@ -28,7 +28,8 @@ const PRIVACY = [
     items: [
       'Cò Con **không bán** thông tin của bạn cho bất kỳ ai.',
       'Một số dịch vụ kỹ thuật giúp app hoạt động: lưu trữ dữ liệu (Supabase), trợ lý AI (Google Gemini), gửi mã OTP (nhà mạng/Twilio), dữ liệu thời tiết (Open-Meteo).',
-      'Câu hỏi/ảnh có thể được đội ngũ kỹ sư xem để trả lời và cải thiện dịch vụ.',
+      '**Khi nào kỹ sư xem câu hỏi:** chỉ những câu được **chuyển cho kỹ sư** (câu khó AI chưa trả lời được) mới được kỹ sư xem để trả lời. Các cuộc trò chuyện khác không bị xem tự do.',
+      'Đội ngũ cũng rà soát câu trả lời của AI (không kèm danh tính của bạn) để cải thiện chất lượng.',
     ],
   },
   {
