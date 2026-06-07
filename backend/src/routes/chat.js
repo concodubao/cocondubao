@@ -325,7 +325,9 @@ router.post('/report-error', verifyJWT, async (req, res) => {
 // ─── GET /chat/sessions/:userId — lịch sử phiên chat ─────────────────────────
 router.get('/sessions/:userId', verifyJWT, async (req, res) => {
   const targetId = req.params.userId
-  if (req.user.role === 'farmer' && req.user.userId !== targetId) {
+  // Chỉ xem được lịch sử phiên của chính mình (kể cả staff — staff đọc nội dung
+  // câu hỏi escalate qua /messages, không cần liệt kê phiên của nông dân).
+  if (req.user.userId !== targetId) {
     return res.status(403).json({ error: 'Không có quyền xem session của người khác.' })
   }
 
@@ -370,17 +372,31 @@ router.get('/sessions/:userId', verifyJWT, async (req, res) => {
 router.get('/messages/:sessionId', verifyJWT, async (req, res) => {
   const sessionId = req.params.sessionId
 
-  // Nông dân chỉ được xem session của mình
-  if (req.user.role === 'farmer') {
-    const { data: session } = await supabase
-      .from('chat_sessions')
-      .select('user_id')
-      .eq('id', sessionId)
-      .single()
+  const { data: session } = await supabase
+    .from('chat_sessions')
+    .select('user_id')
+    .eq('id', sessionId)
+    .single()
+  if (!session) return res.status(404).json({ error: 'Không tìm thấy session.' })
 
-    if (!session) return res.status(404).json({ error: 'Không tìm thấy session.' })
-    if (session.user_id !== req.user.userId) {
+  const isOwner = session.user_id === req.user.userId
+  const isStaff = req.user.role === 'engineer' || req.user.role === 'admin'
+
+  // Chủ phiên xem được. Staff chỉ xem được nếu phiên này từng được chuyển lên
+  // hàng đợi kỹ sư (nông dân chủ động escalate) — không cho đọc chat tuỳ ý.
+  if (!isOwner) {
+    if (!isStaff) {
       return res.status(403).json({ error: 'Không có quyền xem tin nhắn này.' })
+    }
+    const { data: sMsgs } = await supabase.from('messages').select('id').eq('session_id', sessionId)
+    const ids = (sMsgs || []).map(m => m.id)
+    let escalated = false
+    if (ids.length) {
+      const { data: q } = await supabase.from('engineer_queue').select('id').in('message_id', ids).limit(1)
+      escalated = (q?.length || 0) > 0
+    }
+    if (!escalated) {
+      return res.status(403).json({ error: 'Chỉ xem được cuộc trò chuyện đã chuyển cho kỹ sư.' })
     }
   }
 
