@@ -415,7 +415,10 @@ export async function embedAndStoreDoc(docId) {
 
   if (insertError) throw insertError
 
-  await supabase
+  // Bước quyết định doc có "lên kệ" hay không — PHẢI kiểm lỗi, nếu không
+  // thất bại âm thầm ở đây làm tài liệu kẹt mãi ở trạng thái "embedding"
+  // dù chunks đã tạo và log vẫn in thành công.
+  const { data: updated, error: updateError } = await supabase
     .from('knowledge_docs')
     .update({
       status:        'approved',
@@ -423,6 +426,10 @@ export async function embedAndStoreDoc(docId) {
       updated_at:    new Date().toISOString(),
     })
     .eq('id', docId)
+    .select('id')
+
+  if (updateError) throw new Error(`Đã tạo chunks nhưng không duyệt được tài liệu: ${updateError.message}`)
+  if (!updated?.length) throw new Error('Đã tạo chunks nhưng tài liệu không còn tồn tại (có thể đã bị xóa).')
 
   console.log(`[RAG] Embedded doc "${doc.title}" → ${chunks.length} chunks`)
   return { chunksCreated: chunks.length }
