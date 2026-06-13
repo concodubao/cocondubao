@@ -25,6 +25,17 @@ const upload = multer({
   },
 })
 
+// Instance riêng cho STT: chấp nhận audio/* (iOS gửi audio/mp4, máy khác audio/webm).
+// Cũng nhận application/octet-stream phòng trình duyệt không gắn mimetype chuẩn.
+const uploadAudio = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_, file, cb) => {
+    if (file.mimetype.startsWith('audio/') || file.mimetype === 'application/octet-stream') cb(null, true)
+    else cb(new Error('Chỉ hỗ trợ file âm thanh'))
+  },
+})
+
 // ─── Hàm nội bộ: tạo/lấy session ────────────────────────────────────────────
 async function getOrCreateSession(userId, cropType, sessionId) {
   if (sessionId) return sessionId
@@ -259,7 +270,7 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
 })
 
 // ─── POST /chat/stt-fallback — iOS Safari: gửi audio lên, trả về transcript ───
-router.post('/stt-fallback', verifyJWT, upload.single('audio'), async (req, res) => {
+router.post('/stt-fallback', verifyJWT, uploadAudio.single('audio'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'Không nhận được file audio.' })
 
   try {
