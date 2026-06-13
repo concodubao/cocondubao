@@ -5,12 +5,17 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import axios from 'axios'
 
 // ─── Detect môi trường ────────────────────────────────────────────────────────
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-const isChrome = /Chrome/.test(navigator.userAgent) && !/Edg/.test(navigator.userAgent)
+// iPadOS 13+ báo UA là "Macintosh" → bổ sung check maxTouchPoints để bắt iPad.
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+// Safari thật (loại trừ Chrome/Edge/Firefox/Opera trên iOS lẫn desktop)
+const isSafari = /^((?!chrome|android|crios|fxios|edg|opr).)*safari/i.test(navigator.userAgent)
 const hasWebSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
-// iOS Safari: dùng Web Speech nếu có (iOS 16.4+), còn không dùng MediaRecorder + Google STT
-const USE_WEB_SPEECH = hasWebSpeech && (!isIOS || isChrome)
+// Web Speech API CHỈ dùng cho Chromium (Chrome desktop/Android, Edge). Safari —
+// cả iOS, iPadOS lẫn macOS — tuy có webkitSpeechRecognition nhưng hay lỗi
+// 'network'/im lặng không nhận giọng → ép dùng fallback MediaRecorder + Gemini STT.
+const USE_WEB_SPEECH = hasWebSpeech && !isIOS && !isSafari
 
 export function useSTT() {
   const [transcript,    setTranscript]    = useState('')
