@@ -149,12 +149,18 @@ export function useSTT() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       await startVolumeAnalyser(stream)
 
-      // iOS Safari hỗ trợ audio/mp4, các trình duyệt khác dùng webm/opus
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/mp4'
+      // iOS Safari thường chỉ hỗ trợ audio/mp4, máy khác dùng webm/opus.
+      // Không xác định được thì để trình duyệt tự chọn (đừng ép mimeType).
+      let mimeType = ''
+      if (MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus'
+      else if (MediaRecorder.isTypeSupported?.('audio/mp4'))         mimeType = 'audio/mp4'
 
-      const recorder = new MediaRecorder(stream, { mimeType })
+      let recorder
+      try {
+        recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
+      } catch {
+        recorder = new MediaRecorder(stream) // iOS đôi khi từ chối mimeType chỉ định
+      }
       mediaRecRef.current = recorder
       audioChunksRef.current = []
 
@@ -169,16 +175,18 @@ export function useSTT() {
         setIsProcessing(true)
 
         try {
-          const blob = new Blob(audioChunksRef.current, { type: mimeType })
+          const actualType = recorder.mimeType || mimeType || 'audio/mp4'
+          const blob = new Blob(audioChunksRef.current, { type: actualType })
 
-          // Kiểm tra audio có đủ dài không (tối thiểu 0.5s)
-          if (blob.size < 5000) {
+          // Kiểm tra audio có đủ dài không (tối thiểu ~0.5s)
+          if (blob.size < 2000) {
             setError('Ghi âm quá ngắn. Thử nói rõ và lâu hơn nhé.')
             return
           }
 
+          const ext = actualType.includes('webm') ? 'webm' : actualType.includes('mp4') ? 'mp4' : 'audio'
           const formData = new FormData()
-          formData.append('audio', blob, 'recording.webm')
+          formData.append('audio', blob, `recording.${ext}`)
           formData.append('language', 'vi-VN')
 
           const stored = JSON.parse(localStorage.getItem('cocon-auth') || '{}')
@@ -204,7 +212,7 @@ export function useSTT() {
         }
       }
 
-      recorder.start()
+      recorder.start(1000) // timeslice 1s → iOS flush dữ liệu định kỳ, tránh blob rỗng
       setIsListening(true)
       setError(null)
       setTranscript('')
