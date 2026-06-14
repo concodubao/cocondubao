@@ -149,14 +149,15 @@ router.post('/register-email', verifyJWT, requireRole('admin'), async (req, res)
   if (!['engineer', 'admin'].includes(role)) return res.status(400).json({ error: 'Vai trò không hợp lệ.' })
   if (password.length < 8) return res.status(400).json({ error: 'Mật khẩu tối thiểu 8 ký tự.' })
 
-  const { data: existing } = await supabase.from('users').select('id').eq('email', email).single()
+  const normalizedEmail = email.trim().toLowerCase()
+  const { data: existing } = await supabase.from('users').select('id').eq('email', normalizedEmail).single()
   if (existing) return res.status(400).json({ error: 'Email đã được sử dụng.' })
 
   try {
     const password_hash = await bcrypt.hash(password, 10)
     const is_active = role === 'admin'
     const { data: user, error } = await supabase.from('users')
-      .insert({ email, password_hash, role, is_active }).select().single()
+      .insert({ email: normalizedEmail, password_hash, role, is_active }).select().single()
     if (error) throw error
     res.json({ success: true, pending: !is_active })
   } catch (err) {
@@ -169,8 +170,12 @@ router.post('/login-email', async (req, res) => {
   const { email, password } = req.body
   if (!email || !password) return res.status(400).json({ error: 'Vui lòng nhập email và mật khẩu.' })
 
+  // Tài khoản tạo ra lưu email dạng lowercase (admin.js) → đăng nhập cũng phải
+  // chuẩn hóa, nếu không gõ hoa/thừa khoảng trắng sẽ báo sai mật khẩu oan.
+  const normalizedEmail = email.trim().toLowerCase()
+
   try {
-    const { data: user } = await supabase.from('users').select('*').eq('email', email).single()
+    const { data: user } = await supabase.from('users').select('*').eq('email', normalizedEmail).single()
     if (!user || !user.password_hash) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' })
 
     const valid = await bcrypt.compare(password, user.password_hash)

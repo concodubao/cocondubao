@@ -3,6 +3,12 @@ import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { authAPI } from '../services/api'
 import BottomNav from '../components/BottomNav'
+import PasswordInput from '../components/PasswordInput'
+
+// Trang chủ theo vai trò — staff không nên rớt về /home (trang nông dân)
+function roleHome(role) {
+  return role === 'admin' ? '/admin' : role === 'engineer' ? '/engineer/queue' : '/home'
+}
 
 // ─── Modal đặt / đổi mật khẩu ────────────────────────────────────────────────
 function PasswordModal({ mode, onClose, onSuccess }) {
@@ -51,24 +57,22 @@ function PasswordModal({ mode, onClose, onSuccess }) {
         {!isSet && (
           <div className="flex flex-col gap-1.5">
             <label className="text-[14px] font-semibold text-[#0b1c30]">Mật khẩu hiện tại</label>
-            <input type="password" autoComplete="current-password" placeholder="••••••••"
+            <PasswordInput autoComplete="current-password" placeholder="••••••••"
               value={current} onChange={e => setCurrent(e.target.value)}
               className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
           </div>
         )}
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[14px] font-semibold text-[#0b1c30]">
-            {isSet ? 'Mật khẩu mới' : 'Mật khẩu mới'}
-          </label>
-          <input type="password" autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
+          <label className="text-[14px] font-semibold text-[#0b1c30]">Mật khẩu mới</label>
+          <PasswordInput autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
             value={newPw} onChange={e => setNewPw(e.target.value)}
             className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-[14px] font-semibold text-[#0b1c30]">Xác nhận mật khẩu</label>
-          <input type="password" autoComplete="new-password" placeholder="Nhập lại mật khẩu mới"
+          <PasswordInput autoComplete="new-password" placeholder="Nhập lại mật khẩu mới"
             value={confirm} onChange={e => setConfirm(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSubmit()}
             className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
@@ -121,7 +125,7 @@ export default function Profile() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting,     setDeleting]     = useState(false)
 
-  if (isOnboard && user?.name) return <Navigate to="/home" replace />
+  if (isOnboard && user?.name) return <Navigate to={roleHome(user?.role)} replace />
 
   function toggleCrop(id) {
     setCrops(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
@@ -138,7 +142,7 @@ export default function Profile() {
         crops,
       })
       setUser(res.data.user)
-      navigate('/home', { replace: true })
+      navigate(roleHome(res.data.user?.role || user?.role), { replace: true })
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Không lưu được. Thử lại nhé.')
     } finally {
@@ -165,7 +169,7 @@ export default function Profile() {
       {!isOnboard ? (
         <header className="flex items-center gap-3 px-5 pt-5 pb-4">
           <button
-            onClick={() => navigate('/home')}
+            onClick={() => navigate(roleHome(user?.role))}
             aria-label="Quay lại"
             className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center flex-shrink-0"
           >

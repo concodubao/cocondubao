@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Navigate, Link } from 'react-router-dom'
 import { authAPI } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
+import PasswordInput from '../components/PasswordInput'
 
 // ─── Role cards ─────────────────────────────────────────────
 const ROLES = [
@@ -156,7 +157,7 @@ function StepPhonePin() {
           {mode === 'register' ? 'Tạo mã PIN (6 số)' : (legacy ? 'Mật khẩu (tài khoản cũ)' : 'Mã PIN (6 số)')}
         </label>
         {mode === 'login' && legacy ? (
-          <input type="password" autoComplete="current-password" placeholder="Nhập mật khẩu cũ" autoFocus
+          <PasswordInput autoComplete="current-password" placeholder="Nhập mật khẩu cũ" autoFocus
             value={textPass} onChange={e => setTextPass(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && submit()}
             className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
@@ -231,7 +232,7 @@ function StepEmailPassword() {
       </div>
       <div className="space-y-1">
         <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="password">Mật khẩu</label>
-        <input id="password" type="password" autoComplete="current-password" placeholder="••••••••"
+        <PasswordInput id="password" autoComplete="current-password" placeholder="••••••••"
           value={password} onChange={e => setPassword(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleLogin()}
           className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />

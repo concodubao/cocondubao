@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { pushAPI } from '../../services/api'
 import { usePush } from '../../hooks/usePush'
+import { toast } from '../../stores/toastStore'
 import { ChevronLeft, CheckCircle, XCircle } from 'lucide-react'
 
 const TYPE_OPTIONS = [
@@ -45,7 +46,7 @@ export default function NotifSettings() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
-      alert('Không lưu được cài đặt. Thử lại nhé.')
+      toast.error('Không lưu được cài đặt. Thử lại nhé.')
     } finally {
       setSaving(false)
     }
