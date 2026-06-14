@@ -1,9 +1,31 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
 import { communityAPI } from '../../services/api'
 import { toast } from '../../stores/toastStore'
+
+// Đồng bộ 1 bài vào cả cache chi tiết ['post', id] lẫn feed, để khi quay lại
+// feed thấy số like/bình luận đã cập nhật (không bị lệch giữa 2 màn hình).
+function patchFeedPost(qc, id, patch) {
+  qc.setQueryData(['post', id], p => (p ? { ...p, ...patch } : p))
+  qc.setQueryData(['community-feed'], old => {
+    if (!old?.pages) return old
+    return {
+      ...old,
+      pages: old.pages.map(pg => ({
+        ...pg,
+        posts: pg.posts.map(p => (p.id === id ? { ...p, ...patch } : p)),
+      })),
+    }
+  })
+}
+
+function bumpCommentCount(qc, id, delta) {
+  const cur  = qc.getQueryData(['post', id])
+  const next = Math.max(0, Number(cur?.commentCount ?? 0) + delta)
+  patchFeedPost(qc, id, { commentCount: next })
+}
 
 const ROLE_BADGE = {
   engineer: { label: 'Kỹ sư', bg: '#fdf6f0', color: '#2e1505' },
@@ -41,13 +63,21 @@ export default function PostDetail() {
   const { user }      = useAuthStore()
   const queryClient   = useQueryClient()
   const inputRef      = useRef()
-  const [comment, setComment]   = useState('')
-  const [likedByMe, setLikedByMe] = useState(null)
-  const [likeCount, setLikeCount] = useState(null)
+  const [comment, setComment] = useState('')
+  // override like cục bộ; null = dùng giá trị từ post (tránh setState trong effect)
+  const [likeOverride, setLikeOverride] = useState(null)
 
-  // Load post từ feed cache nếu có, không thì gọi riêng
-  const cachedFeed   = queryClient.getQueryData(['community-feed'])
-  const cachedPost   = cachedFeed?.pages?.flatMap(p => p.posts)?.find(p => p.id === id)
+  // Lấy bài từ cache feed nếu có (vào từ feed); nếu không (deep-link / F5 / mở từ
+  // notification) thì gọi API. initialData hiển thị ngay khi đã có trong cache.
+  const cachedFeed = queryClient.getQueryData(['community-feed'])
+  const cachedPost = cachedFeed?.pages?.flatMap(p => p.posts)?.find(p => p.id === id)
+
+  const { data: post, isError } = useQuery({
+    queryKey:    ['post', id],
+    queryFn:     () => communityAPI.getPost(id).then(r => r.data.post),
+    initialData: cachedPost,
+    staleTime:   30_000,
+  })
 
   const { data: commentsData, isLoading: loadingComments } = useQuery({
     queryKey: ['comments', id],
@@ -55,23 +85,19 @@ export default function PostDetail() {
     staleTime: 30_000,
   })
 
-  const comments = commentsData?.comments ?? []
-
-  // Sync like state từ cache khi có
-  useEffect(() => {
-    if (cachedPost && likedByMe === null) {
-      setLikedByMe(cachedPost.likedByMe)
-      setLikeCount(Number(cachedPost.likeCount))
-    }
-  }, [cachedPost])
+  const comments  = commentsData?.comments ?? []
+  const liked     = likeOverride?.liked ?? post?.likedByMe ?? false
+  const likeCount = likeOverride?.count ?? Number(post?.likeCount ?? 0)
 
   function handleLike() {
-    const next = !likedByMe
-    setLikedByMe(next)
-    setLikeCount(c => next ? c + 1 : c - 1)
+    if (!post) return
+    const next      = !liked
+    const nextCount = next ? likeCount + 1 : likeCount - 1
+    setLikeOverride({ liked: next, count: nextCount })
+    patchFeedPost(queryClient, id, { likedByMe: next, likeCount: nextCount })
     communityAPI.toggleLike(id).catch(() => {
-      setLikedByMe(!next)
-      setLikeCount(c => next ? c - 1 : c + 1)
+      setLikeOverride({ liked: !next, count: likeCount })
+      patchFeedPost(queryClient, id, { likedByMe: !next, likeCount })
     })
   }
 
@@ -82,6 +108,7 @@ export default function PostDetail() {
       queryClient.setQueryData(['comments', id], old => ({
         comments: [...(old?.comments ?? []), newComment],
       }))
+      bumpCommentCount(queryClient, id, +1)
     },
     onError: () => toast.error('Không gửi được bình luận. Thử lại nhé.'),
   })
@@ -92,6 +119,7 @@ export default function PostDetail() {
       queryClient.setQueryData(['comments', id], old => ({
         comments: (old?.comments ?? []).filter(c => c.id !== commentId),
       }))
+      bumpCommentCount(queryClient, id, -1)
     },
     onError: () => toast.error('Không thể xóa bình luận.'),
   })
@@ -101,7 +129,6 @@ export default function PostDetail() {
     deleteCommentMutation.mutate(commentId)
   }
 
-  const post  = cachedPost
   const badge = ROLE_BADGE[post?.users?.role]
 
   return (
@@ -157,22 +184,26 @@ export default function PostDetail() {
               <button onClick={handleLike}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-full text-[14px] font-bold transition-colors"
                 style={{
-                  background: likedByMe ? '#fff8e8' : '#fdf8f5',
-                  color:      likedByMe ? '#855300' : '#64748b',
-                  border:     `1.5px solid ${likedByMe ? '#fde68a' : '#f0e0d0'}`,
+                  background: liked ? '#fff8e8' : '#fdf8f5',
+                  color:      liked ? '#855300' : '#64748b',
+                  border:     `1.5px solid ${liked ? '#fde68a' : '#f0e0d0'}`,
                 }}
-                aria-label={likedByMe ? 'Bỏ chúc mừng' : 'Chúc mừng'}>
+                aria-label={liked ? 'Bỏ chúc mừng' : 'Chúc mừng'}>
                 <span className="material-symbols-outlined text-[20px]"
-                      style={likedByMe ? { fontVariationSettings: "'FILL' 1" } : {}}>
+                      style={liked ? { fontVariationSettings: "'FILL' 1" } : {}}>
                   thumb_up
                 </span>
-                Chúc mừng{likeCount !== null && likeCount > 0 ? ` · ${likeCount}` : ''}
+                Chúc mừng{likeCount > 0 ? ` · ${likeCount}` : ''}
               </button>
               <span className="text-[14px] text-[#64748b] flex items-center gap-1.5 px-2">
                 <span className="material-symbols-outlined text-[18px]">chat_bubble_outline</span>
                 {comments.length} bình luận
               </span>
             </div>
+          </div>
+        ) : isError ? (
+          <div className="p-8 text-center text-[#64748b] text-[14px]">
+            Không tìm thấy bài đăng. Có thể bài đã bị xóa.
           </div>
         ) : (
           <div className="p-5 text-center text-[#64748b] text-[14px]">Đang tải bài đăng...</div>

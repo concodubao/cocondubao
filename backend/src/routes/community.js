@@ -64,6 +64,40 @@ router.get('/feed', verifyJWT, async (req, res) => {
   res.json({ posts: result })
 })
 
+// ─── GET /community/posts/:id — lấy 1 bài (deep-link / F5 / mở từ notification) ─
+router.get('/posts/:id', verifyJWT, async (req, res) => {
+  const { data: post, error } = await supabase
+    .from('posts')
+    .select(`
+      id, content, image_url, crop_tags, created_at,
+      users!posts_user_id_fkey ( id, name, village, role ),
+      post_likes ( count ),
+      comments   ( count )
+    `)
+    .eq('id', req.params.id)
+    .single()
+
+  if (error || !post) return res.status(404).json({ error: 'Không tìm thấy bài đăng.' })
+
+  const { data: myLike } = await supabase
+    .from('post_likes')
+    .select('post_id')
+    .eq('post_id', post.id)
+    .eq('user_id', req.user.userId)
+    .maybeSingle()
+
+  res.json({
+    post: {
+      ...post,
+      likeCount:    post.post_likes?.[0]?.count ?? 0,
+      commentCount: post.comments?.[0]?.count   ?? 0,
+      likedByMe:    !!myLike,
+      post_likes:   undefined,
+      comments:     undefined,
+    },
+  })
+})
+
 // ─── POST /community/posts ────────────────────────────────────────────────────
 router.post('/posts', verifyJWT,
   (req, res, next) => {
@@ -150,7 +184,7 @@ router.post('/posts/:id/like', verifyJWT, async (req, res) => {
     .select('post_id')
     .eq('post_id', postId)
     .eq('user_id', userId)
-    .single()
+    .maybeSingle()
 
   if (existing) {
     await supabase.from('post_likes').delete()

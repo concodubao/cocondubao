@@ -79,6 +79,7 @@ export const engineerAPI = {
 
 export const communityAPI = {
   getFeed:        (params = {})  => api.get('/community/feed', { params }),
+  getPost:        (id)           => api.get(`/community/posts/${id}`),
   createPost:     (formData)     => api.post('/community/posts', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),

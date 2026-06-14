@@ -138,7 +138,15 @@ async function analyzeImageWithGemini(imageBuffer, question) {
   try {
     const { GoogleGenerativeAI } = await import('@google/generative-ai')
     const genAI  = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
-    const model  = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    // gemini-2.0-flash free tier đã về 0 (limit:0) → đổi sang gemini-2.5-flash
+    // (đa phương thức, còn free tier). LƯU Ý: model này CHUNG bucket quota với
+    // LLM trả lời RAG → bật billing Gemini mới là cách triệt để. maxOutputTokens
+    // cao vì 2.5 là model "thinking" (token suy nghĩ tính vào output, để thấp
+    // sẽ bị cắt cụt câu trả lời).
+    const model  = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { maxOutputTokens: 2048 },
+    })
 
     const base64Image = imageBuffer.toString('base64')
     const result = await model.generateContent([
@@ -152,7 +160,10 @@ async function analyzeImageWithGemini(imageBuffer, question) {
     ])
     return result.response.text().trim()
   } catch (err) {
-    console.warn('[VISION] Gemini Vision failed:', err.message)
+    // Vẫn trả null để fallback mềm sang RAG (nông dân vẫn nhận được câu trả lời
+    // dựa trên text). Nếu RAG cũng dính quota, handler ngoài sẽ trả 429 thân thiện.
+    const rl = isRateLimit(err)
+    console.warn(`[VISION] Gemini Vision failed${rl ? ' (rate limit/quota)' : ''}:`, err.message)
     return null
   }
 }

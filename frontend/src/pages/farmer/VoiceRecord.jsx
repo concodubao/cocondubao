@@ -5,13 +5,22 @@ import { ChevronLeft, Mic, Square, RefreshCw, Check } from 'lucide-react'
 
 function WaveVisualizer({ volume, isListening, isProcessing }) {
   const BAR_COUNT = 20
+  // Tick chạy theo thời gian để tạo hiệu ứng rung sóng âm. Tách khỏi render
+  // (không gọi Date.now() trong lúc render) để barHeight là hàm thuần.
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (!isListening) return
+    const id = setInterval(() => setTick(t => t + 1), 80)
+    return () => clearInterval(id)
+  }, [isListening])
+
   function barHeight(i) {
     if (!isListening && !isProcessing) return 4
     if (isProcessing) return 20
     const center   = BAR_COUNT / 2
     const distance = Math.abs(i - center) / center
     const base     = volume * (1 - distance * 0.6)
-    const jitter   = Math.sin(Date.now() / 80 + i * 0.7) * 8
+    const jitter   = Math.sin(tick + i * 0.7) * 8
     return Math.max(4, Math.min(60, base * 0.6 + jitter))
   }
   return (
