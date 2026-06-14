@@ -32,7 +32,7 @@ router.get('/feed', verifyJWT, async (req, res) => {
     .from('posts')
     .select(`
       id, content, image_url, crop_tags, created_at,
-      users ( id, name, village, role ),
+      users!posts_user_id_fkey ( id, name, village, role ),
       post_likes ( count ),
       comments   ( count )
     `)
@@ -115,7 +115,7 @@ router.post('/posts', verifyJWT,
       })
       .select(`
         id, content, image_url, crop_tags, created_at,
-        users ( id, name, village, role )
+        users!posts_user_id_fkey ( id, name, village, role )
       `)
       .single()
 
@@ -170,7 +170,7 @@ router.get('/posts/:id/comments', verifyJWT, async (req, res) => {
     .from('comments')
     .select(`
       id, content, created_at,
-      users ( id, name, role )
+      users!comments_user_id_fkey ( id, name, role )
     `)
     .eq('post_id', req.params.id)
     .order('created_at', { ascending: true })
@@ -190,7 +190,7 @@ router.post('/posts/:id/comments', verifyJWT, async (req, res) => {
     .insert({ post_id: req.params.id, user_id: req.user.userId, content: content.trim() })
     .select(`
       id, content, created_at,
-      users ( id, name, role )
+      users!comments_user_id_fkey ( id, name, role )
     `)
     .single()
 
