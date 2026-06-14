@@ -70,11 +70,35 @@ async function getRecentHistory(sessionId, limit = 10) {
 
 // ─── POST /chat/ask — hỏi bằng text ─────────────────────────────────────────
 router.post('/ask', verifyJWT, async (req, res) => {
-  const { text, cropType, sessionId } = req.body
+  const { text, cropType, sessionId, testMode } = req.body
   const userId = req.user.userId
 
   if (!text?.trim()) return res.status(400).json({ error: 'Vui lòng nhập câu hỏi.' })
   if (text.length > 1000) return res.status(400).json({ error: 'Câu hỏi quá dài (tối đa 1000 ký tự).' })
+
+  // Chế độ test (chỉ kỹ sư/admin, từ màn Test AI): chạy RAG để xem AI trả lời ra
+  // sao nhưng KHÔNG lưu session/message, KHÔNG đẩy hàng đợi kỹ sư, KHÔNG push —
+  // tránh làm nhiễu dữ liệu thật và spam thông báo cho kỹ sư khác.
+  const isTest = testMode === true && (req.user.role === 'engineer' || req.user.role === 'admin')
+  if (isTest) {
+    try {
+      const result = await askRAG(text.trim(), cropType, [])
+      return res.json({
+        answer:        result.answer,
+        confidence:    result.confidence,
+        source:        result.source,
+        needEngineer:  result.needEngineer,
+        sessionId:     null,
+        engineerQueued: false,
+        messageId:     null,
+        testMode:      true,
+      })
+    } catch (err) {
+      console.error('[CHAT] /ask testMode error:', err)
+      if (isRateLimit(err)) return res.status(429).json({ error: RATE_LIMIT_MSG })
+      return res.status(500).json({ error: 'Cò Con đang bận, bạn thử lại sau nhé.' })
+    }
+  }
 
   try {
     // Lấy lịch sử để AI nhớ ngữ cảnh

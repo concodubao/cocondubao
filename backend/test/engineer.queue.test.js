@@ -184,3 +184,75 @@ describe('DELETE /engineer/queue/:id', () => {
     expect(res.status).toBe(400)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('GET /engineer/queue/:id — lấy 1 câu hỏi (deep-link Answer page)', () => {
+  it('chặn nông dân (403)', async () => {
+    const res = await request(app).get('/api/v1/engineer/queue/q1').set(auth(farmerToken()))
+    expect(res.status).toBe(403)
+  })
+
+  it('404 khi không tìm thấy', async () => {
+    sb.enqueue({ data: null, error: { message: 'not found' } })
+    const res = await request(app).get('/api/v1/engineer/queue/nope').set(auth(engToken()))
+    expect(res.status).toBe(404)
+  })
+
+  it('200 trả item kèm waitMinutes', async () => {
+    const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString()
+    sb.enqueue({ data: { id: 'q1', status: 'pending', created_at: tenMinAgo, messages: { content: 'Lúa?' } }, error: null })
+    const res = await request(app).get('/api/v1/engineer/queue/q1').set(auth(engToken()))
+    expect(res.status).toBe(200)
+    expect(res.body.item.id).toBe('q1')
+    expect(res.body.item.waitMinutes).toBeGreaterThanOrEqual(9)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('PATCH /engineer/queue/:id/answer — sửa câu đã trả lời = ghi đè', () => {
+  it('ghi đè message engineer cũ thay vì tạo trùng (updated=true)', async () => {
+    sb.enqueue(
+      { // queueItem đã resolved, có answer cũ
+        data: {
+          message_id: 'm1', assigned_to: 'eng1', status: 'resolved', answer: 'Câu trả lời cũ',
+          messages: { session_id: 's1', content: 'Lúa bị gì?', chat_sessions: { user_id: 'farmer1' } },
+        },
+        error: null,
+      },
+      { data: [{ id: 'pm1' }], error: null }, // tìm message engineer cũ theo nội dung
+      { data: null, error: null },            // update message (ghi đè)
+      { data: null, error: null },            // update engineer_queue
+    )
+
+    const res = await request(app)
+      .patch('/api/v1/engineer/queue/q1/answer')
+      .set(auth(engToken()))
+      .send({ answer: 'Câu trả lời đã chỉnh sửa, chi tiết hơn.', addToKnowledge: false })
+
+    expect(res.status).toBe(200)
+    expect(res.body.updated).toBe(true)
+  })
+
+  it('không tìm thấy message cũ → chèn mới (updated=false)', async () => {
+    sb.enqueue(
+      {
+        data: {
+          message_id: 'm1', assigned_to: 'eng1', status: 'resolved', answer: 'Câu cũ',
+          messages: { session_id: 's1', content: 'Lúa?', chat_sessions: { user_id: 'farmer1' } },
+        },
+        error: null,
+      },
+      { data: [], error: null },   // không tìm thấy message cũ
+      { data: null, error: null }, // insert message mới
+      { data: null, error: null }, // update engineer_queue
+    )
+
+    const res = await request(app)
+      .patch('/api/v1/engineer/queue/q1/answer')
+      .set(auth(engToken()))
+      .send({ answer: 'Câu trả lời thay thế đủ dài.', addToKnowledge: false })
+
+    expect(res.status).toBe(200)
+    expect(res.body.updated).toBe(false)
+  })
+})

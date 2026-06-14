@@ -48,14 +48,13 @@ export default function TestAI() {
     setLoading(true)
 
     try {
-      const res = await chatAPI.ask({ text: q, userId: user?.id, cropType: null, sessionId })
-      if (!sessionId) setSessionId(res.data.sessionId)
+      const res = await chatAPI.ask({ text: q, userId: user?.id, cropType: null, sessionId, testMode: true })
+      if (!sessionId && res.data.sessionId) setSessionId(res.data.sessionId)
 
       if (res.data.needEngineer) {
         setMessages(prev => [...prev, {
           id: Date.now() + 1, role: 'system',
-          content: 'AI không đủ tự tin — câu hỏi đã được chuyển vào hàng đợi kỹ sư.',
-          showQueueLink: true,
+          content: 'AI không đủ tự tin — câu này trong thực tế sẽ được chuyển cho kỹ sư (chế độ test nên không tạo hàng đợi thật).',
         }])
       } else {
         setMessages(prev => [...prev, {

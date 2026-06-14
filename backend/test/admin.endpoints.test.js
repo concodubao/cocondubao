@@ -134,3 +134,50 @@ describe('POST /admin/ai-errors/:id/to-knowledge', () => {
     expect(res.body.success).toBe(true)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('PATCH /admin/users/:id — chống admin tự khóa/đổi vai trò mình', () => {
+  it('400 khi admin sửa chính tài khoản của mình', async () => {
+    const res = await request(app).patch('/api/v1/admin/users/admin1').set(admin())
+      .send({ is_active: false })
+    expect(res.status).toBe(400)
+  })
+
+  it('200 khi sửa tài khoản người khác', async () => {
+    sb.enqueue({ data: { id: 'u2', role: 'engineer', is_active: true }, error: null }) // update result
+    const res = await request(app).patch('/api/v1/admin/users/u2').set(admin())
+      .send({ is_active: true })
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+  })
+
+  it('403 với kỹ sư (không phải admin)', async () => {
+    const res = await request(app).patch('/api/v1/admin/users/u2').set(eng()).send({ is_active: true })
+    expect(res.status).toBe(403)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('PATCH /admin/users/:id/reset-pin — chỉ cho nông dân', () => {
+  it('404 khi không tìm thấy người dùng', async () => {
+    sb.enqueue({ data: null, error: null }) // target lookup
+    const res = await request(app).patch('/api/v1/admin/users/nope/reset-pin').set(admin())
+    expect(res.status).toBe(404)
+  })
+
+  it('400 khi target không phải nông dân', async () => {
+    sb.enqueue({ data: { role: 'engineer' }, error: null }) // target lookup
+    const res = await request(app).patch('/api/v1/admin/users/u2/reset-pin').set(admin())
+    expect(res.status).toBe(400)
+  })
+
+  it('200 + trả PIN 6 số cho nông dân', async () => {
+    sb.enqueue(
+      { data: { role: 'farmer' }, error: null },                              // target lookup
+      { data: { id: 'f1', phone: '+84900000000', name: 'Chú Ba', role: 'farmer' }, error: null }, // update result
+    )
+    const res = await request(app).patch('/api/v1/admin/users/f1/reset-pin').set(admin())
+    expect(res.status).toBe(200)
+    expect(res.body.pin).toMatch(/^\d{6}$/)
+  })
+})

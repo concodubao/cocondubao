@@ -84,6 +84,35 @@ describe('POST /chat/report-error — chỉ báo lỗi message của chính mìn
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+describe('POST /chat/ask — testMode (Test AI của kỹ sư) không lưu dữ liệu', () => {
+  it('kỹ sư testMode → 200, không tạo session, testMode=true', async () => {
+    // Không enqueue kết quả supabase nào: nếu handler lỡ ghi DB, mock trả null
+    // nhưng test khẳng định response không có sessionId (không tạo phiên thật).
+    const res = await request(app).post('/api/v1/chat/ask')
+      .set(auth(tok('eng1', 'engineer')))
+      .send({ text: 'Lúa bị vàng lá?', testMode: true })
+    expect(res.status).toBe(200)
+    expect(res.body.testMode).toBe(true)
+    expect(res.body.sessionId).toBeNull()
+    expect(res.body.engineerQueued).toBe(false)
+  })
+
+  it('nông dân gửi testMode vẫn đi luồng thật (lưu session, không có cờ testMode)', async () => {
+    sb.enqueue(
+      { data: { id: 's1' }, error: null },  // getOrCreateSession insert
+      { data: { id: 'um1' }, error: null }, // insert user message
+      { data: { id: 'am1' }, error: null }, // insert answer message
+    )
+    const res = await request(app).post('/api/v1/chat/ask')
+      .set(auth(tok('farmer1', 'farmer')))
+      .send({ text: 'Lúa bị vàng lá?', testMode: true })
+    expect(res.status).toBe(200)
+    expect(res.body.testMode).toBeUndefined()
+    expect(res.body.sessionId).toBe('s1')
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
 describe('GET /chat/sessions/:userId — chỉ chủ phiên', () => {
   it('403 khi xem lịch sử của người khác (kể cả staff)', async () => {
     const res = await request(app).get('/api/v1/chat/sessions/farmer2').set(auth(tok('eng1', 'engineer')))
