@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { engineerAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase } from '../../services/supabase'
+import { toast } from '../../stores/toastStore'
 
 const CROP_LABEL = { rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }
 const CROP_ICON  = { rice: 'grass', veggie: 'eco', fruit: 'forest', other: 'more_horiz' }
@@ -146,7 +147,7 @@ export default function Queue() {
       await engineerAPI.take(item.id)
       navigate(`/engineer/answer/${item.id}`, { state: { queueItem: item } })
     } catch (err) {
-      alert(err.response?.data?.error || 'Không thể nhận câu hỏi này.')
+      toast.error(err.response?.data?.error || 'Không thể nhận câu hỏi này.')
       loadQueue()
     }
   }
@@ -157,8 +158,9 @@ export default function Queue() {
     try {
       await engineerAPI.deleteQueueItem(id)
       setQueue(prev => prev.filter(q => q.id !== id))
+      toast.success('Đã xóa câu hỏi khỏi hàng đợi.')
     } catch (err) {
-      alert(err.response?.data?.error || 'Không thể xóa. Thử lại nhé.')
+      toast.error(err.response?.data?.error || 'Không thể xóa. Thử lại nhé.')
     } finally {
       setDeleting(null)
     }

@@ -257,6 +257,12 @@ router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
 
 // ── PATCH /admin/users/:id ────────────────────────────────────────────────────
 router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => {
+  // Chặn admin tự khóa / tự hạ vai trò chính mình (tránh tự nhốt ra khỏi hệ thống).
+  // Vì không tự sửa được mình → luôn còn ít nhất 1 admin hoạt động.
+  if (req.params.id === req.user.userId) {
+    return res.status(400).json({ error: 'Không thể tự khóa hoặc đổi vai trò tài khoản của chính mình.' })
+  }
+
   const { is_active, role } = req.body
   const updates = {}
 
@@ -277,6 +283,15 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
 // ── PATCH /admin/users/:id/reset-pin — đặt lại mã PIN cho nông dân (quên PIN) ──
 router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req, res) => {
   try {
+    // Chỉ đặt lại PIN cho nông dân (đăng nhập bằng SĐT + PIN). Engineer/admin dùng
+    // email + mật khẩu nên reset thành PIN 6 số là sai luồng.
+    const { data: target } = await supabase
+      .from('users').select('role').eq('id', req.params.id).single()
+    if (!target) return res.status(404).json({ error: 'Không tìm thấy người dùng.' })
+    if (target.role !== 'farmer') {
+      return res.status(400).json({ error: 'Chỉ đặt lại PIN cho tài khoản nông dân.' })
+    }
+
     const pin  = String(Math.floor(100000 + Math.random() * 900000)) // PIN 6 số ngẫu nhiên
     const hash = await bcrypt.hash(pin, 10)
     const { data, error } = await supabase

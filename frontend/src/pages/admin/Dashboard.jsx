@@ -3,6 +3,7 @@ import { useQuery }    from '@tanstack/react-query'
 import { adminAPI, engineerAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { supabase }    from '../../services/supabase'
+import { toast }       from '../../stores/toastStore'
 import { useEffect }   from 'react'
 import { Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight, ShieldCheck } from 'lucide-react'
 
@@ -85,7 +86,7 @@ function QueueSection({ navigate, currentUserId }) {
       await engineerAPI.take(item.id)
       navigate(`/engineer/answer/${item.id}`, { state: { queueItem: item } })
     } catch (err) {
-      alert(err.response?.data?.error || 'Không thể nhận câu hỏi này.')
+      toast.error(err.response?.data?.error || 'Không thể nhận câu hỏi này.')
     }
   }
 

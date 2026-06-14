@@ -2,7 +2,9 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminAPI } from '../../services/api'
-import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound } from 'lucide-react'
+import { useAuthStore } from '../../stores/authStore'
+import { toast } from '../../stores/toastStore'
+import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound, Copy } from 'lucide-react'
 
 const ROLE_MAP = {
   farmer:   { label: 'Nông dân',  color: '#4B230A', bg: '#fdf6f0' },
@@ -10,7 +12,7 @@ const ROLE_MAP = {
   admin:    { label: 'Admin',     color: '#8b5cf6', bg: '#f5f3ff' },
 }
 
-function UserCard({ user, onToggle, onApprove, onChangeRole, onResetPin }) {
+function UserCard({ user, onToggle, onApprove, onChangeRole, onResetPin, isSelf }) {
   const role    = ROLE_MAP[user.role] || ROLE_MAP.farmer
   const waiting = user.role === 'engineer' && !user.is_active
 
@@ -39,28 +41,36 @@ function UserCard({ user, onToggle, onApprove, onChangeRole, onResetPin }) {
       )}
 
       <div style={s.actions}>
-        {waiting && (
-          <button onClick={() => onApprove(user.id)} style={s.btnApprove}>
-            <UserCheck size={14} strokeWidth={2} /> Phê duyệt kỹ sư
-          </button>
+        {isSelf ? (
+          <span style={s.selfNote}>
+            <UserCheck size={13} strokeWidth={2} /> Tài khoản của bạn — không thể tự khóa hoặc đổi vai trò
+          </span>
+        ) : (
+          <>
+            {waiting && (
+              <button onClick={() => onApprove(user.id)} style={s.btnApprove}>
+                <UserCheck size={14} strokeWidth={2} /> Phê duyệt kỹ sư
+              </button>
+            )}
+            {!waiting && (
+              <button onClick={() => onToggle(user.id, !user.is_active)}
+                style={user.is_active ? s.btnLock : s.btnUnlock}>
+                {user.is_active ? <><Lock size={13} strokeWidth={2} /> Khóa</> : <><Unlock size={13} strokeWidth={2} /> Mở khóa</>}
+              </button>
+            )}
+            {user.role === 'farmer' && user.phone && (
+              <button onClick={() => onResetPin(user)} style={s.btnResetPin}>
+                <KeyRound size={13} strokeWidth={2} /> Đặt lại PIN
+              </button>
+            )}
+            <select value={user.role} onChange={e => onChangeRole(user.id, e.target.value)}
+              style={s.roleSelect} aria-label={`Đổi vai trò của ${user.name || user.phone}`}>
+              <option value="farmer">Nông dân</option>
+              <option value="engineer">Kỹ sư</option>
+              <option value="admin">Admin</option>
+            </select>
+          </>
         )}
-        {!waiting && (
-          <button onClick={() => onToggle(user.id, !user.is_active)}
-            style={user.is_active ? s.btnLock : s.btnUnlock}>
-            {user.is_active ? <><Lock size={13} strokeWidth={2} /> Khóa</> : <><Unlock size={13} strokeWidth={2} /> Mở khóa</>}
-          </button>
-        )}
-        {user.role === 'farmer' && user.phone && (
-          <button onClick={() => onResetPin(user)} style={s.btnResetPin}>
-            <KeyRound size={13} strokeWidth={2} /> Đặt lại PIN
-          </button>
-        )}
-        <select value={user.role} onChange={e => onChangeRole(user.id, e.target.value)}
-          style={s.roleSelect} aria-label={`Đổi vai trò của ${user.name || user.phone}`}>
-          <option value="farmer">Nông dân</option>
-          <option value="engineer">Kỹ sư</option>
-          <option value="admin">Admin</option>
-        </select>
       </div>
     </div>
   )
@@ -152,9 +162,40 @@ function CreateEngineerModal({ onClose, onCreated }) {
   )
 }
 
+// Modal hiển thị PIN mới — copy được để báo lại cho nông dân (alert không copy được)
+function PinResultModal({ data, onClose }) {
+  function copyPin() {
+    navigator.clipboard?.writeText(data.pin)
+      .then(() => toast.success('Đã copy mã PIN'))
+      .catch(() => {})
+  }
+  return (
+    <div style={s.pinOverlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={s.pinModal}>
+        <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#fff8e8', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+          <KeyRound size={22} color="#855300" strokeWidth={2} />
+        </div>
+        <h2 style={{ fontSize: 17, fontWeight: 700, color: '#0f172a', margin: 0, textAlign: 'center' }}>
+          Mã PIN mới
+        </h2>
+        <p style={{ fontSize: 13, color: '#64748b', margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
+          Cho <strong>{data.user?.name || data.user?.phone || 'nông dân'}</strong>. Hãy báo lại mã này — nông dân có thể tự đổi trong mục Hồ sơ.
+        </p>
+        <button onClick={copyPin} style={s.pinBox} aria-label="Bấm để copy mã PIN">
+          <span style={{ letterSpacing: 6, fontSize: 30, fontWeight: 800, color: '#4B230A', fontFamily: 'monospace' }}>{data.pin}</span>
+          <Copy size={18} color="#7a6358" strokeWidth={2} />
+        </button>
+        <button onClick={onClose} style={{ ...s.btnApprove, justifyContent: 'center', padding: '12px' }}>Đã hiểu</button>
+      </div>
+    </div>
+  )
+}
+
 export default function Users() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
+  const { user: me } = useAuthStore()
+  const [pinResult, setPinResult] = useState(null)
   const [tab,         setTab]         = useState('farmer')
   const [search,      setSearch]      = useState('')
   const [showCreate,  setShowCreate]  = useState(false)
@@ -168,13 +209,13 @@ export default function Users() {
   const updateUser = useMutation({
     mutationFn: ({ id, updates }) => adminAPI.updateUser(id, updates),
     onSuccess:  () => queryClient.invalidateQueries({ queryKey: ['admin-users'] }),
-    onError:    () => alert('Cập nhật thất bại. Thử lại nhé.'),
+    onError:    (e) => toast.error(e.response?.data?.error || 'Cập nhật thất bại. Thử lại nhé.'),
   })
 
   const resetPin = useMutation({
     mutationFn: id => adminAPI.resetUserPin(id).then(r => r.data),
-    onSuccess:  d  => alert(`Mã PIN mới của ${d.user?.name || d.user?.phone || 'nông dân'}: ${d.pin}\n\nHãy báo lại mã này cho nông dân. Họ có thể tự đổi trong mục Hồ sơ.`),
-    onError:    () => alert('Không đặt lại được PIN. Thử lại nhé.'),
+    onSuccess:  d  => setPinResult(d),
+    onError:    (e) => toast.error(e.response?.data?.error || 'Không đặt lại được PIN. Thử lại nhé.'),
   })
   function handleResetPin(user) {
     if (confirm(`Đặt lại mã PIN cho ${user.name || user.phone}?\nMã PIN cũ sẽ không dùng được nữa.`)) resetPin.mutate(user.id)
@@ -229,7 +270,7 @@ export default function Users() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 10, alignItems: 'start' }}>
             {users.map(user => (
-              <UserCard key={user.id} user={user}
+              <UserCard key={user.id} user={user} isSelf={user.id === me?.id}
                 onToggle={(id, active) => updateUser.mutate({ id, updates: { is_active: active } })}
                 onApprove={id => updateUser.mutate({ id, updates: { is_active: true } })}
                 onChangeRole={(id, role) => { if (confirm(`Đổi vai trò thành ${role}?`)) updateUser.mutate({ id, updates: { role } }) }}
@@ -248,6 +289,8 @@ export default function Users() {
           }}
         />
       )}
+
+      {pinResult && <PinResultModal data={pinResult} onClose={() => setPinResult(null)} />}
     </div>
   )
 }
@@ -276,4 +319,8 @@ const s = {
   btnUnlock:   { padding: '7px 12px', background: '#fdf6f0', color: '#4B230A', border: '1px solid #f5d5b0', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
   btnResetPin: { padding: '7px 12px', background: '#fff8e8', color: '#855300', border: '1px solid #fde68a', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
   roleSelect:  { padding: '6px 10px', fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#0f172a', cursor: 'pointer' },
+  selfNote:    { display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#64748b', background: '#f1f5f9', padding: '7px 12px', borderRadius: 8, fontStyle: 'italic' },
+  pinOverlay:  { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(2px)' },
+  pinModal:    { background: '#fff', borderRadius: 20, padding: '24px 22px', width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 14 },
+  pinBox:      { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#fff8e8', border: '1.5px dashed #fde68a', borderRadius: 14, padding: '16px', cursor: 'pointer', width: '100%' },
 }

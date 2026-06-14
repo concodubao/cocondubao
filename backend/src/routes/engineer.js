@@ -144,6 +144,30 @@ router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, re
   res.json({ queue, total: queue.length })
 })
 
+// GET /engineer/queue/:id — lấy 1 câu hỏi (Answer page deep-link / F5 / chỉnh sửa)
+router.get('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+  const { data, error } = await supabase
+    .from('engineer_queue')
+    .select(`
+      id, status, created_at, resolved_at, assigned_to, answer, add_to_knowledge,
+      messages (
+        id, content, image_url, confidence, created_at,
+        chat_sessions ( crop_type, users ( name, village, phone ) )
+      )
+    `)
+    .eq('id', req.params.id)
+    .single()
+
+  if (error || !data) return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' })
+
+  res.json({
+    item: {
+      ...data,
+      waitMinutes: Math.round((Date.now() - new Date(data.created_at)) / 60000),
+    },
+  })
+})
+
 // PATCH /engineer/queue/:id/take — kỹ sư nhận câu hỏi (atomic, tránh race condition)
 router.patch('/queue/:id/take', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { id } = req.params
@@ -183,6 +207,7 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
         message_id,
         assigned_to,
         status,
+        answer,
         messages (
           session_id,
           content,
@@ -199,22 +224,45 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
       return res.status(403).json({ error: 'Câu hỏi này đang được kỹ sư khác xử lý.' })
     }
 
-    const sessionId = queueItem.messages?.session_id
-    const farmerId  = queueItem.messages?.chat_sessions?.user_id
-    const question  = queueItem.messages?.content
+    const sessionId  = queueItem.messages?.session_id
+    const farmerId   = queueItem.messages?.chat_sessions?.user_id
+    const question   = queueItem.messages?.content
+    const isEditing  = queueItem.status === 'resolved'
+    const newAnswer  = answer.trim()
 
-    // Lưu câu trả lời vào messages
-    await supabase.from('messages').insert({
-      session_id: sessionId,
-      role:       'engineer',
-      content:    answer.trim(),
-      source:     'engineer',
-    })
+    // Khi sửa câu đã trả lời (status=resolved): GHI ĐÈ message engineer cũ thay vì
+    // chèn câu mới — nếu không nông dân sẽ thấy 2 câu trả lời. Khớp theo nội dung
+    // câu cũ để đúng message kể cả khi 1 phiên có nhiều lần escalate.
+    let overwritten = false
+    if (isEditing && queueItem.answer) {
+      const { data: prev } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('role', 'engineer')
+        .eq('content', queueItem.answer)
+        .order('created_at', { ascending: false })
+        .limit(1)
+      if (prev?.length) {
+        await supabase.from('messages').update({ content: newAnswer }).eq('id', prev[0].id)
+        overwritten = true
+      }
+    }
+
+    // Câu trả lời mới (lần đầu) hoặc không tìm thấy message cũ → chèn mới
+    if (!overwritten) {
+      await supabase.from('messages').insert({
+        session_id: sessionId,
+        role:       'engineer',
+        content:    newAnswer,
+        source:     'engineer',
+      })
+    }
 
     // Cập nhật trạng thái queue → resolved
     await supabase.from('engineer_queue').update({
       status:           'resolved',
-      answer:           answer.trim(),
+      answer:           newAnswer,
       add_to_knowledge: addToKnowledge,
       resolved_at:      new Date().toISOString(),
     }).eq('id', id)
@@ -227,7 +275,7 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
           .insert({
             title:       `QA: ${question.slice(0, 60)}`,
             source:      'engineer_answer',
-            content:     `Câu hỏi: ${question}\n\nCâu trả lời: ${answer.trim()}`,
+            content:     `Câu hỏi: ${question}\n\nCâu trả lời: ${newAnswer}`,
             status:      'embedding',
             uploaded_by: req.user.userId,
           })
@@ -241,16 +289,16 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
       }
     }
 
-    // Push notification đến nông dân
+    // Push notification đến nông dân (phân biệt trả lời mới vs. cập nhật)
     if (farmerId) {
       notifyFarmer(
         farmerId,
-        '🐦 Kỹ sư đã trả lời câu hỏi của bạn!',
-        answer.trim().slice(0, 100) + (answer.length > 100 ? '...' : '')
+        overwritten ? '🐦 Kỹ sư đã cập nhật câu trả lời' : '🐦 Kỹ sư đã trả lời câu hỏi của bạn!',
+        newAnswer.slice(0, 100) + (newAnswer.length > 100 ? '...' : '')
       ).catch(e => console.warn('[PUSH] notify farmer failed:', e.message))
     }
 
-    res.json({ success: true, addedToKnowledge: addToKnowledge })
+    res.json({ success: true, addedToKnowledge: addToKnowledge, updated: overwritten })
 
   } catch (err) {
     console.error('[ENGINEER] answer error:', err)

@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
+import { toast } from '../../stores/toastStore'
 import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive, Trash2, Search, AlertCircle } from 'lucide-react'
 
 const CROP_OPTIONS = [
@@ -194,11 +195,12 @@ export default function Knowledge() {
     setApproving(id)
     try {
       await engineerAPI.approveDoc(id)
+      toast.success('Đã duyệt — đang embed vào kho tri thức.')
       queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
     } catch (err) {
       const msg = err.response?.data?.error || err.message || 'Embed thất bại. Thử lại nhé.'
       console.error('[Knowledge] approve error:', err.response?.data || err)
-      alert(msg)
+      toast.error(msg)
     } finally {
       setApproving(null)
     }
@@ -208,9 +210,10 @@ export default function Knowledge() {
     if (!confirm('Lưu trữ tài liệu này? AI sẽ không dùng tài liệu này nữa.')) return
     try {
       await engineerAPI.archiveDoc(id)
+      toast.success('Đã lưu trữ tài liệu.')
       queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
     } catch {
-      alert('Không thể lưu trữ. Thử lại nhé.')
+      toast.error('Không thể lưu trữ. Thử lại nhé.')
     }
   }
 
@@ -219,9 +222,10 @@ export default function Knowledge() {
     setDeleting(id)
     try {
       await engineerAPI.deleteDoc(id)
+      toast.success('Đã xóa tài liệu.')
       queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
     } catch (err) {
-      alert(err.response?.data?.error || 'Không thể xóa. Thử lại nhé.')
+      toast.error(err.response?.data?.error || 'Không thể xóa. Thử lại nhé.')
     } finally {
       setDeleting(null)
     }

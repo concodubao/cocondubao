@@ -62,6 +62,7 @@ export const pushAPI = {
 export const engineerAPI = {
   // Hàng đợi
   getQueue:        (status = 'pending') => api.get(`/engineer/queue?status=${status}`),
+  getQueueItem:    (id)                 => api.get(`/engineer/queue/${id}`),
   take:            (id)                 => api.patch(`/engineer/queue/${id}/take`),
   answer:          (id, data)           => api.patch(`/engineer/queue/${id}/answer`, data),
   deleteQueueItem: (id)                 => api.delete(`/engineer/queue/${id}`),

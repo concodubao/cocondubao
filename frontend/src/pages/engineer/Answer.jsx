@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
 
 // ─── Image Lightbox ───────────────────────────────────────────────────────────
@@ -32,36 +33,53 @@ const TEMPLATES = [
 
 // ─── Answer page ──────────────────────────────────────────────────────────────
 export default function Answer() {
-  const navigate = useNavigate()
-  const { id }   = useParams()
-  const location = useLocation()
-  const item     = location.state?.queueItem
+  const navigate  = useNavigate()
+  const { id }    = useParams()
+  const location  = useLocation()
+  const stateItem = location.state?.queueItem
 
-  const [answer,         setAnswer]         = useState('')
+  // Ưu tiên item từ navigation state (vào từ queue/history). Nếu thiếu (F5 / mở
+  // link trực tiếp) thì gọi API — không còn bị đá về queue và mất câu đang soạn.
+  const { data: item, isLoading } = useQuery({
+    queryKey:    ['queue-item', id],
+    queryFn:     () => engineerAPI.getQueueItem(id).then(r => r.data.item),
+    initialData: stateItem,
+    enabled:     !stateItem,
+    staleTime:   30_000,
+  })
+
+  // draft = null → hiển thị câu trả lời đã có (khi chỉnh sửa); gõ vào mới ghi đè.
+  const [draft,          setDraft]          = useState(null)
   const [addToKnowledge, setAddToKnowledge] = useState(false)
   const [loading,        setLoading]        = useState(false)
   const [error,          setError]          = useState('')
   const [lightbox,       setLightbox]       = useState(false)
 
-  // Hooks phải chạy trước mọi return có điều kiện (rules-of-hooks)
-  if (!item) return <Navigate to="/engineer/queue" replace />
-
-  const msg  = item?.messages
-  const user = msg?.chat_sessions?.users
+  const answer    = draft ?? (item?.answer || '')
+  const msg       = item?.messages
+  const user      = msg?.chat_sessions?.users
+  const isEditing = item?.status === 'resolved'
 
   async function handleSubmit() {
-    if (!answer.trim())             return setError('Vui lòng nhập câu trả lời.')
+    if (!answer.trim())            return setError('Vui lòng nhập câu trả lời.')
     if (answer.trim().length < 20) return setError('Câu trả lời quá ngắn (tối thiểu 20 ký tự).')
     setLoading(true)
     setError('')
     try {
       await engineerAPI.answer(id, { answer: answer.trim(), addToKnowledge })
-      navigate('/engineer/queue')
+      navigate(isEditing ? '/engineer/history' : '/engineer/queue')
     } catch (err) {
       setError(err.response?.data?.error || 'Không lưu được câu trả lời.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Hooks đã chạy xong ở trên → giờ mới được return có điều kiện (rules-of-hooks)
+  if (!item) {
+    return isLoading
+      ? <div className="min-h-dvh flex items-center justify-center text-[#7a6358]">Đang tải câu hỏi...</div>
+      : <Navigate to="/engineer/queue" replace />
   }
 
   return (
@@ -74,7 +92,9 @@ export default function Answer() {
           className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
           <span className="material-symbols-outlined text-[22px]">arrow_back</span>
         </button>
-        <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">Trả lời & Kiểm duyệt</h1>
+        <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">
+          {isEditing ? 'Chỉnh sửa câu trả lời' : 'Trả lời & Kiểm duyệt'}
+        </h1>
       </header>
 
       <main className="flex-1 flex flex-col gap-4 p-4"
@@ -124,7 +144,7 @@ export default function Answer() {
             {TEMPLATES.map(t => (
               <button
                 key={t.label}
-                onClick={() => setAnswer(t.text)}
+                onClick={() => setDraft(t.text)}
                 className="px-3 py-1.5 text-[13px] font-semibold bg-white border border-[#f0e0d0]
                            rounded-full text-[#4B230A] active:scale-95 transition-transform"
               >
@@ -146,7 +166,7 @@ export default function Answer() {
           <textarea
             id="answer-textarea"
             value={answer}
-            onChange={e => setAnswer(e.target.value)}
+            onChange={e => setDraft(e.target.value)}
             placeholder="Soạn câu trả lời chi tiết, dễ hiểu cho nông dân..."
             rows={8}
             aria-required="true"

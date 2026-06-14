@@ -297,7 +297,10 @@ export default function PostDetail() {
                        disabled:opacity-40 flex-shrink-0"
             aria-label="Gửi bình luận"
           >
-            <span className="material-symbols-outlined text-white text-[18px] ms-fill">send</span>
+            {addCommentMutation.isPending
+              ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <span className="material-symbols-outlined text-white text-[18px] ms-fill">send</span>
+            }
           </button>
         </div>
       </div>

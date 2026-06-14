@@ -338,7 +338,10 @@ export default function Community() {
 
   const deleteMutation = useMutation({
     mutationFn: id => communityAPI.deletePost(id),
-    onSuccess:  () => queryClient.invalidateQueries({ queryKey: ['community-feed'] }),
+    onSuccess:  () => {
+      queryClient.invalidateQueries({ queryKey: ['community-feed'] })
+      toast.success('Đã xóa bài đăng.')
+    },
     onError:    () => toast.error('Không thể xóa bài. Thử lại nhé.'),
   })
 
