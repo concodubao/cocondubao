@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { pushAPI } from '../../services/api'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { ChevronLeft, AlertTriangle, Tag, Cloud, Send, Clock, CheckCircle } from 'lucide-react'
 
 const TYPE_OPTIONS = [
@@ -39,6 +40,7 @@ function NotifPreview({ type, title, body }) {
 export default function SendNotif() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
+  const isDesktop   = useIsDesktop()
 
   const [type,       setType]       = useState('alert')
   const [title,      setTitle]      = useState('')
@@ -104,9 +106,11 @@ export default function SendNotif() {
   return (
     <div style={s.page}>
       <header style={s.header}>
-        <button onClick={() => navigate('/admin')} style={s.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
-        </button>
+        {!isDesktop && (
+          <button onClick={() => navigate('/admin')} style={s.iconBtn} aria-label="Quay lại">
+            <ChevronLeft size={22} />
+          </button>
+        )}
         <h1 style={s.title}>Soạn thông báo</h1>
       </header>
 

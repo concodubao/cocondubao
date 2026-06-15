@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 
 // ─── Image Lightbox ───────────────────────────────────────────────────────────
 function ImageLightbox({ src, alt, onClose }) {
@@ -36,6 +37,7 @@ export default function Answer() {
   const navigate  = useNavigate()
   const { id }    = useParams()
   const location  = useLocation()
+  const isDesktop = useIsDesktop()
   const stateItem = location.state?.queueItem
 
   // Ưu tiên item từ navigation state (vào từ queue/history). Nếu thiếu (F5 / mở
@@ -88,10 +90,12 @@ export default function Answer() {
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
-        <button onClick={() => navigate('/engineer/queue')} aria-label="Quay lại"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
-          <span className="material-symbols-outlined text-[22px]">arrow_back</span>
-        </button>
+        {!isDesktop && (
+          <button onClick={() => navigate('/engineer/queue')} aria-label="Quay lại"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
+            <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+          </button>
+        )}
         <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">
           {isEditing ? 'Chỉnh sửa câu trả lời' : 'Trả lời & Kiểm duyệt'}
         </h1>

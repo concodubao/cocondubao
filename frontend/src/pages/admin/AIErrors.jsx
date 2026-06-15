@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminAPI } from '../../services/api'
 import { toast } from '../../stores/toastStore'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { ChevronLeft, AlertTriangle, RotateCcw, HelpCircle, Check, CheckCircle, BookOpen, X } from 'lucide-react'
 
 const ERROR_TYPE = {
@@ -116,6 +117,7 @@ function ComposeModal({ item, onClose, onSubmit, saving }) {
 export default function AIErrors() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
+  const isDesktop   = useIsDesktop()
   const [filter, setFilter] = useState('unreviewed')
   const [composing, setComposing] = useState(null)
 
@@ -158,9 +160,11 @@ export default function AIErrors() {
   return (
     <div style={s.page}>
       <header style={s.header}>
-        <button onClick={() => navigate('/admin')} style={s.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
-        </button>
+        {!isDesktop && (
+          <button onClick={() => navigate('/admin')} style={s.iconBtn} aria-label="Quay lại">
+            <ChevronLeft size={22} />
+          </button>
+        )}
         <h1 style={s.title}>Báo lỗi AI</h1>
       </header>
 

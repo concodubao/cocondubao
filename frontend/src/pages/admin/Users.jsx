@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { adminAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../stores/toastStore'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound, Copy } from 'lucide-react'
 
 const ROLE_MAP = {
@@ -195,6 +196,7 @@ export default function Users() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
   const { user: me } = useAuthStore()
+  const isDesktop = useIsDesktop()
   const [pinResult, setPinResult] = useState(null)
   const [tab,         setTab]         = useState('farmer')
   const [search,      setSearch]      = useState('')
@@ -233,9 +235,11 @@ export default function Users() {
   return (
     <div style={s.page}>
       <header style={s.header}>
-        <button onClick={() => navigate('/admin')} style={s.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
-        </button>
+        {!isDesktop && (
+          <button onClick={() => navigate('/admin')} style={s.iconBtn} aria-label="Quay lại">
+            <ChevronLeft size={22} />
+          </button>
+        )}
         <h1 style={s.title}>Quản lý người dùng</h1>
         <button onClick={() => setShowCreate(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px',

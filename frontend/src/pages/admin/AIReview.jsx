@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query'
 import { adminAPI } from '../../services/api'
 import { toast } from '../../stores/toastStore'
 import { useAuthStore } from '../../stores/authStore'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { ChevronLeft, BookOpen, X } from 'lucide-react'
 
 const SOURCE_LABEL = {
@@ -98,6 +99,7 @@ const FILTERS = [
 export default function AIReview() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const isDesktop = useIsDesktop()
   const backTo = user?.role === 'admin' ? '/admin' : '/engineer/queue'
   const [filter, setFilter] = useState('all')
   const [composing, setComposing] = useState(null)
@@ -119,9 +121,11 @@ export default function AIReview() {
   return (
     <div style={s.page}>
       <header style={s.header}>
-        <button onClick={() => navigate(backTo)} style={s.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
-        </button>
+        {!isDesktop && (
+          <button onClick={() => navigate(backTo)} style={s.iconBtn} aria-label="Quay lại">
+            <ChevronLeft size={22} />
+          </button>
+        )}
         <h1 style={s.title}>Soát chất lượng AI</h1>
       </header>
 

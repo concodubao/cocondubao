@@ -19,6 +19,9 @@ function PasswordModal({ mode, onClose, onSuccess }) {
   const [error,    setError]    = useState('')
 
   const isSet = mode === 'set'
+  const tooShort  = newPw.length > 0 && newPw.length < 6
+  const mismatch  = confirm.length > 0 && newPw !== confirm
+  const canSubmit = newPw.length >= 6 && newPw === confirm && (isSet || current.length > 0)
 
   async function handleSubmit() {
     if (!newPw || newPw.length < 6) return setError('Mật khẩu cần ít nhất 6 ký tự.')
@@ -67,24 +70,41 @@ function PasswordModal({ mode, onClose, onSuccess }) {
           <label className="text-[14px] font-semibold text-[#0b1c30]">Mật khẩu mới</label>
           <PasswordInput autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
             value={newPw} onChange={e => setNewPw(e.target.value)}
-            className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
+            className={`w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] rounded-2xl text-[16px]
+                        ${tooShort ? 'border-[#f3b4b4]' : 'border-[#f0e0d0]'}`} />
+          <p className={`text-[12.5px] flex items-center gap-1 ${newPw.length >= 6 ? 'text-[#4B230A]' : 'text-[#7a6358]'}`}>
+            <span className="material-symbols-outlined text-[15px]">
+              {newPw.length >= 6 ? 'check_circle' : 'info'}
+            </span>
+            Tối thiểu 6 ký tự
+          </p>
         </div>
 
         <div className="flex flex-col gap-1.5">
           <label className="text-[14px] font-semibold text-[#0b1c30]">Xác nhận mật khẩu</label>
           <PasswordInput autoComplete="new-password" placeholder="Nhập lại mật khẩu mới"
             value={confirm} onChange={e => setConfirm(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-            className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
+            onKeyDown={e => e.key === 'Enter' && canSubmit && handleSubmit()}
+            className={`w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] rounded-2xl text-[16px]
+                        ${mismatch ? 'border-[#f3b4b4]' : confirm.length > 0 && !mismatch ? 'border-[#86c79a]' : 'border-[#f0e0d0]'}`} />
+          {confirm.length > 0 && (
+            <p className={`text-[12.5px] flex items-center gap-1 ${mismatch ? 'text-[#c62828]' : 'text-[#15803d]'}`}>
+              <span className="material-symbols-outlined text-[15px]">
+                {mismatch ? 'cancel' : 'check_circle'}
+              </span>
+              {mismatch ? 'Mật khẩu chưa khớp' : 'Khớp rồi'}
+            </p>
+          )}
         </div>
 
         {error && (
           <p className="text-[13px] text-[#ba1a1a] bg-[#ffdad6] px-4 py-3 rounded-2xl m-0">{error}</p>
         )}
 
-        <button onClick={handleSubmit} disabled={loading}
+        <button onClick={handleSubmit} disabled={loading || !canSubmit}
           className="w-full h-[56px] rounded-full bg-[#4B230A] text-white text-[16px] font-bold
-                     flex items-center justify-center gap-2 shadow-md active:scale-95 disabled:opacity-60 transition-all">
+                     flex items-center justify-center gap-2 shadow-md active:scale-95
+                     disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 transition-all">
           {loading
             ? <><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Đang lưu...</>
             : isSet ? 'Đặt mật khẩu' : 'Đổi mật khẩu'}

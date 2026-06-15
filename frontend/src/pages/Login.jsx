@@ -275,8 +275,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#4B230A] overflow-hidden max-w-[480px] mx-auto">
-      <header className="flex-shrink-0 flex flex-col items-center gap-4 px-5 pb-8 fade-in"
+    <div className="min-h-dvh flex flex-col bg-[#4B230A] overflow-hidden max-w-[480px] mx-auto
+                    md:max-w-none md:justify-center md:items-center md:px-6 md:py-10">
+      <div className="flex flex-col flex-1 w-full md:flex-none md:max-w-[440px]
+                      md:rounded-[32px] md:overflow-hidden md:shadow-[0_24px_70px_rgba(0,0,0,0.45)]">
+      <header className="flex-shrink-0 flex flex-col items-center gap-4 px-5 pb-8 fade-in md:pt-12"
               style={{ paddingTop: 'max(48px, env(safe-area-inset-top))' }}>
         <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center shadow-[0_0_0_2px_rgba(255,255,255,0.3)]">
           <img src="/cocon-icon-bg.png" alt="Cò Con" className="w-20 h-20 object-contain" />
@@ -287,7 +290,7 @@ export default function Login() {
         </div>
       </header>
 
-      <div className="flex-1 bg-white rounded-t-[28px] px-5 pt-6 overflow-y-auto"
+      <div className="flex-1 bg-white rounded-t-[28px] px-5 pt-6 overflow-y-auto md:flex-none md:rounded-t-none"
            style={{ paddingBottom: 'max(40px, env(safe-area-inset-bottom))' }}>
         {step !== 'role' && (
           <button onClick={handleBack} className="flex items-center gap-1 text-[#4B230A] font-bold text-[16px] mb-5">
@@ -305,9 +308,10 @@ export default function Login() {
           <Link to="/policies" className="text-[#4B230A] font-semibold underline">Điều khoản &amp; Chính sách</Link>
         </p>
       </div>
+      </div>
 
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] h-32
-                      bg-gradient-to-t from-[#4B230A]/10 to-transparent pointer-events-none -z-10" />
+                      bg-gradient-to-t from-[#4B230A]/10 to-transparent pointer-events-none -z-10 md:hidden" />
     </div>
   )
 }

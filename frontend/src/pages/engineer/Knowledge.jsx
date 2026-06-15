@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
 import { toast } from '../../stores/toastStore'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive, Trash2, Search, AlertCircle } from 'lucide-react'
 
 const CROP_OPTIONS = [
@@ -159,6 +160,7 @@ function DocCard({ doc, onApprove, onArchive, onDelete, approving, deleting }) {
 export default function Knowledge() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
+  const isDesktop   = useIsDesktop()
   const [filter,     setFilter]     = useState('all')
   const [search,     setSearch]     = useState('')
   const [approving,  setApproving]  = useState(null)
@@ -241,9 +243,11 @@ export default function Knowledge() {
   return (
     <div style={styles.page}>
       <header style={styles.header}>
-        <button onClick={() => navigate('/engineer/queue')} style={styles.iconBtn} aria-label="Quay lại">
-          <ChevronLeft size={22} />
-        </button>
+        {!isDesktop && (
+          <button onClick={() => navigate('/engineer/queue')} style={styles.iconBtn} aria-label="Quay lại">
+            <ChevronLeft size={22} />
+          </button>
+        )}
         <h1 style={styles.title}>Kho tri thức RAG</h1>
       </header>
 

@@ -1,17 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useIsDesktop } from '../hooks/useIsDesktop'
 import { ClipboardList, BookOpen, BarChart2, Users, Send, AlertTriangle, LogOut, FlaskConical, CloudSun, Menu, X, ShieldCheck } from 'lucide-react'
-
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768)
-  useEffect(() => {
-    const fn = () => setIsDesktop(window.innerWidth >= 768)
-    window.addEventListener('resize', fn)
-    return () => window.removeEventListener('resize', fn)
-  }, [])
-  return isDesktop
-}
 
 const ENGINEER_NAV = [
   { path: '/engineer/queue',     Icon: ClipboardList, label: 'Hàng đợi',     short: 'Hàng đợi' },
