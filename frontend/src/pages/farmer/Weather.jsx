@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useWeather, getWMO, farmingTip } from '../../hooks/useWeather'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
+import { useAuthStore } from '../../stores/authStore'
 
 const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 
@@ -76,25 +78,33 @@ function DayCard({ day, index }) {
 
 export default function Weather() {
   const navigate = useNavigate()
+  const isDesktop = useIsDesktop()
+  const { user } = useAuthStore()
+  const isStaff = user?.role === 'engineer' || user?.role === 'admin'
+  // Staff trên desktop đã có sidebar điều hướng → nút Back thừa. Farmer/khách
+  // (không có sidebar) vẫn giữ Back để còn lối quay lại.
+  const hideBack = isDesktop && isStaff
   const { days, today, current, hourly, currentTemp, location, loading, error } = useWeather()
 
   const wmo = getWMO(today?.weathercode)
   const tip = farmingTip(today)
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto overflow-x-hidden">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] md:max-w-[920px] mx-auto overflow-x-hidden">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
                          bg-white border-b border-[#f1f5f9] shadow-[0_1px_6px_rgba(0,0,0,0.04)]">
-        <button onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')} aria-label="Quay lại"
-          className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
-          <span className="material-symbols-outlined text-[22px]">arrow_back</span>
-        </button>
+        {!hideBack && (
+          <button onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')} aria-label="Quay lại"
+            className="w-10 h-10 rounded-2xl flex items-center justify-center text-[#7a6358]">
+            <span className="material-symbols-outlined text-[22px]">arrow_back</span>
+          </button>
+        )}
         <h1 className="flex-1 text-[18px] font-extrabold text-[#0b1c30] m-0">Dự báo thời tiết</h1>
       </header>
 
-      <main className="flex-1 flex flex-col gap-4 px-4 py-4">
+      <main className="flex-1 flex flex-col gap-4 px-4 py-4 md:px-6">
 
         {loading && (
           <div className="flex flex-col items-center justify-center gap-3 pt-16 text-[#64748b]">
@@ -112,7 +122,9 @@ export default function Weather() {
         )}
 
         {!loading && !error && today && (
-          <>
+          <div className="flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-5 md:items-start">
+            {/* Cột trái: hôm nay + lời khuyên */}
+            <div className="flex flex-col gap-4">
             {/* Hero card hôm nay */}
             <div className="rounded-3xl px-6 py-6 text-white shadow-lg"
                  style={{ background: 'linear-gradient(135deg, #0ea5e9, #075985)' }}>
@@ -164,7 +176,10 @@ export default function Weather() {
 
             {/* Lời khuyên canh tác */}
             {tip && <TipBanner tip={tip} />}
+            </div>
 
+            {/* Cột phải: theo giờ + 7 ngày */}
+            <div className="flex flex-col gap-4">
             {/* Dự báo theo giờ */}
             {hourly.length > 0 && (
               <div>
@@ -207,11 +222,13 @@ export default function Weather() {
               </div>
             </div>
 
+            </div>
+
             {/* Footer */}
-            <p className="text-center text-[11px] text-[#64748b] pb-2">
+            <p className="md:col-span-2 text-center text-[11px] text-[#64748b] pb-2">
               Nguồn: Open-Meteo · Cập nhật mỗi 30 phút
             </p>
-          </>
+          </div>
         )}
       </main>
     </div>
