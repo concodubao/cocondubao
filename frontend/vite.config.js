@@ -26,6 +26,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,ico,png}'],
+        // Nạp push/notificationclick handlers vào SW production (workbox generateSW
+        // không tự có). Trước đây handler chỉ nằm ở public/sw.js → bị ghi đè khi
+        // build → production không hiện thông báo đẩy.
+        importScripts: ['push-sw.js'],
         runtimeCaching: [
           {
             // API: NetworkFirst — online lấy mới; offline/sóng yếu rơi về bản cache
