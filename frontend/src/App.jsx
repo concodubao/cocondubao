@@ -24,6 +24,7 @@ import NotifList     from './pages/farmer/NotifList'
 import NotifDetail   from './pages/farmer/NotifDetail'
 import NotifSettings from './pages/farmer/NotifSettings'
 import ToastContainer from './components/Toast'
+import OfflineBanner  from './components/OfflineBanner'
 import DesktopLayout  from './components/DesktopLayout'
 
 // ─── Pages lazy (kỹ sư + admin, ít dùng hơn) ─────────────────────────────────
@@ -92,6 +93,7 @@ export default function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <OfflineBanner />
       <ToastContainer />
       <BrowserRouter>
         <Routes>
