@@ -31,6 +31,9 @@ vi.mock('../src/services/rag.js', () => ({
   askRAG: vi.fn().mockResolvedValue({ answer: 'x', confidence: 0.9, source: 'rag', needEngineer: false }),
   embedAndStoreDoc: vi.fn().mockResolvedValue({ chunksCreated: 1 }),
 }))
+// sharp là native module — không cần thật trong test access (không xử lý ảnh),
+// mock để khỏi phụ thuộc binary theo nền tảng (CI linux vs dev win32).
+vi.mock('sharp', () => ({ default: vi.fn() }))
 
 const chatRoutes = (await import('../src/routes/chat.js')).default
 const app = express()

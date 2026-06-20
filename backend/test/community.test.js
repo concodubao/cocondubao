@@ -23,6 +23,8 @@ const sb = vi.hoisted(() => {
 })
 
 vi.mock('../src/services/supabase.js', () => ({ supabase: sb.supabase }))
+// sharp là native module — mock để test không phụ thuộc binary theo nền tảng
+vi.mock('sharp', () => ({ default: vi.fn() }))
 
 const communityRoutes = (await import('../src/routes/community.js')).default
 const app = express()
