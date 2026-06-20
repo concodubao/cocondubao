@@ -336,6 +336,52 @@ router.post('/stt-fallback', verifyJWT, uploadAudio.single('audio'), async (req,
   }
 })
 
+// ─── POST /chat/escalate — nông dân chủ động xin kỹ sư tư vấn thêm ───────────
+// Dùng khi AI đã trả lời nhưng nông dân muốn kỹ sư xem lại. Tạo entry hàng đợi
+// từ câu hỏi (user message) ngay trước câu trả lời được chỉ định.
+router.post('/escalate', verifyJWT, async (req, res) => {
+  const { messageId } = req.body
+  if (!messageId) return res.status(400).json({ error: 'Thiếu messageId.' })
+
+  try {
+    const { data: ans } = await supabase
+      .from('messages')
+      .select('id, session_id, created_at, chat_sessions ( user_id )')
+      .eq('id', messageId)
+      .single()
+    if (!ans) return res.status(404).json({ error: 'Không tìm thấy câu trả lời.' })
+    if (ans.chat_sessions?.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Không có quyền với tin nhắn này.' })
+    }
+
+    // Câu hỏi của nông dân ngay trước câu trả lời này
+    const { data: prev } = await supabase
+      .from('messages')
+      .select('id, content')
+      .eq('session_id', ans.session_id)
+      .eq('role', 'user')
+      .lte('created_at', ans.created_at)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    const question = prev?.[0]
+    if (!question) return res.status(404).json({ error: 'Không tìm thấy câu hỏi gốc.' })
+
+    // Đã có trong hàng đợi rồi thì không tạo trùng
+    const { data: existing } = await supabase
+      .from('engineer_queue').select('id').eq('message_id', question.id).limit(1)
+    if (existing?.length) return res.json({ success: true, already: true })
+
+    await supabase.from('engineer_queue').insert({ message_id: question.id, status: 'pending' })
+    notifyEngineer('Nông dân muốn kỹ sư tư vấn thêm', (question.content || '').slice(0, 100))
+      .catch(e => console.warn('[PUSH] notify engineer failed:', e.message))
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[CHAT] /escalate error:', err)
+    res.status(500).json({ error: 'Không gửi được cho kỹ sư. Thử lại nhé.' })
+  }
+})
+
 // ─── POST /chat/report-error — nông dân báo lỗi câu trả lời AI ───────────────
 router.post('/report-error', verifyJWT, async (req, res) => {
   const { messageId, errorType, note } = req.body

@@ -113,6 +113,53 @@ describe('POST /chat/ask — testMode (Test AI của kỹ sư) không lưu dữ 
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+describe('POST /chat/escalate — nông dân xin kỹ sư xem lại', () => {
+  const farmer = () => auth(tok('farmer1', 'farmer'))
+  const ansMsg = (userId) => ({ id: 'm1', session_id: 's1', created_at: new Date().toISOString(), chat_sessions: { user_id: userId } })
+
+  it('400 khi thiếu messageId', async () => {
+    const res = await request(app).post('/api/v1/chat/escalate').set(farmer()).send({})
+    expect(res.status).toBe(400)
+  })
+
+  it('404 khi không tìm thấy câu trả lời', async () => {
+    sb.enqueue({ data: null, error: null })
+    const res = await request(app).post('/api/v1/chat/escalate').set(farmer()).send({ messageId: 'm1' })
+    expect(res.status).toBe(404)
+  })
+
+  it('403 khi tin nhắn thuộc nông dân khác', async () => {
+    sb.enqueue({ data: ansMsg('other'), error: null })
+    const res = await request(app).post('/api/v1/chat/escalate').set(farmer()).send({ messageId: 'm1' })
+    expect(res.status).toBe(403)
+  })
+
+  it('200 tạo hàng đợi khi chưa có', async () => {
+    sb.enqueue(
+      { data: ansMsg('farmer1'), error: null },
+      { data: [{ id: 'uq1', content: 'Lúa bị gì?' }], error: null }, // câu hỏi gốc
+      { data: [], error: null },                                     // chưa có trong queue
+      { data: null, error: null },                                   // insert queue
+    )
+    const res = await request(app).post('/api/v1/chat/escalate').set(farmer()).send({ messageId: 'm1' })
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.already).toBeUndefined()
+  })
+
+  it('200 already=true khi câu hỏi đã trong hàng đợi', async () => {
+    sb.enqueue(
+      { data: ansMsg('farmer1'), error: null },
+      { data: [{ id: 'uq1', content: 'Lúa bị gì?' }], error: null },
+      { data: [{ id: 'q1' }], error: null }, // đã có trong queue
+    )
+    const res = await request(app).post('/api/v1/chat/escalate').set(farmer()).send({ messageId: 'm1' })
+    expect(res.status).toBe(200)
+    expect(res.body.already).toBe(true)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
 describe('GET /chat/sessions/:userId — chỉ chủ phiên', () => {
   it('403 khi xem lịch sử của người khác (kể cả staff)', async () => {
     const res = await request(app).get('/api/v1/chat/sessions/farmer2').set(auth(tok('eng1', 'engineer')))

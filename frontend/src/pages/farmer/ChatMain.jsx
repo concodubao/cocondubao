@@ -59,7 +59,7 @@ function VolumeWave({ volume }) {
 }
 
 // ─── MessageBubble ────────────────────────────────────────────────────────────
-function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
+function MessageBubble({ msg, onReport, onSpeak, onEscalate, escalated, speakingMsgId }) {
   const isUser         = msg.role === 'user'
   const isSystem       = msg.role === 'system'
   const isThisSpeaking = speakingMsgId === msg.id
@@ -153,6 +153,20 @@ function MessageBubble({ msg, onReport, onSpeak, speakingMsgId }) {
               <span className="material-symbols-outlined text-[13px]">flag</span>
               Báo lỗi
             </button>
+            {msg.source !== 'engineer' && (
+              <button
+                onClick={() => onEscalate(msg.id)}
+                disabled={escalated}
+                aria-label="Hỏi lại kỹ sư"
+                className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-lg
+                  ${escalated
+                    ? 'text-[#2e1505] bg-[#fdf6f0] border border-[#f5d5b0]'
+                    : 'text-[#4B230A] bg-white border border-[#4B230A]'}`}
+              >
+                <span className="material-symbols-outlined text-[13px] ms-fill">support_agent</span>
+                {escalated ? 'Đã gửi kỹ sư' : 'Hỏi lại kỹ sư'}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -227,6 +241,7 @@ export default function ChatMain() {
   const [loading,     setLoading]     = useState(false)
   const [loadingHist, setLoadingHist] = useState(false)
   const [showReport,  setShowReport]  = useState(null)
+  const [escalatedIds, setEscalatedIds] = useState(() => new Set())
 
   const [activeCrop, setActiveCrop] = useState(user?.crops?.[0] || null)
   const userCrops   = user?.crops || []
@@ -326,6 +341,18 @@ export default function ChatMain() {
     }
   }
 
+  async function handleEscalate(messageId) {
+    if (escalatedIds.has(messageId)) return
+    if (!confirm('Gửi câu hỏi này cho kỹ sư nông nghiệp xem lại?')) return
+    try {
+      await chatAPI.escalate(messageId)
+      setEscalatedIds(prev => new Set(prev).add(messageId))
+      toast.success('Đã gửi cho kỹ sư. Kỹ sư sẽ trả lời trong vòng 24 giờ.')
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Không gửi được. Thử lại nhé.')
+    }
+  }
+
   return (
     <div className="h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] mx-auto">
 
@@ -412,6 +439,8 @@ export default function ChatMain() {
             msg={msg}
             onReport={id => setShowReport(id)}
             onSpeak={handleSpeak}
+            onEscalate={handleEscalate}
+            escalated={escalatedIds.has(msg.id)}
             speakingMsgId={speakingMsgId}
           />
         ))}
