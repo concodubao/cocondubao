@@ -54,6 +54,9 @@ router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
 // ── GET /admin/stats ─────────────────────────────────────────────────────────
 router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
   try {
+    const since24h = new Date(Date.now() - 24 * 3600000).toISOString()
+    const since30d = new Date(Date.now() - 30 * 86400000).toISOString()
+
     const [
       { count: totalUsers },
       { count: totalSessions },
@@ -61,6 +64,7 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
       { count: pendingQueue },
       { count: totalNotifs },
       { count: errorReports },
+      { count: overdueQueue },
     ] = await Promise.all([
       supabase.from('users').select('*', { count: 'exact', head: true }),
       supabase.from('chat_sessions').select('*', { count: 'exact', head: true }),
@@ -68,6 +72,9 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
       supabase.from('engineer_queue').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('notifications').select('*', { count: 'exact', head: true }),
       supabase.from('ai_error_reports').select('*', { count: 'exact', head: true }),
+      // Câu hỏi chờ kỹ sư quá 24h (pending hoặc đang xử lý) — cần ưu tiên
+      supabase.from('engineer_queue').select('*', { count: 'exact', head: true })
+        .in('status', ['pending', 'in_progress']).lt('created_at', since24h),
     ])
 
     const { data: confData } = await supabase
@@ -98,6 +105,37 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
       if (dayMap[key] !== undefined) dayMap[key]++
     })
 
+    // Thời gian phản hồi trung bình của kỹ sư (câu đã trả lời trong 30 ngày)
+    const { data: resolved } = await supabase
+      .from('engineer_queue')
+      .select('created_at, resolved_at')
+      .eq('status', 'resolved')
+      .not('resolved_at', 'is', null)
+      .gte('resolved_at', since30d)
+
+    let avgResponseHours = null
+    if (resolved?.length) {
+      const totalMs = resolved.reduce((sum, r) => sum + (new Date(r.resolved_at) - new Date(r.created_at)), 0)
+      avgResponseHours = Math.round((totalMs / resolved.length) / 3600000 * 10) / 10
+    }
+
+    // Top cây trồng được hỏi nhiều nhất (30 ngày)
+    const { data: cropRows } = await supabase
+      .from('chat_sessions')
+      .select('crop_type')
+      .gte('created_at', since30d)
+
+    const CROP_LABEL = { rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }
+    const cropCount = {}
+    for (const r of cropRows || []) {
+      const c = r.crop_type || 'other'
+      cropCount[c] = (cropCount[c] || 0) + 1
+    }
+    const topCrops = Object.entries(cropCount)
+      .map(([crop, count]) => ({ crop, label: CROP_LABEL[crop] || crop, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+
     res.json({
       totalUsers,
       totalSessions,
@@ -105,6 +143,9 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
       pendingQueue,
       totalNotifs,
       errorReports,
+      overdueQueue,
+      avgResponseHours,
+      topCrops,
       ragRate,
       sessionsByDay: Object.entries(dayMap).map(([date, count]) => ({ date, count })),
     })

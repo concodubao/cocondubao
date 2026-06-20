@@ -209,6 +209,15 @@ export default function Dashboard() {
               <StatCard label="Lỗi AI"    value={data?.errorReports}  color={data?.errorReports > 10 ? '#f59e0b' : '#0f172a'} onClick={() => navigate('/admin/ai-errors')} />
             </div>
 
+            <div style={s.grid2}>
+              <StatCard label="Chờ quá hạn 24h" value={data?.overdueQueue ?? 0}
+                color={(data?.overdueQueue || 0) > 0 ? '#ef4444' : '#0f172a'}
+                onClick={() => navigate('/engineer/queue')} />
+              <StatCard label="Phản hồi TB (kỹ sư)"
+                value={data?.avgResponseHours != null ? `${data.avgResponseHours}h` : '–'}
+                sub="30 ngày gần nhất" />
+            </div>
+
             <div style={s.card}>
               <div style={s.cardHead}>
                 <span style={s.cardTitle}>AI tự trả lời</span>
@@ -228,6 +237,26 @@ export default function Dashboard() {
               <p style={s.cardTitle}>Phiên chat 7 ngày gần nhất</p>
               <BarChart data={data?.sessionsByDay} />
             </div>
+
+            {data?.topCrops?.length > 0 && (
+              <div style={s.card}>
+                <p style={s.cardTitle}>Cây trồng được hỏi nhiều (30 ngày)</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                  {data.topCrops.map(c => {
+                    const max = data.topCrops[0].count || 1
+                    return (
+                      <div key={c.crop} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 13, color: '#475569', width: 92, flexShrink: 0 }}>{c.label}</span>
+                        <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.round(c.count / max * 100)}%`, background: '#4B230A', borderRadius: 99 }} />
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', width: 32, textAlign: 'right' }}>{c.count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <QueueSection navigate={navigate} currentUserId={user?.id} />
 
@@ -273,7 +302,7 @@ const s = {
   grid2:     { gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 },
   statCard:  { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
   statLabel: { fontSize: 11, color: '#64748b', textAlign: 'center' },
-  statSub:   { fontSize: 10, color: '#e2e8f0' },
+  statSub:   { fontSize: 10, color: '#94a3b8' },
   card:      { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 },
   cardHead:  { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   cardTitle: { fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 },
