@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/authStore'
 import { pushAPI } from '../services/api'
 import { usePush } from '../hooks/usePush'
 import { useWeather, getWMO } from '../hooks/useWeather'
+import { getDailyTip } from '../data/farmingTips'
 import BottomNav from '../components/BottomNav'
 
 function AlertBanner({ notifications }) {
@@ -212,7 +213,7 @@ export default function Home() {
             <div className="flex-1">
               <div className="text-[13px] font-bold text-[#92400e] uppercase tracking-wide mb-1">Mẹo hôm nay</div>
               <p className="text-[14px] text-[#78350f] leading-snug m-0">
-                Vụ hè thu nên bón phân đợt 2 sau khi cấy 20–25 ngày để lúa đẻ nhánh đều.
+                {getDailyTip(user?.crops)}
               </p>
             </div>
           </div>
