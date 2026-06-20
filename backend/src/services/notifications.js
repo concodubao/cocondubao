@@ -41,7 +41,7 @@ export function isQuietHour(quietStart, quietEnd) {
 export async function dispatchNotification(notif) {
   const { data: subscriptions } = await supabase
     .from('push_subscriptions')
-    .select('endpoint, keys, user_id, notif_types, quiet_start, quiet_end')
+    .select('endpoint, keys, user_id, notif_types, quiet_start, quiet_end, crops_filter')
     .eq('active', true)
 
   if (!subscriptions?.length) return { sent: 0, failed: 0, total: 0 }
@@ -53,7 +53,10 @@ export async function dispatchNotification(notif) {
     return true
   })
 
-  // Nếu nhắm theo cây trồng → chỉ gửi cho user có crop khớp
+  // Nếu nhắm theo cây trồng → chỉ gửi cho subscription có crop khớp.
+  // Ưu tiên BỘ LỌC CÁ NHÂN của thiết bị (crops_filter); rỗng thì dùng cây trong
+  // hồ sơ (users.crops). Trước đây crops_filter được lưu nhưng không bao giờ
+  // được dùng khi gửi → cài đặt "lọc theo cây" của nông dân vô tác dụng.
   let targetSubs = filtered
   const cropTags = notif.crop_tags || []
   if (cropTags.length > 0) {
@@ -65,8 +68,8 @@ export async function dispatchNotification(notif) {
 
     const userMap = Object.fromEntries((users || []).map(u => [u.id, u.crops || []]))
     targetSubs = filtered.filter(sub => {
-      const userCrops = userMap[sub.user_id] || []
-      return cropTags.some(tag => userCrops.includes(tag))
+      const effectiveCrops = (sub.crops_filter?.length ? sub.crops_filter : userMap[sub.user_id]) || []
+      return cropTags.some(tag => effectiveCrops.includes(tag))
     })
   }
 

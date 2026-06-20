@@ -8,7 +8,7 @@
 
 import express from 'express'
 import bcrypt  from 'bcrypt'
-import { verifyJWT, requireRole } from '../middleware/auth.js'
+import { verifyJWT, requireRole, markInactive, markActive } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
 import { embedAndStoreDoc } from '../services/rag.js'
 
@@ -420,6 +420,10 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
 
   if (error) return res.status(500).json({ error: error.message })
 
+  // Cập nhật denylist để khoá/mở khoá có hiệu lực tức thì (không chờ poller 60s)
+  if (is_active === false) markInactive(req.params.id)
+  if (is_active === true)  markActive(req.params.id)
+
   let action = 'update_user', detail = ''
   if (is_active !== undefined) { action = is_active ? 'unlock_user' : 'lock_user'; detail = is_active ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }
   if (role) { action = 'change_role'; detail = `Đổi vai trò → ${role}` }
@@ -449,6 +453,7 @@ router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req
       .select('id, phone, name, role')
       .single()
     if (error) throw error
+    markActive(req.params.id) // reset-pin đặt is_active:true → bỏ khỏi denylist
     logAudit(req, 'reset_pin', data, 'Đặt lại mã PIN')
     res.json({ success: true, pin, user: data }) // trả PIN để admin báo lại cho nông dân
   } catch (err) {

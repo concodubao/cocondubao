@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest'
 import jwt from 'jsonwebtoken'
-import { verifyJWT, requireRole } from '../src/middleware/auth.js'
+
+// Middleware giờ import services/supabase.js (denylist tài khoản bị khoá) → mock để
+// không tạo client thật (thiếu env trong test sẽ throw "supabaseUrl is required").
+vi.mock('../src/services/supabase.js', () => ({ supabase: { from: () => ({}) } }))
+
+const { verifyJWT, requireRole, markInactive, markActive } = await import('../src/middleware/auth.js')
 
 const SECRET = 'test-secret-key'
 
@@ -76,6 +81,32 @@ describe('verifyJWT', () => {
     expect(res.statusCode).toBeNull()
     expect(req.user.userId).toBe('u1')
     expect(req.user.role).toBe('farmer')
+  })
+
+  it('trả 401 khi tài khoản bị khoá dù token còn hạn', () => {
+    const token = jwt.sign({ userId: 'banned1', role: 'farmer' }, SECRET)
+    const req = { headers: { authorization: `Bearer ${token}` } }
+    const res = mockRes()
+    const next = vi.fn()
+
+    markInactive('banned1')
+    verifyJWT(req, res, next)
+
+    expect(res.statusCode).toBe(401)
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('cho qua lại sau khi mở khoá (markActive)', () => {
+    const token = jwt.sign({ userId: 'banned1', role: 'farmer' }, SECRET)
+    const req = { headers: { authorization: `Bearer ${token}` } }
+    const res = mockRes()
+    const next = vi.fn()
+
+    markActive('banned1')
+    verifyJWT(req, res, next)
+
+    expect(next).toHaveBeenCalledOnce()
+    expect(res.statusCode).toBeNull()
   })
 
   it('trả 401 khi token đã hết hạn', () => {

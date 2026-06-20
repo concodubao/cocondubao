@@ -15,6 +15,7 @@ import engineerRoutes  from './routes/engineer.js'
 import adminRoutes     from './routes/admin.js'
 import communityRoutes from './routes/community.js'
 import { startNotificationScheduler } from './services/notifications.js'
+import { startUserStatusSync } from './middleware/auth.js'
 
 const app = express()
 
@@ -87,4 +88,7 @@ app.listen(PORT, () => {
 
   // Scheduler gửi thông báo đặt lịch (quét mỗi 60s). In-process — đúng khi 1 replica.
   startNotificationScheduler()
+
+  // Đồng bộ denylist tài khoản bị khoá (để khoá có hiệu lực sớm dù JWT còn hạn).
+  startUserStatusSync()
 })
