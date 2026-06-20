@@ -29,4 +29,10 @@ export default defineConfig([
       'react-hooks/purity': 'warn',
     },
   },
+  {
+    // Service worker (dev SW + push handlers): dùng global của service worker
+    // (importScripts, self, clients, caches, registration...) thay vì browser.
+    files: ['public/sw.js', 'public/push-sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
 ])
