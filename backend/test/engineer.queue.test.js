@@ -9,7 +9,8 @@ const SECRET = 'test-secret-key'
 const sb = vi.hoisted(() => {
   const queue = []
   const CHAIN = ['select', 'insert', 'update', 'delete', 'eq', 'in', 'order',
-                 'range', 'contains', 'is', 'not', 'single', 'limit', 'or']
+                 'range', 'contains', 'is', 'not', 'single', 'maybeSingle', 'limit', 'or',
+                 'gte', 'lt', 'lte', 'gt', 'ilike']
   const makeBuilder = () => {
     const b = {}
     for (const m of CHAIN) b[m] = () => b
@@ -205,6 +206,30 @@ describe('GET /engineer/queue/:id — lấy 1 câu hỏi (deep-link Answer page)
     expect(res.status).toBe(200)
     expect(res.body.item.id).toBe('q1')
     expect(res.body.item.waitMinutes).toBeGreaterThanOrEqual(9)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('GET /engineer/stats — thống kê cá nhân kỹ sư', () => {
+  it('chặn nông dân (403)', async () => {
+    const res = await request(app).get('/api/v1/engineer/stats').set(auth(farmerToken()))
+    expect(res.status).toBe(403)
+  })
+
+  it('200 trả thống kê (đếm + thời gian phản hồi TB)', async () => {
+    const created  = new Date(Date.now() - 2 * 3600_000).toISOString()
+    const resolved = new Date().toISOString()
+    sb.enqueue(
+      { count: 5 }, // totalResolved
+      { count: 2 }, // resolvedWeek
+      { data: [{ created_at: created, resolved_at: resolved, add_to_knowledge: true }], error: null },
+    )
+    const res = await request(app).get('/api/v1/engineer/stats').set(auth(engToken()))
+    expect(res.status).toBe(200)
+    expect(res.body.totalResolved).toBe(5)
+    expect(res.body.resolvedWeek).toBe(2)
+    expect(res.body.avgResponseHours).toBeGreaterThanOrEqual(1.9)
+    expect(res.body.addedToKnowledge).toBe(1)
   })
 })
 

@@ -114,6 +114,11 @@ export default function History() {
   const [loading,  setLoading]  = useState(true)
   const [filter,   setFilter]   = useState('all')
   const [search,   setSearch]   = useState('')
+  const [stats,    setStats]    = useState(null)
+
+  useEffect(() => {
+    engineerAPI.getStats().then(r => setStats(r.data)).catch(() => {})
+  }, [])
 
   useEffect(() => {
     async function load() {
@@ -191,6 +196,24 @@ export default function History() {
           </div>
         </div>
       </header>
+
+      {/* Thống kê cá nhân */}
+      {stats && (
+        <div className="grid grid-cols-4 gap-2 px-4 pt-3">
+          {[
+            { label: 'Đã trả lời',  value: stats.totalResolved ?? 0 },
+            { label: '7 ngày qua',  value: stats.resolvedWeek ?? 0 },
+            { label: 'Phản hồi TB', value: stats.avgResponseHours != null ? `${stats.avgResponseHours}h` : '–' },
+            { label: 'Vào kho RAG', value: stats.addedToKnowledge ?? 0 },
+          ].map(item => (
+            <div key={item.label}
+              className="bg-white border border-[#f0e0d0] rounded-2xl py-2.5 px-2 flex flex-col items-center gap-0.5">
+              <span className="text-[20px] font-extrabold text-[#4B230A]">{item.value}</span>
+              <span className="text-[11px] text-[#7a6358] text-center leading-tight">{item.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Filter chips */}
       <div className="flex gap-2 px-4 py-3 overflow-x-auto scrollbar-none">

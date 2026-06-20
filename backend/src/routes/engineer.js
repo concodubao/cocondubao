@@ -379,6 +379,40 @@ router.get('/history', verifyJWT, requireRole('engineer', 'admin'), async (req, 
   res.json({ history: data || [], total: count ?? (data?.length || 0) })
 })
 
+// GET /engineer/stats — thống kê cá nhân của kỹ sư đang đăng nhập
+router.get('/stats', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+  const me = req.user.userId
+  const since7d = new Date(Date.now() - 7 * 86400000).toISOString()
+
+  try {
+    const [{ count: totalResolved }, { count: resolvedWeek }] = await Promise.all([
+      supabase.from('engineer_queue').select('*', { count: 'exact', head: true })
+        .eq('assigned_to', me).eq('status', 'resolved'),
+      supabase.from('engineer_queue').select('*', { count: 'exact', head: true })
+        .eq('assigned_to', me).eq('status', 'resolved').gte('resolved_at', since7d),
+    ])
+
+    const { data: resolved } = await supabase
+      .from('engineer_queue')
+      .select('created_at, resolved_at, add_to_knowledge')
+      .eq('assigned_to', me).eq('status', 'resolved')
+      .not('resolved_at', 'is', null)
+
+    let avgResponseHours = null
+    let addedToKnowledge = 0
+    if (resolved?.length) {
+      const totalMs = resolved.reduce((s, r) => s + (new Date(r.resolved_at) - new Date(r.created_at)), 0)
+      avgResponseHours = Math.round((totalMs / resolved.length) / 3600000 * 10) / 10
+      addedToKnowledge = resolved.filter(r => r.add_to_knowledge).length
+    }
+
+    res.json({ totalResolved, resolvedWeek, avgResponseHours, addedToKnowledge })
+  } catch (err) {
+    console.error('[ENGINEER] stats error:', err)
+    res.status(500).json({ error: 'Không lấy được thống kê.' })
+  }
+})
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PHẦN 2 — KHO TRI THỨC RAG
 // ══════════════════════════════════════════════════════════════════════════════

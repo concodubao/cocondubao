@@ -70,6 +70,7 @@ export const engineerAPI = {
   answer:          (id, data)           => api.patch(`/engineer/queue/${id}/answer`, data),
   deleteQueueItem: (id)                 => api.delete(`/engineer/queue/${id}`),
   getHistory:      (params = {})        => api.get('/engineer/history', { params }),
+  getStats:        ()                   => api.get('/engineer/stats'),
 
   // Kho tri thức
   uploadDoc:  (formData) => api.post('/knowledge/upload', formData, {
