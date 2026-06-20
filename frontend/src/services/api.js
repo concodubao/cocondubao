@@ -60,6 +60,9 @@ export const pushAPI = {
   updateSettings:   settings => api.patch('/push/notifications/settings', settings),
   getScheduled:     ()      => api.get('/push/scheduled'),
   cancelScheduled:  (id)    => api.delete(`/push/scheduled/${id}`),
+  getDrafts:        ()      => api.get('/push/drafts'),
+  approveDraft:     (id)    => api.post(`/push/drafts/${id}/approve`),
+  dismissDraft:     (id)    => api.delete(`/push/drafts/${id}`),
 }
 
 export const engineerAPI = {

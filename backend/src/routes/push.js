@@ -185,6 +185,67 @@ router.delete('/scheduled/:id', verifyJWT, requireRole('admin'), async (req, res
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+// BẢN NHÁP CẢNH BÁO THỜI TIẾT (hệ thống tạo, admin duyệt rồi mới gửi)
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /push/drafts — danh sách bản nháp cảnh báo thời tiết đang chờ duyệt
+router.get('/drafts', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, title, body, type, crop_tags, created_at')
+      .eq('type', 'weather')
+      .is('created_by', null)
+      .is('sent_at', null)
+      .is('scheduled_at', null)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    res.json({ drafts: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// POST /push/drafts/:id/approve — admin duyệt & gửi bản nháp ngay
+router.post('/drafts/:id/approve', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const { data: notif } = await supabase
+      .from('notifications')
+      .select('id, title, body, type, image_url, crop_tags, sent_at')
+      .eq('id', req.params.id)
+      .single()
+    if (!notif) return res.status(404).json({ error: 'Không tìm thấy bản nháp.' })
+    if (notif.sent_at) return res.status(400).json({ error: 'Bản nháp này đã được gửi.' })
+
+    // Đánh dấu admin đã duyệt + đã gửi trước khi dispatch (tránh gửi trùng)
+    await supabase
+      .from('notifications')
+      .update({ sent_at: new Date().toISOString(), created_by: req.user.userId })
+      .eq('id', req.params.id)
+
+    const stats = await dispatchNotification(notif)
+    res.json({ success: true, sent: stats.sent, total: stats.total })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// DELETE /push/drafts/:id — admin bỏ bản nháp (chưa gửi)
+router.delete('/drafts/:id', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const { data: notif } = await supabase
+      .from('notifications').select('id, sent_at').eq('id', req.params.id).single()
+    if (!notif) return res.status(404).json({ error: 'Không tìm thấy bản nháp.' })
+    if (notif.sent_at) return res.status(400).json({ error: 'Đã gửi, không thể bỏ.' })
+    const { error } = await supabase.from('notifications').delete().eq('id', req.params.id)
+    if (error) throw error
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATIONS — XEM VÀ ĐỌC
 // ══════════════════════════════════════════════════════════════════════════════
 

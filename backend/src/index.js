@@ -17,6 +17,7 @@ import adminRoutes     from './routes/admin.js'
 import communityRoutes from './routes/community.js'
 import { startNotificationScheduler } from './services/notifications.js'
 import { startUserStatusSync } from './middleware/auth.js'
+import { startWeatherAlertScheduler } from './services/weatherAlerts.js'
 
 const app = express()
 
@@ -106,4 +107,7 @@ app.listen(PORT, () => {
 
   // Đồng bộ denylist tài khoản bị khoá (để khoá có hiệu lực sớm dù JWT còn hạn).
   startUserStatusSync()
+
+  // Quét thời tiết tạo bản nháp cảnh báo cho admin duyệt (mỗi 6h).
+  startWeatherAlertScheduler()
 })

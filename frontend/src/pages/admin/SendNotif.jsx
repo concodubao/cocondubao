@@ -52,6 +52,61 @@ function ScheduledList() {
   )
 }
 
+// Bản nháp cảnh báo thời tiết do hệ thống tạo — admin xem rồi Gửi hoặc Bỏ
+function WeatherDraftsList() {
+  const queryClient = useQueryClient()
+  const { data } = useQuery({
+    queryKey: ['weather-drafts'],
+    queryFn:  () => pushAPI.getDrafts().then(r => r.data.drafts),
+    refetchInterval: 5 * 60_000,
+  })
+  const list = data || []
+  const approve = useMutation({
+    mutationFn: (id) => pushAPI.approveDraft(id),
+    onSuccess:  (res) => {
+      toast.success(`Đã gửi cảnh báo đến ${res.data.sent}/${res.data.total} thiết bị.`)
+      queryClient.invalidateQueries({ queryKey: ['weather-drafts'] })
+      queryClient.invalidateQueries({ queryKey: ['notifications'] })
+    },
+    onError: (e) => toast.error(e.response?.data?.error || 'Không gửi được. Thử lại nhé.'),
+  })
+  const dismiss = useMutation({
+    mutationFn: (id) => pushAPI.dismissDraft(id),
+    onSuccess:  () => { toast.success('Đã bỏ bản nháp.'); queryClient.invalidateQueries({ queryKey: ['weather-drafts'] }) },
+    onError:    (e) => toast.error(e.response?.data?.error || 'Không bỏ được.'),
+  })
+
+  if (list.length === 0) return null
+
+  return (
+    <section style={s.section}>
+      <p style={s.sLabel}>🌦️ Gợi ý cảnh báo thời tiết ({list.length})</p>
+      <p style={s.sDesc}>Hệ thống tự phát hiện từ dự báo. Xem rồi bấm Gửi cho nông dân, hoặc Bỏ.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {list.map(n => (
+          <div key={n.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>{n.title}</p>
+              <p style={{ fontSize: 13, color: '#92400e', margin: '2px 0 0', lineHeight: 1.45 }}>{n.body}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => approve.mutate(n.id)} disabled={approve.isPending}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 13, fontWeight: 700, color: '#fff', background: '#4B230A', border: 'none', borderRadius: 8, padding: '8px', cursor: 'pointer' }}>
+                <Send size={13} strokeWidth={2.5} /> Gửi cho nông dân
+              </button>
+              <button onClick={() => { if (confirm('Bỏ bản nháp cảnh báo này?')) dismiss.mutate(n.id) }} disabled={dismiss.isPending}
+                aria-label="Bỏ bản nháp"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, fontWeight: 600, color: '#ef4444', background: '#fff', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>
+                <XIcon size={13} strokeWidth={2.5} /> Bỏ
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 const TYPE_OPTIONS = [
   { id: 'alert',     Icon: AlertTriangle, label: 'Cảnh báo dịch bệnh', desc: 'Ưu tiên cao — hiển thị nổi bật', color: '#ef4444', bg: '#fef2f2' },
   { id: 'promotion', Icon: Tag,           label: 'Khuyến mãi vật tư',  desc: 'Phân bón, thuốc BVTV giảm giá', color: '#3b82f6', bg: '#eff6ff' },
@@ -163,6 +218,7 @@ export default function SendNotif() {
       </header>
 
       <main style={s.main}>
+        <WeatherDraftsList />
         <ScheduledList />
 
         <section style={s.section}>
