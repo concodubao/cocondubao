@@ -228,3 +228,26 @@ describe('GET /admin/users/:id/activity — chi tiết 1 nông dân', () => {
     expect(res.body.questions[0].content).toBe('Lúa bị gì?')
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('GET /admin/audit — nhật ký thao tác admin', () => {
+  it('403 với kỹ sư', async () => {
+    const res = await request(app).get('/api/v1/admin/audit').set(eng())
+    expect(res.status).toBe(403)
+  })
+
+  it('200 + ready=true trả logs', async () => {
+    sb.enqueue({ data: [{ id: 'a1', admin_name: 'Admin1', action: 'lock_user', target_name: 'Chú Ba', detail: 'Khóa tài khoản', created_at: new Date().toISOString() }], error: null })
+    const res = await request(app).get('/api/v1/admin/audit').set(admin())
+    expect(res.status).toBe(200)
+    expect(res.body.ready).toBe(true)
+    expect(res.body.logs).toHaveLength(1)
+  })
+
+  it('200 + ready=false khi bảng chưa tạo (chưa chạy migration)', async () => {
+    sb.enqueue({ data: null, error: { message: 'relation "admin_audit_log" does not exist' } })
+    const res = await request(app).get('/api/v1/admin/audit').set(admin())
+    expect(res.status).toBe(200)
+    expect(res.body.ready).toBe(false)
+  })
+})

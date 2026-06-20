@@ -14,6 +14,23 @@ import { embedAndStoreDoc } from '../services/rag.js'
 
 const router = express.Router()
 
+// Ghi nhật ký thao tác admin. Không chặn luồng chính nếu bảng chưa có (degrade mềm).
+async function logAudit(req, action, target, detail) {
+  try {
+    const { error } = await supabase.from('admin_audit_log').insert({
+      admin_id:    req.user.userId,
+      admin_name:  req.user.name || null,
+      action,
+      target_id:   target?.id || null,
+      target_name: target?.name || target?.phone || target?.email || null,
+      detail:      detail || null,
+    })
+    if (error) console.warn('[ADMIN] audit log skipped:', error.message)
+  } catch (e) {
+    console.warn('[ADMIN] audit log error:', e.message)
+  }
+}
+
 // ── POST /admin/engineers — admin tạo tài khoản kỹ sư hoặc admin ─────────────
 router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
   const { email, password, name, role: reqRole } = req.body
@@ -45,6 +62,7 @@ router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
       .single()
 
     if (error) throw error
+    logAudit(req, 'create_staff', user, `Tạo tài khoản ${role}`)
     res.json({ success: true, user })
   } catch (err) {
     res.status(500).json({ error: err.message })
@@ -366,6 +384,19 @@ router.get('/users/:id/activity', verifyJWT, requireRole('admin'), async (req, r
   }
 })
 
+// ── GET /admin/audit — nhật ký thao tác admin ────────────────────────────────
+router.get('/audit', verifyJWT, requireRole('admin'), async (req, res) => {
+  const { data, error } = await supabase
+    .from('admin_audit_log')
+    .select('id, admin_name, action, target_name, detail, created_at')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  // Bảng chưa tạo (chưa chạy migration) → trả rỗng + cờ ready=false để UI báo
+  if (error) return res.json({ logs: [], ready: false })
+  res.json({ logs: data || [], ready: true })
+})
+
 // ── PATCH /admin/users/:id ────────────────────────────────────────────────────
 router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => {
   // Chặn admin tự khóa / tự hạ vai trò chính mình (tránh tự nhốt ra khỏi hệ thống).
@@ -388,6 +419,12 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+
+  let action = 'update_user', detail = ''
+  if (is_active !== undefined) { action = is_active ? 'unlock_user' : 'lock_user'; detail = is_active ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }
+  if (role) { action = 'change_role'; detail = `Đổi vai trò → ${role}` }
+  logAudit(req, action, data, detail)
+
   res.json({ success: true, user: data })
 })
 
@@ -412,6 +449,7 @@ router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req
       .select('id, phone, name, role')
       .single()
     if (error) throw error
+    logAudit(req, 'reset_pin', data, 'Đặt lại mã PIN')
     res.json({ success: true, pin, user: data }) // trả PIN để admin báo lại cho nông dân
   } catch (err) {
     res.status(500).json({ error: err.message })

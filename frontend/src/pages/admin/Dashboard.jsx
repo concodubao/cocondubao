@@ -5,7 +5,7 @@ import { useAuthStore } from '../../stores/authStore'
 import { supabase }    from '../../services/supabase'
 import { toast }       from '../../stores/toastStore'
 import { useEffect }   from 'react'
-import { Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight, ShieldCheck } from 'lucide-react'
+import { Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight, ShieldCheck, ScrollText } from 'lucide-react'
 
 function BarChart({ data }) {
   if (!data?.length) return null
@@ -282,6 +282,10 @@ export default function Dashboard() {
               <button onClick={() => navigate('/admin/users')} style={s.actionBtn}>
                 <Users size={20} color="#3b82f6" strokeWidth={1.5} />
                 <span>Quản lý tài khoản</span>
+              </button>
+              <button onClick={() => navigate('/admin/audit')} style={s.actionBtn}>
+                <ScrollText size={20} color="#7c3aed" strokeWidth={1.5} />
+                <span>Nhật ký thao tác</span>
               </button>
             </div>
           </>
