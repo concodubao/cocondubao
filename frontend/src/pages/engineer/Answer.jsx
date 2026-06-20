@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
+import { useTemplateStore } from '../../stores/templateStore'
 
 // ─── Image Lightbox ───────────────────────────────────────────────────────────
 function ImageLightbox({ src, alt, onClose }) {
@@ -56,6 +57,10 @@ export default function Answer() {
   const [loading,        setLoading]        = useState(false)
   const [error,          setError]          = useState('')
   const [lightbox,       setLightbox]       = useState(false)
+  const [savingTpl,      setSavingTpl]      = useState(false)
+  const [tplLabel,       setTplLabel]       = useState('')
+
+  const { templates: customTemplates, addTemplate, removeTemplate } = useTemplateStore()
 
   const answer    = draft ?? (item?.answer || '')
   const msg       = item?.messages
@@ -75,6 +80,14 @@ export default function Answer() {
     } finally {
       setLoading(false)
     }
+  }
+
+  function saveTemplate() {
+    const label = tplLabel.trim()
+    if (!label || answer.trim().length < 20) return
+    addTemplate({ id: Date.now().toString(), label, text: answer.trim() })
+    setTplLabel('')
+    setSavingTpl(false)
   }
 
   // Hooks đã chạy xong ở trên → giờ mới được return có điều kiện (rules-of-hooks)
@@ -143,7 +156,30 @@ export default function Answer() {
 
         {/* Mẫu trả lời nhanh */}
         <section className="flex flex-col gap-2">
-          <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider m-0">Mẫu nhanh</p>
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider m-0">Mẫu nhanh</p>
+            {answer.trim().length >= 20 && !savingTpl && (
+              <button onClick={() => setSavingTpl(true)}
+                className="flex items-center gap-1 text-[12px] font-semibold text-[#4B230A]">
+                <span className="material-symbols-outlined text-[15px]">bookmark_add</span>
+                Lưu làm mẫu
+              </button>
+            )}
+          </div>
+
+          {savingTpl && (
+            <div className="flex gap-2">
+              <input value={tplLabel} onChange={e => setTplLabel(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveTemplate()}
+                placeholder="Tên mẫu (vd: Đạo ôn)" autoFocus
+                className="flex-1 px-3 py-2 text-[14px] bg-white border-2 border-[#f0e0d0] rounded-xl outline-none focus:border-[#4B230A]" />
+              <button onClick={saveTemplate} disabled={!tplLabel.trim()}
+                className="px-4 rounded-xl bg-[#4B230A] text-white text-[13px] font-bold disabled:opacity-50">Lưu</button>
+              <button onClick={() => { setSavingTpl(false); setTplLabel('') }}
+                className="px-4 rounded-xl bg-[#f1f5f9] text-[#64748b] text-[13px]">Hủy</button>
+            </div>
+          )}
+
           <div className="flex gap-2 flex-wrap">
             {TEMPLATES.map(t => (
               <button
@@ -154,6 +190,19 @@ export default function Answer() {
               >
                 {t.label}
               </button>
+            ))}
+            {customTemplates.map(t => (
+              <span key={t.id}
+                className="inline-flex items-center bg-[#fdf6f0] border border-[#f5d5b0] rounded-full overflow-hidden">
+                <button onClick={() => setDraft(t.text)}
+                  className="pl-3 pr-1.5 py-1.5 text-[13px] font-semibold text-[#4B230A] active:scale-95 transition-transform">
+                  {t.label}
+                </button>
+                <button onClick={() => removeTemplate(t.id)} aria-label={`Xóa mẫu ${t.label}`}
+                  className="pr-2.5 pl-0.5 py-1.5 text-[#b08968] hover:text-[#ef4444]">
+                  <span className="material-symbols-outlined text-[15px]">close</span>
+                </button>
+              </span>
             ))}
           </div>
         </section>
