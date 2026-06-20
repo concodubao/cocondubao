@@ -1,8 +1,9 @@
 // frontend/src/App.jsx
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './stores/authStore'
+import { useDisplayStore } from './stores/displayStore'
 
 // ─── Pages tải ngay (nông dân, dùng nhiều nhất) ───────────────────────────────
 import Splash        from './pages/Splash'
@@ -83,6 +84,12 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 export default function App() {
+  const fontScale = useDisplayStore(s => s.fontScale)
+  useEffect(() => {
+    // `zoom` phóng to cả layout lẫn chữ; reset về '' khi = 1 cho gọn
+    document.documentElement.style.zoom = fontScale === 1 ? '' : String(fontScale)
+  }, [fontScale])
+
   return (
     <QueryClientProvider client={queryClient}>
       <ToastContainer />
