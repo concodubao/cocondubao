@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useTemplateStore } from '../../stores/templateStore'
+import AnswerContent from '../../components/AnswerContent'
 
 // ─── Image Lightbox ───────────────────────────────────────────────────────────
 function ImageLightbox({ src, alt, onClose }) {
@@ -59,6 +60,7 @@ export default function Answer() {
   const [lightbox,       setLightbox]       = useState(false)
   const [savingTpl,      setSavingTpl]      = useState(false)
   const [tplLabel,       setTplLabel]       = useState('')
+  const [preview,        setPreview]        = useState(false)
 
   const { templates: customTemplates, addTemplate, removeTemplate } = useTemplateStore()
 
@@ -209,25 +211,46 @@ export default function Answer() {
 
         {/* Textarea trả lời */}
         <section className="flex flex-col gap-2">
-          <label htmlFor="answer-textarea"
-            className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider">
-            Câu trả lời
-            <span className="normal-case font-normal text-[#d4b8a8] ml-1">
-              ({answer.trim().length} ký tự)
-            </span>
-          </label>
-          <textarea
-            id="answer-textarea"
-            value={answer}
-            onChange={e => setDraft(e.target.value)}
-            placeholder="Soạn câu trả lời chi tiết, dễ hiểu cho nông dân..."
-            rows={8}
-            aria-required="true"
-            className="w-full px-4 py-3 text-[16px] text-[#0b1c30] bg-white
-                       border-2 border-[#f0e0d0] rounded-[20px] resize-none leading-relaxed
-                       focus:border-[#4B230A] focus:ring-2 focus:ring-[#4B230A]/10 outline-none
-                       transition-colors min-h-[180px]"
-          />
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="answer-textarea"
+              className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider">
+              Câu trả lời
+              <span className="normal-case font-normal text-[#d4b8a8] ml-1">
+                ({answer.trim().length} ký tự)
+              </span>
+            </label>
+            <div className="flex bg-[#fdf6f0] rounded-full p-0.5 flex-shrink-0">
+              {[['Soạn', false], ['Xem trước', true]].map(([lbl, val]) => (
+                <button key={lbl} type="button" onClick={() => setPreview(val)}
+                  className={`px-3 py-1 text-[12px] font-bold rounded-full transition-all
+                    ${preview === val ? 'bg-[#4B230A] text-white' : 'text-[#7a6358]'}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {preview ? (
+            <div className="w-full px-4 py-3 bg-white border-2 border-[#f0e0d0] rounded-[20px]
+                            text-[16px] text-[#0b1c30] leading-relaxed min-h-[180px]">
+              {answer.trim()
+                ? <AnswerContent content={answer} showDisclaimer={false} />
+                : <span className="text-[#d4b8a8]">Chưa có nội dung để xem trước.</span>}
+            </div>
+          ) : (
+            <textarea
+              id="answer-textarea"
+              value={answer}
+              onChange={e => setDraft(e.target.value)}
+              placeholder="Soạn câu trả lời chi tiết, dễ hiểu cho nông dân..."
+              rows={8}
+              aria-required="true"
+              className="w-full px-4 py-3 text-[16px] text-[#0b1c30] bg-white
+                         border-2 border-[#f0e0d0] rounded-[20px] resize-none leading-relaxed
+                         focus:border-[#4B230A] focus:ring-2 focus:ring-[#4B230A]/10 outline-none
+                         transition-colors min-h-[180px]"
+            />
+          )}
           {error && (
             <div role="alert"
               className="flex items-start gap-2 bg-[#fef2f2] border-l-4 border-[#EF4444]
