@@ -26,7 +26,7 @@ vi.mock('@google/generative-ai', () => ({
   }),
 }))
 
-const { askRAG, checkFAQ, getAnswerCache, setAnswerCache, _clearAnswerCache } =
+const { askRAG, checkFAQ, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache } =
   await import('../src/services/rag.js')
 
 const fakeVector = () => ({ embedding: { values: new Array(1536).fill(0.01) } })
@@ -80,6 +80,33 @@ describe('answer cache', () => {
 
   it('miss → null', () => {
     expect(getAnswerCache('chưa từng hỏi', null)).toBeNull()
+  })
+})
+
+describe('semantic cache', () => {
+  it('embedding rất sát (≥0.95) → trả lại kết quả đã cache', () => {
+    const result = { answer: 'bón đạm', confidence: 0.9, source: 'rag' }
+    const emb = [1, 0, 0, 0]
+    setAnswerCache('bón phân lúa sao', 'rice', result, emb)
+    const near = [0.99, 0.02, 0, 0] // gần như cùng hướng
+    const hit = getSemanticCache(near, 'rice')
+    expect(hit?.result).toEqual(result)
+    expect(hit.similarity).toBeGreaterThanOrEqual(0.95)
+  })
+
+  it('embedding khác hướng → không khớp', () => {
+    setAnswerCache('bón phân lúa sao', 'rice', { answer: 'x' }, [1, 0, 0, 0])
+    expect(getSemanticCache([0, 1, 0, 0], 'rice')).toBeNull()
+  })
+
+  it('cropType khác → không khớp dù embedding sát', () => {
+    setAnswerCache('câu', 'rice', { answer: 'lúa' }, [1, 0, 0, 0])
+    expect(getSemanticCache([1, 0, 0, 0], 'fruit')).toBeNull()
+  })
+
+  it('entry không có embedding (cache cũ) → bỏ qua, không lỗi', () => {
+    setAnswerCache('câu cũ', 'rice', { answer: 'x' }) // không truyền embedding
+    expect(getSemanticCache([1, 0, 0, 0], 'rice')).toBeNull()
   })
 })
 

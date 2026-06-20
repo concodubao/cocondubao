@@ -6,7 +6,8 @@ import express        from 'express'
 import cors           from 'cors'
 import helmet         from 'helmet'
 import webpush        from 'web-push'
-import rateLimit      from 'express-rate-limit'
+import jwt            from 'jsonwebtoken'
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit'
 
 import authRoutes      from './routes/auth.js'
 import chatRoutes      from './routes/chat.js'
@@ -24,14 +25,28 @@ const app = express()
 app.set('trust proxy', 1)
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
-// Chat: 15 req/phút/IP (tránh spam AI). Dùng keyGenerator mặc định — đã an toàn
-// IPv6 và đọc req.ip đúng nhờ 'trust proxy' ở trên (keyGenerator thủ công cũ gây
-// lỗi ERR_ERL_KEY_GEN_IPV6 trên express-rate-limit v8).
+// Chat limiter khoá theo userId (đã đăng nhập) thay vì IP: cả xã dùng chung 4G/NAT
+// sẽ không bị chặn nhầm nhau. Chưa đăng nhập (token thiếu/sai) thì rơi về IP qua
+// ipKeyGenerator — helper chính thức chuẩn hoá IPv6, KHÔNG gây ERR_ERL_KEY_GEN_IPV6
+// (lỗi đó do keyGenerator cũ trả thẳng req.ip; dùng ipKeyGenerator là cách được hỗ trợ).
+function userOrIpKey(req) {
+  const h = req.headers.authorization
+  if (h?.startsWith('Bearer ')) {
+    try {
+      const p = jwt.verify(h.split(' ')[1], process.env.JWT_SECRET)
+      if (p?.userId) return `user:${p.userId}`
+    } catch { /* token lỗi → khoá theo IP */ }
+  }
+  return ipKeyGenerator(req.ip)
+}
+
+// Chat: 15 req/phút/user (hoặc IP nếu chưa đăng nhập) — tránh spam AI.
 const chatLimiter = rateLimit({
   windowMs:         60 * 1000,
   max:              15,
   standardHeaders:  true,
   legacyHeaders:    false,
+  keyGenerator:     userOrIpKey,
   message:          { error: 'Bạn hỏi quá nhiều rồi, thử lại sau 1 phút nhé.' },
 })
 

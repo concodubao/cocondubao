@@ -45,8 +45,8 @@ export async function notifyEngineer(title, body) {
     title,
     body,
     url:  '/engineer/queue',
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    icon: '/cocon-icon-bg.png',
+    badge: '/cocon-icon-bg.png',
     actions: [
       { action: 'view', title: 'Xem ngay' },
       { action: 'dismiss', title: 'Bỏ qua' },
@@ -58,8 +58,9 @@ export async function notifyEngineer(title, body) {
   await sendToSubscriptions(subscriptions, payload)
 }
 
-// ─── Notify nông dân khi kỹ sư trả lời ───────────────────────────────────────
-export async function notifyFarmer(userId, title, body) {
+// ─── Notify 1 nông dân (kỹ sư trả lời, có bình luận mới...) ───────────────────
+// opts: { url, tag } — url trang mở khi bấm; tag để gộp/không gộp với notif khác.
+export async function notifyFarmer(userId, title, body, opts = {}) {
   const { data: subscriptions } = await supabase
     .from('push_subscriptions')
     .select('endpoint, keys')
@@ -69,13 +70,13 @@ export async function notifyFarmer(userId, title, body) {
   const payload = JSON.stringify({
     title,
     body,
-    url:  '/notifications',
-    icon: '/favicon.svg',
-    badge: '/favicon.svg',
+    url:   opts.url || '/notifications',
+    icon:  '/cocon-icon-bg.png',
+    badge: '/cocon-icon-bg.png',
     actions: [
-      { action: 'view', title: 'Xem câu trả lời' },
+      { action: 'view', title: 'Xem ngay' },
     ],
-    tag:     `farmer-answer-${userId}`,
+    tag:      opts.tag || `farmer-answer-${userId}`,
     renotify: true,
   })
 

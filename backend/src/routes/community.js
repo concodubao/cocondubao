@@ -12,6 +12,7 @@ import multer  from 'multer'
 import sharp   from 'sharp'
 import { verifyJWT } from '../middleware/auth.js'
 import { supabase }  from '../services/supabase.js'
+import { notifyFarmer } from '../services/webpush.js'
 
 const router = express.Router()
 
@@ -242,6 +243,17 @@ router.post('/posts/:id/comments', verifyJWT, async (req, res) => {
     .single()
 
   if (error) return res.status(500).json({ error: error.message })
+
+  // Báo cho chủ bài có bình luận mới (bỏ qua khi tự bình luận bài của mình)
+  const { data: post } = await supabase.from('posts').select('user_id').eq('id', req.params.id).single()
+  if (post && post.user_id !== req.user.userId) {
+    const who = data.users?.name || 'Một bà con'
+    notifyFarmer(post.user_id, '💬 Bài của bạn có bình luận mới', `${who}: ${content.trim().slice(0, 80)}`, {
+      url: `/community/${req.params.id}`,
+      tag: `post-comment-${req.params.id}`,
+    }).catch(e => console.warn('[PUSH] notify comment failed:', e.message))
+  }
+
   res.json({ comment: data })
 })
 

@@ -109,15 +109,44 @@ export function _clearAnswerCache() {
   _answerCache.clear()
 }
 
-export function setAnswerCache(question, cropType, result) {
+export function setAnswerCache(question, cropType, result, embedding = null) {
   if (_answerCache.size >= CACHE_MAX) {
     // Xóa entry cũ nhất (insertion order)
     _answerCache.delete(_answerCache.keys().next().value)
   }
   _answerCache.set(_cacheKey(question, cropType), {
     result,
+    cropType: cropType || null,
+    embedding,                       // lưu để so khớp ngữ nghĩa (semantic cache)
     expiresAt: Date.now() + CACHE_TTL,
   })
+}
+
+// ─── Semantic cache — khớp câu hỏi cùng ý dù diễn đạt khác ───────────────────
+// Cache khoá theo chuỗi y hệt thì "bón phân lúa sao" và "lúa bón phân thế nào" là
+// 2 key khác → miss, tốn quota Gemini. Tận dụng embedding (đã tính ở bước 1) để
+// trả lại câu trả lời đã cache nếu rất sát nghĩa (cosine ≥ ngưỡng).
+const SEMANTIC_THRESHOLD = 0.95
+function cosineSim(a, b) {
+  if (!a || !b || a.length !== b.length) return 0
+  let dot = 0, na = 0, nb = 0
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
+  const denom = Math.sqrt(na) * Math.sqrt(nb)
+  return denom ? dot / denom : 0
+}
+
+export function getSemanticCache(embedding, cropType) {
+  if (!embedding?.length) return null
+  const now = Date.now()
+  let bestResult = null, bestSim = 0
+  for (const [key, entry] of _answerCache) {
+    if (now > entry.expiresAt) { _answerCache.delete(key); continue }
+    if ((entry.cropType || null) !== (cropType || null)) continue
+    if (!entry.embedding) continue
+    const sim = cosineSim(embedding, entry.embedding)
+    if (sim >= SEMANTIC_THRESHOLD && sim > bestSim) { bestResult = entry.result; bestSim = sim }
+  }
+  return bestResult ? { result: bestResult, similarity: bestSim } : null
 }
 
 // ─── LLM invoke với retry khi gặp 429 ────────────────────────────────────────
@@ -234,6 +263,14 @@ export async function askRAG(question, cropType = null, history = []) {
     // BƯỚC 1: Embed câu hỏi thành vector 1536 chiều
     const [queryEmbedding] = await embedTexts([question], 'RETRIEVAL_QUERY')
 
+    // BƯỚC 1.5: Semantic cache — câu hỏi cùng ý dù diễn đạt khác → trả thẳng cache,
+    // bỏ qua pgvector + LLM (tiết kiệm quota Gemini).
+    const sem = getSemanticCache(queryEmbedding, cropType)
+    if (sem) {
+      console.log(`[RAG] semantic cache hit (sim=${sem.similarity.toFixed(3)}) for "${question.slice(0, 50)}..."`)
+      return { ...sem.result, source: sem.result.source + '_semcached' }
+    }
+
     // BƯỚC 2: Tìm top-5 chunks gần nhất trong pgvector
     const { data: chunks, error } = await supabase.rpc('match_knowledge_chunks', {
       query_embedding: queryEmbedding,
@@ -275,7 +312,7 @@ export async function askRAG(question, cropType = null, history = []) {
         source:       'qa_direct',
         chunksFound:  chunks.length,
       }
-      setAnswerCache(question, cropType, result)
+      setAnswerCache(question, cropType, result, queryEmbedding)
       return result
     }
 
@@ -312,7 +349,7 @@ export async function askRAG(question, cropType = null, history = []) {
     }
 
     // Cache câu trả lời tin cậy cao (confidence ≥ 0.7) để tái sử dụng
-    setAnswerCache(question, cropType, result)
+    setAnswerCache(question, cropType, result, queryEmbedding)
 
     return result
 

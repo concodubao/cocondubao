@@ -14,11 +14,11 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 | G7 | 🟠 Logic | chat vision | Vision hardcode `confidence 0.9`, không có lối thoát kỹ sư | Phát hiện câu trả lời không chắc → chuyển kỹ sư xem ảnh | ✅ |
 | G8 | 🟠 Bảo mật | auth | `request-otp` lộ tồn tại số + vai trò (enumeration) | Bỏ `existingRole` + `isExistingUser` khỏi response | ✅ |
 | G9 | 🟠 Hạ tầng | storage | Xóa post/account không xóa ảnh → rác bucket | Xóa file storage kèm post; dọn ảnh user khi xóa account | ✅ |
-| G10 | 🟡 Quota | rag | Answer cache key chuỗi y hệt → miss nhiều, phí Gemini | Semantic cache theo embedding sim ≥ 0.95 | ⬜ |
-| G11 | 🟡 UX | community | Comment không báo chủ bài; không kiểm duyệt/báo cáo | `notifyFarmer` khi có comment + cờ báo cáo | ⬜ |
-| G12 | 🟡 UX | chat | Chỉ có 👎 (report-error), thiếu 👍 + dedup báo lỗi | Thêm phản hồi tích cực + chặn spam | ⬜ |
-| G13 | 🟡 UX | engineer/admin | Hứa "trả lời trong 24h" nhưng không theo dõi quá hạn | Dashboard hiện câu quá hạn | ⬜ |
-| G14 | 🟡 Bảo mật | rate-limit | Chat 15/phút theo IP → cả xã chung NAT bị chặn nhầm | Key theo `userId` cho route đã auth | ⬜ |
+| G10 | 🟡 Quota | rag | Answer cache key chuỗi y hệt → miss nhiều, phí Gemini | Semantic cache theo embedding cosine ≥ 0.95 | ✅ |
+| G11 | 🟡 UX | community | Comment không báo chủ bài | `notifyFarmer` khi có comment (mở đúng bài). Kiểm duyệt/báo cáo: ⏳ cần migration | 🔶 |
+| G12 | 🟡 UX | chat | Chỉ có 👎 (report-error), thiếu 👍 + dedup báo lỗi | Dedup báo lỗi (idempotent). 👍 phản hồi tích cực: ⏳ cần bảng mới | 🔶 |
+| G13 | 🟡 UX | engineer/admin | Hứa "trả lời trong 24h" nhưng không theo dõi quá hạn | ĐÃ CÓ SẴN: `overdueQueue` + StatCard "Chờ quá hạn 24h" | ✅ |
+| G14 | 🟡 Bảo mật | rate-limit | Chat 15/phút theo IP → cả xã chung NAT bị chặn nhầm | Key theo `userId` (JWT) + `ipKeyGenerator` fallback | ✅ |
 | G15 | 🟢 DX | repo | `knowledge.js` stub chết; không CI; không Sentry | Xóa stub, thêm CI vitest+eslint, gắn Sentry | ⬜ |
 | G16 | 🟢 Nâng cấp | notifications | Đủ nguyên liệu cảnh báo thời tiết/mùa vụ tự động | Scheduler sinh cảnh báo theo `useWeather`+crop | ⬜ |
 
@@ -28,3 +28,8 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 - **Đợt 2** (logic/an toàn dữ liệu): G6 → G7 → G8 → G9
 - **Đợt 3** (trải nghiệm & quota): G4 → G10 → G11 → G12 → G13 → G14
 - **Đợt 4** (DX & mở rộng): G15 → G16
+
+## Follow-up cần migration DB (psql 17, hỏi user trước khi áp prod)
+
+- **G11b** — Kiểm duyệt cộng đồng: bảng `post_reports`/`comment_reports` (hoặc cờ `reported`+`report_count`), endpoint báo cáo, hàng đợi duyệt cho admin.
+- **G12b** — Phản hồi tích cực 👍: bảng `answer_feedback` (message_id, user_id, helpful) + nút ở `AIResult.jsx`; câu nhiều 👍 + confidence cao → gợi ý kỹ sư duyệt thành curated QA.

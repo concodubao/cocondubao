@@ -423,6 +423,15 @@ router.post('/report-error', verifyJWT, async (req, res) => {
       return res.status(403).json({ error: 'Không có quyền báo lỗi tin nhắn này.' })
     }
 
+    // Chặn spam: 1 nông dân chỉ báo lỗi 1 lần cho mỗi message (idempotent)
+    const { data: dup } = await supabase
+      .from('ai_error_reports')
+      .select('id')
+      .eq('message_id', messageId)
+      .eq('user_id', req.user.userId)
+      .limit(1)
+    if (dup?.length) return res.json({ success: true, already: true })
+
     await supabase.from('ai_error_reports').insert({
       message_id: messageId,
       user_id:    req.user.userId,

@@ -45,7 +45,7 @@ Cả hai deploy **tự động qua git push** (Railway watch backend, Vercel wat
 
 ## Kiến trúc backend
 
-- `src/index.js` — wiring: helmet, cors, 2 rate-limiter (chat 15/phút, auth 10/phút theo IP), mount routes dưới `/api/v1/*`, và khởi động notification scheduler. `app.set('trust proxy', 1)` là bắt buộc để `req.ip` đúng sau reverse-proxy của Railway — **đừng thêm `keyGenerator` thủ công** cho rate-limit (gây `ERR_ERL_KEY_GEN_IPV6` trên express-rate-limit v8).
+- `src/index.js` — wiring: helmet, cors, 2 rate-limiter (chat 15/phút theo **userId** rồi fallback IP, auth 10/phút theo IP), mount routes dưới `/api/v1/*`, khởi động notification scheduler + đồng bộ denylist tài khoản bị khoá. `app.set('trust proxy', 1)` là bắt buộc để `req.ip` đúng sau reverse-proxy của Railway. Chat limiter dùng `keyGenerator` thủ công (`userOrIpKey`): khoá theo `user:<userId>` khi có JWT, chưa đăng nhập thì gọi `ipKeyGenerator(req.ip)`. **Quan trọng:** nếu tự viết keyGenerator mà fallback theo IP thì PHẢI dùng `ipKeyGenerator` (export từ express-rate-limit) chứ đừng trả thẳng `req.ip` — trả `req.ip` thô mới gây `ERR_ERL_KEY_GEN_IPV6` trên v8.
 - Auth: JWT tự ký (`middleware/auth.js`: `verifyJWT` đọc `Bearer`, `requireRole(...roles)`). KHÔNG dùng Supabase Auth — password tự hash bằng bcrypt trong `routes/auth.js`.
 - `services/rag.js` — trái tim hệ thống. Pipeline `askRAG()` phân tầng để **tiết kiệm quota Gemini**, theo thứ tự:
   1. `checkFAQ()` — regex match câu xã giao, trả lời ngay, 0 quota.
