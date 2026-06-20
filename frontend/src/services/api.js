@@ -63,7 +63,7 @@ export const pushAPI = {
 
 export const engineerAPI = {
   // Hàng đợi
-  getQueue:        (status = 'pending') => api.get(`/engineer/queue?status=${status}`),
+  getQueue:        (status = 'pending', limit = 50) => api.get(`/engineer/queue?status=${status}&limit=${limit}`),
   getQueueItem:    (id)                 => api.get(`/engineer/queue/${id}`),
   take:            (id)                 => api.patch(`/engineer/queue/${id}/take`),
   answer:          (id, data)           => api.patch(`/engineer/queue/${id}/answer`, data),

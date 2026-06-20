@@ -116,6 +116,8 @@ export default function Queue() {
   const [loading,  setLoading]  = useState(true)
   const [tab,      setTab]      = useState('pending')
   const [deleting, setDeleting] = useState(null)
+  const [search,   setSearch]   = useState('')
+  const [crop,     setCrop]     = useState('all')
 
   async function loadQueue() {
     setLoading(true)
@@ -171,6 +173,27 @@ export default function Queue() {
     { key: 'in_progress', label: 'Đang xử lý'  },
   ]
 
+  const CROP_FILTERS = [
+    { key: 'all',    label: 'Tất cả' },
+    { key: 'rice',   label: 'Lúa' },
+    { key: 'veggie', label: 'Rau màu' },
+    { key: 'fruit',  label: 'Cây ăn trái' },
+    { key: 'other',  label: 'Khác' },
+  ]
+
+  // Lọc client-side trên danh sách đã tải (theo cây trồng + tìm tên/nội dung)
+  const filtered = queue.filter(item => {
+    const msg = item.messages
+    if (crop !== 'all' && msg?.chat_sessions?.crop_type !== crop) return false
+    const q = search.trim().toLowerCase()
+    if (q) {
+      const name    = msg?.chat_sessions?.users?.name?.toLowerCase() || ''
+      const content = msg?.content?.toLowerCase() || ''
+      if (!name.includes(q) && !content.includes(q)) return false
+    }
+    return true
+  })
+
   return (
     <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[1080px] mx-auto w-full">
 
@@ -207,6 +230,34 @@ export default function Queue() {
         ))}
       </div>
 
+      {/* Tìm kiếm + lọc cây trồng */}
+      {!loading && queue.length > 0 && (
+        <div className="flex flex-col gap-2.5 px-4 py-3 bg-white border-b border-[#f1f5f9]">
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2
+                             text-[20px] text-[#7a6358]">search</span>
+            <input
+              type="search" value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Tìm theo tên nông dân hoặc nội dung câu hỏi..."
+              className="w-full h-[44px] pl-11 pr-4 bg-[#fdf8f5] border border-[#f0e0d0] rounded-2xl
+                         text-[15px] text-[#0b1c30] placeholder-[#d4b8a8]
+                         focus:border-[#4B230A] focus:ring-2 focus:ring-[#4B230A]/10 outline-none"
+            />
+          </div>
+          <div className="flex gap-2 overflow-x-auto scrollbar-none">
+            {CROP_FILTERS.map(f => (
+              <button key={f.key} onClick={() => setCrop(f.key)}
+                className={`flex-shrink-0 px-3.5 py-1.5 text-[13px] font-semibold rounded-full border-[1.5px] transition-all
+                  ${crop === f.key
+                    ? 'bg-[#4B230A] text-white border-[#4B230A]'
+                    : 'bg-white text-[#7a6358] border-[#f0e0d0]'}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       <main className="flex-1 p-4" aria-live="polite">
         {loading ? (
@@ -215,18 +266,22 @@ export default function Queue() {
               <div key={i} className="skeleton h-40 rounded-[20px]" />
             ))}
           </div>
-        ) : queue.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-4 py-16">
             <div className="w-20 h-20 rounded-[24px] bg-[#fdf6f0] flex items-center justify-center">
-              <span className="material-symbols-outlined text-[44px] text-[#f5d5b0] ms-fill">check_circle</span>
+              <span className="material-symbols-outlined text-[44px] text-[#f5d5b0] ms-fill">
+                {queue.length > 0 ? 'search_off' : 'check_circle'}
+              </span>
             </div>
             <p className="text-[16px] text-[#7a6358] text-center m-0">
-              {tab === 'pending' ? 'Không có câu hỏi nào đang chờ.' : 'Không có câu hỏi đang xử lý.'}
+              {queue.length > 0
+                ? 'Không có câu hỏi khớp bộ lọc.'
+                : tab === 'pending' ? 'Không có câu hỏi nào đang chờ.' : 'Không có câu hỏi đang xử lý.'}
             </p>
           </div>
         ) : (
           <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(300px,1fr))] items-start">
-            {queue.map(item => (
+            {filtered.map(item => (
               <QueueCard
                 key={item.id}
                 item={item}
