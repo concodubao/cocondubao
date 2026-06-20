@@ -82,16 +82,14 @@ router.post('/request-otp', otpLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Không gửi được OTP: ' + error.message })
   }
 
-  const { data: existingUser } = await supabase
-    .from('users').select('id, role').eq('phone', normalized).single()
-
   console.log(`[AUTH] OTP gửi qua Twilio đến ${normalized}`)
 
+  // Không trả isExistingUser/existingRole: tránh để lộ số nào đã đăng ký và vai
+  // trò của số đó (account enumeration). Luồng đăng nhập/đăng ký xác định sau khi
+  // verify OTP qua trường isNewUser.
   res.json({
-    success:        true,
-    phone:          normalized,
-    isExistingUser: !!existingUser,
-    existingRole:   existingUser?.role ?? null,
+    success: true,
+    phone:   normalized,
   })
 })
 
@@ -326,6 +324,20 @@ router.delete('/account', verifyJWT, async (req, res) => {
     await supabase.from('push_subscriptions')
       .update({ active: false })
       .eq('user_id', req.user.userId)
+
+    // Xóa ảnh nông dân đã tải lên (sâu bệnh + cộng đồng) để không còn truy cập
+    // được qua URL cũ và khỏi rác bucket. Best-effort — lỗi không chặn xóa account.
+    for (const folder of [`pest-images/${req.user.userId}`, `community/${req.user.userId}`]) {
+      try {
+        const { data: files } = await supabase.storage.from('images').list(folder)
+        if (files?.length) {
+          await supabase.storage.from('images').remove(files.map(f => `${folder}/${f.name}`))
+        }
+      } catch (e) {
+        console.warn('[AUTH] dọn ảnh khi xóa account lỗi:', e.message)
+      }
+    }
+
     res.json({ success: true })
   } catch (err) {
     return serverError(res, 'auth', err)

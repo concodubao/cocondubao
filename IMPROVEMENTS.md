@@ -10,10 +10,10 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 | G3 | 🔴 Bug | notifications | `crops_filter` lưu nhưng dispatch không dùng → lọc cây vô tác dụng | dispatch ưu tiên `crops_filter`, fallback `users.crops` | ✅ |
 | G4 | 🔴 Bug | sw.js | Mất sóng = trắng màn hình; PWA không cache offline | `fetch` handler + precache app shell + cache câu trả lời | ⬜ |
 | G5 | 🟠 Bug | sw.js | Click notif chỉ `focus()`, không mở đúng `url` | `navigate(url)` rồi focus | ✅ |
-| G6 | 🟠 Logic | chat /ask | Insert message không check lỗi → ghi nửa chừng, queue mất | Check `error` từng bước / gộp giao dịch | ⬜ |
-| G7 | 🟠 Logic | chat vision | Vision hardcode `confidence 0.9`, không có lối thoát kỹ sư | Luôn gợi ý hỏi kỹ sư cho câu ảnh / parse độ chắc | ⬜ |
-| G8 | 🟠 Bảo mật | auth | `request-otp` lộ tồn tại số + vai trò (enumeration) | Bỏ `existingRole`, cân nhắc bỏ `isExistingUser` | ⬜ |
-| G9 | 🟠 Hạ tầng | storage | Xóa post/comment/account không xóa ảnh → rác bucket | Xóa file storage kèm row | ⬜ |
+| G6 | 🟠 Logic | chat /ask | Insert message không check lỗi → ghi nửa chừng, queue mất | Check `error` insert userMsg, throw nếu fail | ✅ |
+| G7 | 🟠 Logic | chat vision | Vision hardcode `confidence 0.9`, không có lối thoát kỹ sư | Phát hiện câu trả lời không chắc → chuyển kỹ sư xem ảnh | ✅ |
+| G8 | 🟠 Bảo mật | auth | `request-otp` lộ tồn tại số + vai trò (enumeration) | Bỏ `existingRole` + `isExistingUser` khỏi response | ✅ |
+| G9 | 🟠 Hạ tầng | storage | Xóa post/account không xóa ảnh → rác bucket | Xóa file storage kèm post; dọn ảnh user khi xóa account | ✅ |
 | G10 | 🟡 Quota | rag | Answer cache key chuỗi y hệt → miss nhiều, phí Gemini | Semantic cache theo embedding sim ≥ 0.95 | ⬜ |
 | G11 | 🟡 UX | community | Comment không báo chủ bài; không kiểm duyệt/báo cáo | `notifyFarmer` khi có comment + cờ báo cáo | ⬜ |
 | G12 | 🟡 UX | chat | Chỉ có 👎 (report-error), thiếu 👍 + dedup báo lỗi | Thêm phản hồi tích cực + chặn spam | ⬜ |

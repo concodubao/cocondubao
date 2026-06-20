@@ -15,6 +15,14 @@ import { supabase }  from '../services/supabase.js'
 
 const router = express.Router()
 
+// Trích path trong bucket 'images' từ public URL (để xóa file khi xóa bài/tài khoản)
+function storagePathFromUrl(url) {
+  if (!url) return null
+  const marker = '/object/public/images/'
+  const i = url.indexOf(marker)
+  return i === -1 ? null : url.slice(i + marker.length)
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 10 * 1024 * 1024 },
@@ -162,7 +170,7 @@ router.post('/posts', verifyJWT,
 // ─── DELETE /community/posts/:id ─────────────────────────────────────────────
 router.delete('/posts/:id', verifyJWT, async (req, res) => {
   const { data: post } = await supabase
-    .from('posts').select('user_id').eq('id', req.params.id).single()
+    .from('posts').select('user_id, image_url').eq('id', req.params.id).single()
 
   if (!post) return res.status(404).json({ error: 'Không tìm thấy bài đăng.' })
   if (req.user.role !== 'admin' && post.user_id !== req.user.userId) {
@@ -171,6 +179,11 @@ router.delete('/posts/:id', verifyJWT, async (req, res) => {
 
   const { error } = await supabase.from('posts').delete().eq('id', req.params.id)
   if (error) return res.status(500).json({ error: error.message })
+
+  // Xóa luôn ảnh trong storage để khỏi rác bucket (best-effort, không chặn response)
+  const path = storagePathFromUrl(post.image_url)
+  if (path) supabase.storage.from('images').remove([path]).catch(() => {})
+
   res.json({ success: true })
 })
 

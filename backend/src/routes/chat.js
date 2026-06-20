@@ -107,11 +107,15 @@ router.post('/ask', verifyJWT, async (req, res) => {
 
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
-    const { data: userMsg } = await supabase.from('messages').insert({
+    // Lưu câu hỏi của nông dân — PHẢI check lỗi: queue kỹ sư liên kết tới message
+    // này, nếu insert thất bại mà bỏ qua thì câu trả lời vẫn ghi nhưng không vào
+    // được hàng đợi → nông dân thấy "đã chuyển kỹ sư" mà thực ra không có gì.
+    const { data: userMsg, error: userMsgErr } = await supabase.from('messages').insert({
       session_id: sid,
       role:       'user',
       content:    text.trim(),
     }).select('id').single()
+    if (userMsgErr || !userMsg) throw userMsgErr || new Error('Không lưu được câu hỏi.')
 
     const answerContent = result.needEngineer
       ? 'Câu hỏi của bạn đã được chuyển cho kỹ sư nông nghiệp. Kỹ sư sẽ trả lời trong vòng 24 giờ.'
@@ -156,6 +160,13 @@ router.post('/ask', verifyJWT, async (req, res) => {
     res.status(500).json({ error: 'Cò Con đang bận, bạn thử lại sau nhé.' })
   }
 })
+
+// Câu trả lời ảnh có dấu hiệu KHÔNG CHẮC → nên để kỹ sư xem ảnh trực tiếp thay vì
+// trả lời tự tin có thể sai (đoán sai sâu bệnh = nông dân phun sai thuốc).
+function visionLooksUncertain(text) {
+  const t = (text || '').toLowerCase()
+  return /(không|chẳng|khó)\s*(chắc|rõ|xác định|nhận ra|phân biệt)|không thể xác định|cần (thêm|hỏi).*(kỹ sư|chuyên gia)|chụp.*rõ hơn|ảnh.*(mờ|không rõ|thiếu sáng)/.test(t)
+}
 
 // ─── Helper: phân tích ảnh bằng Gemini Vision ───────────────────────────────
 async function analyzeImageWithGemini(imageBuffer, question) {
@@ -233,12 +244,21 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
     // Nếu có ảnh → dùng Gemini Vision phân tích trực tiếp
     if (imageBuffer) {
       const visionAnswer = await analyzeImageWithGemini(imageBuffer, question)
-      if (visionAnswer) {
+      if (visionAnswer && !visionLooksUncertain(visionAnswer)) {
         result = {
           answer:       visionAnswer,
           confidence:   0.9,
           needEngineer: false,
           source:       'vision',
+          chunksFound:  0,
+        }
+      } else if (visionAnswer) {
+        // Vision không chắc → chuyển kỹ sư (ảnh đã upload, kỹ sư xem được)
+        result = {
+          answer:       null,
+          confidence:   0.4,
+          needEngineer: true,
+          source:       'vision_low_conf',
           chunksFound:  0,
         }
       }
@@ -255,12 +275,13 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
 
     const sid = await getOrCreateSession(userId, cropType, sessionId)
 
-    const { data: userMsg } = await supabase.from('messages').insert({
+    const { data: userMsg, error: userMsgErr } = await supabase.from('messages').insert({
       session_id: sid,
       role:       'user',
       content:    question,
       image_url:  imageUrl,
     }).select('id').single()
+    if (userMsgErr || !userMsg) throw userMsgErr || new Error('Không lưu được câu hỏi.')
 
     const answerContent = result.needEngineer
       ? 'Ảnh và câu hỏi của bạn đã được gửi cho kỹ sư. Kỹ sư sẽ xem ảnh và trả lời trong 24 giờ.'
