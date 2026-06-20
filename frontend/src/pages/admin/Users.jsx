@@ -5,7 +5,55 @@ import { adminAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../stores/toastStore'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
-import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound, Copy, Download } from 'lucide-react'
+import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound, Copy, Download, Activity } from 'lucide-react'
+
+// Modal xem hoạt động 1 nông dân (lịch sử hỏi) — để admin hỗ trợ qua điện thoại
+function ActivityModal({ user, onClose }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['user-activity', user.id],
+    queryFn:  () => adminAPI.getUserActivity(user.id).then(r => r.data),
+  })
+  return (
+    <div style={s.pinOverlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={s.actModal}>
+        <div style={s.actHead}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 16, fontWeight: 700, margin: 0, color: '#0f172a' }}>{user.name || 'Nông dân'}</p>
+            <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>
+              {user.phone || user.email}{data?.user?.village ? ` · ${data.user.village}` : ''}
+            </p>
+          </div>
+          <button onClick={onClose} aria-label="Đóng" style={s.iconBtn}><X size={20} /></button>
+        </div>
+        <div style={s.actBody}>
+          {isLoading ? (
+            <p style={{ color: '#64748b', textAlign: 'center', padding: 16 }}>Đang tải...</p>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px' }}>
+                Tổng <b>{data?.totalSessions ?? 0}</b> phiên chat · {data?.questions?.length ?? 0} câu hỏi gần đây
+              </p>
+              {(data?.questions || []).length === 0 ? (
+                <p style={{ fontSize: 13, color: '#64748b' }}>Chưa có câu hỏi nào.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {data.questions.map((q, i) => (
+                    <div key={i} style={s.actQ}>
+                      <p style={{ fontSize: 14, color: '#0f172a', margin: 0, lineHeight: 1.45 }}>{q.content}</p>
+                      <p style={{ fontSize: 11, color: '#94a3b8', margin: '3px 0 0' }}>
+                        {new Date(q.created_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const ROLE_MAP = {
   farmer:   { label: 'Nông dân',  color: '#4B230A', bg: '#fdf6f0' },
@@ -13,7 +61,7 @@ const ROLE_MAP = {
   admin:    { label: 'Admin',     color: '#8b5cf6', bg: '#f5f3ff' },
 }
 
-function UserCard({ user, onToggle, onApprove, onChangeRole, onResetPin, isSelf }) {
+function UserCard({ user, onToggle, onApprove, onChangeRole, onResetPin, onViewActivity, isSelf }) {
   const role    = ROLE_MAP[user.role] || ROLE_MAP.farmer
   const waiting = user.role === 'engineer' && !user.is_active
 
@@ -57,6 +105,11 @@ function UserCard({ user, onToggle, onApprove, onChangeRole, onResetPin, isSelf 
               <button onClick={() => onToggle(user.id, !user.is_active)}
                 style={user.is_active ? s.btnLock : s.btnUnlock}>
                 {user.is_active ? <><Lock size={13} strokeWidth={2} /> Khóa</> : <><Unlock size={13} strokeWidth={2} /> Mở khóa</>}
+              </button>
+            )}
+            {user.role === 'farmer' && (
+              <button onClick={() => onViewActivity(user)} style={s.btnActivity}>
+                <Activity size={13} strokeWidth={2} /> Hoạt động
               </button>
             )}
             {user.role === 'farmer' && user.phone && (
@@ -198,6 +251,7 @@ export default function Users() {
   const { user: me } = useAuthStore()
   const isDesktop = useIsDesktop()
   const [pinResult, setPinResult] = useState(null)
+  const [activityUser, setActivityUser] = useState(null)
   const [tab,         setTab]         = useState('farmer')
   const [search,      setSearch]      = useState('')
   const [showCreate,  setShowCreate]  = useState(false)
@@ -302,7 +356,8 @@ export default function Users() {
                 onToggle={(id, active) => updateUser.mutate({ id, updates: { is_active: active } })}
                 onApprove={id => updateUser.mutate({ id, updates: { is_active: true } })}
                 onChangeRole={(id, role) => { if (confirm(`Đổi vai trò thành ${role}?`)) updateUser.mutate({ id, updates: { role } }) }}
-                onResetPin={handleResetPin} />
+                onResetPin={handleResetPin}
+                onViewActivity={setActivityUser} />
             ))}
           </div>
         )}
@@ -319,6 +374,7 @@ export default function Users() {
       )}
 
       {pinResult && <PinResultModal data={pinResult} onClose={() => setPinResult(null)} />}
+      {activityUser && <ActivityModal user={activityUser} onClose={() => setActivityUser(null)} />}
     </div>
   )
 }
@@ -351,4 +407,9 @@ const s = {
   pinOverlay:  { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, backdropFilter: 'blur(2px)' },
   pinModal:    { background: '#fff', borderRadius: 20, padding: '24px 22px', width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 14 },
   pinBox:      { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#fff8e8', border: '1.5px dashed #fde68a', borderRadius: 14, padding: '16px', cursor: 'pointer', width: '100%' },
+  btnActivity: { padding: '7px 12px', background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', gap: 5 },
+  actModal:    { position: 'relative', background: '#fff', width: '100%', maxWidth: 480, maxHeight: '82dvh', borderRadius: 18, display: 'flex', flexDirection: 'column', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' },
+  actHead:     { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px', borderBottom: '1px solid #f1f5f9' },
+  actBody:     { flex: 1, overflowY: 'auto', padding: '14px 16px' },
+  actQ:        { background: '#fdf8f5', border: '1px solid #f0e0d0', borderRadius: 10, padding: '9px 12px' },
 }

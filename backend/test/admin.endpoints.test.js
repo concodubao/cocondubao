@@ -199,3 +199,32 @@ describe('GET /admin/users/export — xuất CSV', () => {
     expect(res.text).toContain('Nông dân')
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('GET /admin/users/:id/activity — chi tiết 1 nông dân', () => {
+  it('403 với kỹ sư', async () => {
+    const res = await request(app).get('/api/v1/admin/users/f1/activity').set(eng())
+    expect(res.status).toBe(403)
+  })
+
+  it('404 khi không tìm thấy người dùng', async () => {
+    sb.enqueue({ data: null, error: null }) // user lookup
+    const res = await request(app).get('/api/v1/admin/users/nope/activity').set(admin())
+    expect(res.status).toBe(404)
+  })
+
+  it('200 trả user + phiên + câu hỏi gần đây', async () => {
+    const now = new Date().toISOString()
+    sb.enqueue(
+      { data: { id: 'f1', name: 'Chú Ba', phone: '+84900000000', role: 'farmer' }, error: null }, // user
+      { count: 3 },                                                                                // totalSessions
+      { data: [{ id: 's1', crop_type: 'rice', status: 'active', created_at: now }], error: null }, // sessions
+      { data: [{ content: 'Lúa bị gì?', created_at: now }], error: null },                         // questions
+    )
+    const res = await request(app).get('/api/v1/admin/users/f1/activity').set(admin())
+    expect(res.status).toBe(200)
+    expect(res.body.totalSessions).toBe(3)
+    expect(res.body.questions).toHaveLength(1)
+    expect(res.body.questions[0].content).toBe('Lúa bị gì?')
+  })
+})

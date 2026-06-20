@@ -329,6 +329,43 @@ router.get('/users/export', verifyJWT, requireRole('admin'), async (req, res) =>
   res.send(csv)
 })
 
+// ── GET /admin/users/:id/activity — chi tiết 1 nông dân (để hỗ trợ qua điện thoại) ──
+router.get('/users/:id/activity', verifyJWT, requireRole('admin'), async (req, res) => {
+  const userId = req.params.id
+  try {
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, name, phone, email, village, crops, role, is_active, created_at')
+      .eq('id', userId)
+      .single()
+    if (!user) return res.status(404).json({ error: 'Không tìm thấy người dùng.' })
+
+    const [{ count: totalSessions }, { data: sessions }] = await Promise.all([
+      supabase.from('chat_sessions').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('chat_sessions').select('id, crop_type, status, created_at')
+        .eq('user_id', userId).order('created_at', { ascending: false }).limit(10),
+    ])
+
+    const sessionIds = (sessions || []).map(s => s.id)
+    let questions = []
+    if (sessionIds.length) {
+      const { data: msgs } = await supabase
+        .from('messages')
+        .select('content, created_at')
+        .in('session_id', sessionIds)
+        .eq('role', 'user')
+        .order('created_at', { ascending: false })
+        .limit(20)
+      questions = msgs || []
+    }
+
+    res.json({ user, totalSessions: totalSessions ?? 0, sessions: sessions || [], questions })
+  } catch (err) {
+    console.error('[ADMIN] user activity error:', err)
+    res.status(500).json({ error: 'Không lấy được hoạt động người dùng.' })
+  }
+})
+
 // ── PATCH /admin/users/:id ────────────────────────────────────────────────────
 router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => {
   // Chặn admin tự khóa / tự hạ vai trò chính mình (tránh tự nhốt ra khỏi hệ thống).
