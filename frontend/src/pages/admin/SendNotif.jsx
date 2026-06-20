@@ -1,9 +1,56 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { pushAPI } from '../../services/api'
+import { toast } from '../../stores/toastStore'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
-import { ChevronLeft, AlertTriangle, Tag, Cloud, Send, Clock, CheckCircle } from 'lucide-react'
+import { ChevronLeft, AlertTriangle, Tag, Cloud, Send, Clock, CheckCircle, X as XIcon } from 'lucide-react'
+
+// Danh sách thông báo đã lên lịch (chưa gửi) — admin xem & hủy
+function ScheduledList() {
+  const queryClient = useQueryClient()
+  const { data } = useQuery({
+    queryKey: ['scheduled'],
+    queryFn:  () => pushAPI.getScheduled().then(r => r.data.scheduled),
+    refetchInterval: 60_000,
+  })
+  const list = data || []
+  const cancel = useMutation({
+    mutationFn: (id) => pushAPI.cancelScheduled(id),
+    onSuccess:  () => { toast.success('Đã hủy thông báo đã lên lịch.'); queryClient.invalidateQueries({ queryKey: ['scheduled'] }) },
+    onError:    (e) => toast.error(e.response?.data?.error || 'Không hủy được. Thử lại nhé.'),
+  })
+
+  if (list.length === 0) return null
+
+  return (
+    <section style={s.section}>
+      <p style={s.sLabel}>Đã lên lịch ({list.length})</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {list.map(n => (
+          <div key={n.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: '10px 12px' }}>
+            <Clock size={15} color="#f59e0b" strokeWidth={2} style={{ marginTop: 2, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</p>
+              <p style={{ fontSize: 12, color: '#92400e', margin: '2px 0 0' }}>
+                {new Date(n.scheduled_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                {n.region ? ` · ${n.region}` : ''}
+              </p>
+            </div>
+            <button
+              onClick={() => { if (confirm('Hủy thông báo đã lên lịch này?')) cancel.mutate(n.id) }}
+              disabled={cancel.isPending}
+              aria-label="Hủy thông báo"
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color: '#ef4444', background: '#fff', border: '1px solid #fecaca', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }}
+            >
+              <XIcon size={13} strokeWidth={2.5} /> Hủy
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 const TYPE_OPTIONS = [
   { id: 'alert',     Icon: AlertTriangle, label: 'Cảnh báo dịch bệnh', desc: 'Ưu tiên cao — hiển thị nổi bật', color: '#ef4444', bg: '#fef2f2' },
@@ -56,6 +103,7 @@ export default function SendNotif() {
     onSuccess: (res) => {
       setResult(res.data)
       queryClient.invalidateQueries({ queryKey: ['notifications'] })
+      queryClient.invalidateQueries({ queryKey: ['scheduled'] })
     },
     onError: (err) => {
       setError(err.response?.data?.error || 'Gửi thất bại. Thử lại nhé.')
@@ -115,6 +163,8 @@ export default function SendNotif() {
       </header>
 
       <main style={s.main}>
+        <ScheduledList />
+
         <section style={s.section}>
           <p style={s.sLabel}>Preview</p>
           <NotifPreview type={type} title={title} body={body} />

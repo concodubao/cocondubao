@@ -57,6 +57,8 @@ export const pushAPI = {
   markRead:         (id)    => api.patch(`/push/notifications/${id}/read`),
   getSettings:      ()      => api.get('/push/notifications/settings'),
   updateSettings:   settings => api.patch('/push/notifications/settings', settings),
+  getScheduled:     ()      => api.get('/push/scheduled'),
+  cancelScheduled:  (id)    => api.delete(`/push/scheduled/${id}`),
 }
 
 export const engineerAPI = {

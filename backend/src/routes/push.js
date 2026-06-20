@@ -152,6 +152,38 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
   }
 })
 
+// GET /push/scheduled — admin xem thông báo đã lên lịch nhưng CHƯA gửi
+router.get('/scheduled', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, title, body, type, region, crop_tags, scheduled_at, created_at')
+      .not('scheduled_at', 'is', null)
+      .is('sent_at', null)
+      .order('scheduled_at', { ascending: true })
+    if (error) throw error
+    res.json({ scheduled: data || [] })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// DELETE /push/scheduled/:id — admin hủy thông báo đã lên lịch (chỉ khi chưa gửi)
+router.delete('/scheduled/:id', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const { data: notif } = await supabase
+      .from('notifications').select('id, sent_at').eq('id', req.params.id).single()
+    if (!notif) return res.status(404).json({ error: 'Không tìm thấy thông báo.' })
+    if (notif.sent_at) return res.status(400).json({ error: 'Thông báo đã gửi, không thể hủy.' })
+
+    const { error } = await supabase.from('notifications').delete().eq('id', req.params.id)
+    if (error) throw error
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ══════════════════════════════════════════════════════════════════════════════
 // NOTIFICATIONS — XEM VÀ ĐỌC
 // ══════════════════════════════════════════════════════════════════════════════
