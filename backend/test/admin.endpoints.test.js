@@ -181,3 +181,21 @@ describe('PATCH /admin/users/:id/reset-pin — chỉ cho nông dân', () => {
     expect(res.body.pin).toMatch(/^\d{6}$/)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('GET /admin/users/export — xuất CSV', () => {
+  it('403 với kỹ sư', async () => {
+    const res = await request(app).get('/api/v1/admin/users/export').set(eng())
+    expect(res.status).toBe(403)
+  })
+
+  it('200 trả CSV (có BOM + tiêu đề + dữ liệu) cho admin', async () => {
+    sb.enqueue({ data: [{ name: 'Chú Ba', phone: '+84900000000', role: 'farmer', village: 'Ấp 1', crops: ['rice'], is_active: true, created_at: new Date().toISOString() }], error: null })
+    const res = await request(app).get('/api/v1/admin/users/export').set(admin())
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toContain('text/csv')
+    expect(res.text).toContain('Tên')
+    expect(res.text).toContain('Chú Ba')
+    expect(res.text).toContain('Nông dân')
+  })
+})

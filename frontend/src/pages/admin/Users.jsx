@@ -5,7 +5,7 @@ import { adminAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { toast } from '../../stores/toastStore'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
-import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound, Copy } from 'lucide-react'
+import { ChevronLeft, MapPin, Lock, Unlock, UserCheck, UserPlus, X, KeyRound, Copy, Download } from 'lucide-react'
 
 const ROLE_MAP = {
   farmer:   { label: 'Nông dân',  color: '#4B230A', bg: '#fdf6f0' },
@@ -223,6 +223,24 @@ export default function Users() {
     if (confirm(`Đặt lại mã PIN cho ${user.name || user.phone}?\nMã PIN cũ sẽ không dùng được nữa.`)) resetPin.mutate(user.id)
   }
 
+  async function handleExport() {
+    try {
+      const res  = await adminAPI.exportUsers(tab)
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = `cocon-${tab}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Đã tải file CSV.')
+    } catch {
+      toast.error('Không xuất được. Thử lại nhé.')
+    }
+  }
+
   const users   = data || []
   const pending = users.filter(u => u.role === 'engineer' && !u.is_active).length
 
@@ -241,6 +259,12 @@ export default function Users() {
           </button>
         )}
         <h1 style={s.title}>Quản lý người dùng</h1>
+        <button onClick={handleExport} aria-label="Xuất CSV"
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px',
+                   background: '#fff', color: '#4B230A', border: '1.5px solid #f0e0d0', borderRadius: 10,
+                   cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+          <Download size={15} strokeWidth={2} /> CSV
+        </button>
         <button onClick={() => setShowCreate(true)}
           style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px',
                    background: '#4B230A', color: '#fff', border: 'none', borderRadius: 10,

@@ -100,6 +100,7 @@ export const adminAPI = {
   getAIReview:    (filter)       => api.get('/admin/ai-review', { params: filter ? { filter } : {} }),
   addKnowledgeQA: (data)         => api.post('/admin/knowledge-qa', data),
   getUsers:       (params = {}) => api.get('/admin/users', { params }),
+  exportUsers:    (role)        => api.get('/admin/users/export', { params: role ? { role } : {}, responseType: 'text' }),
   updateUser:     (id, updates) => api.patch(`/admin/users/${id}`, updates),
   resetUserPin:   (id)          => api.patch(`/admin/users/${id}/reset-pin`),
   getAIErrors: (reviewed)       => api.get('/admin/ai-errors', {

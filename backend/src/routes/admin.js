@@ -296,6 +296,39 @@ router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
   res.json({ users: data })
 })
 
+// ── GET /admin/users/export — xuất danh sách user ra CSV (báo cáo cho xã) ──────
+router.get('/users/export', verifyJWT, requireRole('admin'), async (req, res) => {
+  const { role } = req.query
+  let query = supabase
+    .from('users')
+    .select('name, phone, email, role, village, crops, is_active, created_at')
+    .order('created_at', { ascending: false })
+  if (role) query = query.eq('role', role)
+
+  const { data, error } = await query
+  if (error) return res.status(500).json({ error: error.message })
+
+  const ROLE = { farmer: 'Nông dân', engineer: 'Kỹ sư', admin: 'Admin' }
+  // Bọc trường có dấu phẩy/ngoặc kép/xuống dòng để CSV không vỡ cột
+  const esc = (v) => {
+    const s = v == null ? '' : String(v)
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const header = ['Tên', 'SĐT', 'Email', 'Vai trò', 'Ấp/Xã', 'Cây trồng', 'Trạng thái', 'Ngày tạo']
+  const rows = (data || []).map(u => [
+    u.name, u.phone, u.email, ROLE[u.role] || u.role, u.village,
+    Array.isArray(u.crops) ? u.crops.join('; ') : '',
+    u.is_active ? 'Hoạt động' : 'Khóa',
+    u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '',
+  ].map(esc).join(','))
+
+  // BOM (﻿) để Excel mở đúng tiếng Việt UTF-8
+  const csv = '﻿' + [header.join(','), ...rows].join('\n')
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+  res.setHeader('Content-Disposition', 'attachment; filename="cocon-users.csv"')
+  res.send(csv)
+})
+
 // ── PATCH /admin/users/:id ────────────────────────────────────────────────────
 router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => {
   // Chặn admin tự khóa / tự hạ vai trò chính mình (tránh tự nhốt ra khỏi hệ thống).
