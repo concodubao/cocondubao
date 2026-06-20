@@ -3,7 +3,7 @@ import { useTTS } from '../../hooks/useTTS'
 import { chatAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { useState } from 'react'
-import { ChevronLeft, Volume2, VolumeX, MessageCircle, Home } from 'lucide-react'
+import { ChevronLeft, Volume2, VolumeX, MessageCircle, Home, ThumbsUp } from 'lucide-react'
 import AnswerContent from '../../components/AnswerContent'
 
 export default function AIResult() {
@@ -16,6 +16,7 @@ export default function AIResult() {
 
   const [reported,   setReported]   = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [helpful,    setHelpful]    = useState(false)
 
   if (!answer && !engineerQueued) return <Navigate to="/chat" replace />
   if (engineerQueued) return <Navigate to="/chat/waiting" state={{ sessionId, messageId }} replace />
@@ -32,6 +33,11 @@ export default function AIResult() {
     } catch {
       alert('Không gửi được báo lỗi. Thử lại nhé.')
     }
+  }
+
+  async function handleHelpful() {
+    setHelpful(true) // phản hồi lạc quan, không chặn UI nếu mạng chậm
+    try { await chatAPI.feedback(messageId, true) } catch { /* im lặng — không phiền nông dân */ }
   }
 
   return (
@@ -88,12 +94,23 @@ export default function AIResult() {
               <Home size={18} strokeWidth={2} /> Trang chủ
             </button>
           </div>
-          {!reported ? (
-            <button onClick={() => setShowReport(true)} style={s.reportLink}>
-              Câu trả lời này chưa đúng?
-            </button>
-          ) : (
-            <p style={s.reportedText}>Cảm ơn bạn đã báo lỗi!</p>
+          {messageId && (
+            <div style={s.feedbackRow}>
+              {!helpful ? (
+                <button onClick={handleHelpful} style={s.helpfulBtn} aria-label="Câu trả lời hữu ích">
+                  <ThumbsUp size={16} strokeWidth={2} /> Hữu ích
+                </button>
+              ) : (
+                <span style={s.helpfulDone}><ThumbsUp size={15} strokeWidth={2.5} /> Cảm ơn bạn!</span>
+              )}
+              {!reported ? (
+                <button onClick={() => setShowReport(true)} style={s.reportLink}>
+                  Chưa đúng?
+                </button>
+              ) : (
+                <span style={s.reportedText}>Đã báo lỗi</span>
+              )}
+            </div>
           )}
         </div>
       </main>
@@ -134,8 +151,11 @@ const s = {
   actionRow:     { display: 'flex', gap: 10 },
   btnAsk:        { flex: 1, padding: '14px', fontSize: 16, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
   btnHome:       { flex: 1, padding: '14px', fontSize: 16, background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  feedbackRow:   { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 2 },
+  helpfulBtn:    { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#4B230A', background: '#fdf6f0', border: '1px solid #f5d5b0', borderRadius: 99, padding: '7px 16px', cursor: 'pointer' },
+  helpfulDone:   { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#4B230A' },
   reportLink:    { fontSize: 13, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', textAlign: 'center', padding: '4px 0' },
-  reportedText:  { fontSize: 13, color: '#4B230A', textAlign: 'center' },
+  reportedText:  { fontSize: 13, color: '#64748b' },
   overlay:       { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end' },
   modal:         { background: '#fff', borderRadius: '20px 20px 0 0', padding: '24px 20px 36px', width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   reportBtn:     { padding: '13px', fontSize: 16, background: '#fdf8f5', border: '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', color: '#0f172a', textAlign: 'left' },

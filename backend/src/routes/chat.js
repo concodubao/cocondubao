@@ -444,6 +444,40 @@ router.post('/report-error', verifyJWT, async (req, res) => {
   }
 })
 
+// ─── POST /chat/feedback — nông dân đánh dấu câu trả lời hữu ích (👍) ─────────
+// Tín hiệu tích cực bổ sung cho report-error (👎). Câu nhiều 👍 + confidence cao
+// về sau có thể gợi ý kỹ sư duyệt thành QA biên soạn.
+router.post('/feedback', verifyJWT, async (req, res) => {
+  const { messageId, helpful = true } = req.body
+  if (!messageId) return res.status(400).json({ error: 'Thiếu messageId.' })
+
+  try {
+    // Chỉ phản hồi trên message thuộc session của chính mình
+    const { data: msg } = await supabase
+      .from('messages')
+      .select('id, chat_sessions ( user_id )')
+      .eq('id', messageId)
+      .single()
+    if (!msg) return res.status(404).json({ error: 'Không tìm thấy câu trả lời.' })
+    if (msg.chat_sessions?.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'Không có quyền phản hồi tin nhắn này.' })
+    }
+
+    // upsert → đổi được phản hồi, 1 nông dân 1 lần / 1 câu (unique message_id,user_id)
+    const { error } = await supabase.from('answer_feedback').upsert({
+      message_id: messageId,
+      user_id:    req.user.userId,
+      helpful:    helpful !== false,
+    }, { onConflict: 'message_id,user_id' })
+    if (error) throw error
+
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[CHAT] /feedback error:', err.message)
+    res.status(500).json({ error: 'Không gửi được phản hồi.' })
+  }
+})
+
 // ─── GET /chat/sessions/:userId — lịch sử phiên chat ─────────────────────────
 router.get('/sessions/:userId', verifyJWT, async (req, res) => {
   const targetId = req.params.userId

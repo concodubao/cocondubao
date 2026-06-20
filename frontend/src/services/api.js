@@ -48,6 +48,7 @@ export const chatAPI = {
   getMessages:  sessionId  => api.get(`/chat/messages/${sessionId}`),
   reportError:  data       => api.post('/chat/report-error', data),
   escalate:     messageId  => api.post('/chat/escalate', { messageId }),
+  feedback:     (messageId, helpful = true) => api.post('/chat/feedback', { messageId, helpful }),
 }
 
 export const pushAPI = {
