@@ -209,6 +209,27 @@ describe('GET /engineer/queue/:id — lấy 1 câu hỏi (deep-link Answer page)
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+describe('GET /docs/:id — xem nội dung tài liệu trước khi duyệt', () => {
+  it('chặn nông dân (403)', async () => {
+    const res = await request(app).get('/api/v1/engineer/docs/d1').set(auth(farmerToken()))
+    expect(res.status).toBe(403)
+  })
+
+  it('404 khi không tìm thấy', async () => {
+    sb.enqueue({ data: null, error: { message: 'not found' } })
+    const res = await request(app).get('/api/v1/engineer/docs/nope').set(auth(engToken()))
+    expect(res.status).toBe(404)
+  })
+
+  it('200 trả tài liệu kèm content', async () => {
+    sb.enqueue({ data: { id: 'd1', title: 'Bệnh đạo ôn', status: 'draft', content: 'Nội dung tài liệu...' }, error: null })
+    const res = await request(app).get('/api/v1/engineer/docs/d1').set(auth(engToken()))
+    expect(res.status).toBe(200)
+    expect(res.body.doc.content).toContain('Nội dung')
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
 describe('PATCH /engineer/queue/:id/answer — sửa câu đã trả lời = ghi đè', () => {
   it('ghi đè message engineer cũ thay vì tạo trùng (updated=true)', async () => {
     sb.enqueue(

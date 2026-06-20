@@ -471,6 +471,18 @@ router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res
   res.json({ docs })
 })
 
+// GET /docs/:id — nội dung đầy đủ 1 tài liệu (để xem trước khi duyệt)
+router.get('/docs/:id', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+  const { data, error } = await supabase
+    .from('knowledge_docs')
+    .select('id, title, source, crop_tags, status, content, created_at, updated_at')
+    .eq('id', req.params.id)
+    .single()
+
+  if (error || !data) return res.status(404).json({ error: 'Không tìm thấy tài liệu.' })
+  res.json({ doc: data })
+})
+
 // PATCH /:id/approve — duyệt + embed nền
 router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { id } = req.params

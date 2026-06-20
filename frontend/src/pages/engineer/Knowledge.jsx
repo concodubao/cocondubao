@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { engineerAPI } from '../../services/api'
 import { toast } from '../../stores/toastStore'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
-import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive, Trash2, Search, AlertCircle } from 'lucide-react'
+import { ChevronLeft, Upload, FolderOpen, FileText, Check, Archive, Trash2, Search, AlertCircle, Eye, X } from 'lucide-react'
 
 const CROP_OPTIONS = [
   { id: 'rice',   label: 'Lúa' },
@@ -97,7 +97,7 @@ function UploadForm({ onSuccess }) {
   )
 }
 
-function DocCard({ doc, onApprove, onArchive, onDelete, approving, deleting }) {
+function DocCard({ doc, onApprove, onArchive, onDelete, onPreview, approving, deleting }) {
   const isApproving = approving === doc.id
   const isDeleting  = deleting  === doc.id
   const canDelete   = doc.status === 'draft' || doc.status === 'embedding'
@@ -128,6 +128,9 @@ function DocCard({ doc, onApprove, onArchive, onDelete, approving, deleting }) {
         {doc.chunkCount > 0 && <span style={{ ...styles.tag, background: '#eff6ff', color: '#3b82f6' }}>{doc.chunkCount} chunks</span>}
       </div>
       <div style={styles.docActions}>
+        <button onClick={() => onPreview(doc.id)} style={styles.btnView} aria-label="Xem nội dung">
+          <Eye size={13} strokeWidth={2} /> Xem
+        </button>
         {doc.status === 'draft' && (
           <button onClick={() => onApprove(doc.id)} disabled={isApproving}
             style={{ ...styles.btnApprove, opacity: isApproving ? 0.7 : 1 }}>
@@ -157,10 +160,45 @@ function DocCard({ doc, onApprove, onArchive, onDelete, approving, deleting }) {
   )
 }
 
+// Modal xem nội dung đầy đủ tài liệu (đọc trước khi Duyệt)
+function DocPreviewModal({ id, onClose, onApprove, approving }) {
+  const { data: doc, isLoading } = useQuery({
+    queryKey: ['doc', id],
+    queryFn:  () => engineerAPI.getDoc(id).then(r => r.data.doc),
+  })
+  return (
+    <div style={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={styles.previewModal}>
+        <div style={styles.previewHead}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', margin: 0 }}>{doc?.title || 'Đang tải...'}</p>
+            {doc?.source && <p style={{ fontSize: 12, color: '#64748b', margin: '2px 0 0' }}>{doc.source}</p>}
+          </div>
+          <button onClick={onClose} aria-label="Đóng" style={styles.iconBtn}><X size={20} /></button>
+        </div>
+        <div style={styles.previewBody}>
+          {isLoading
+            ? <p style={{ color: '#64748b', textAlign: 'center', padding: 20 }}>Đang tải nội dung...</p>
+            : <pre style={styles.previewText}>{doc?.content || '(Tài liệu không có nội dung)'}</pre>}
+        </div>
+        {doc?.status === 'draft' && (
+          <div style={styles.previewFoot}>
+            <button onClick={() => { onApprove(doc.id); onClose() }} disabled={approving}
+              style={{ ...styles.btnApprove, justifyContent: 'center', padding: '11px', opacity: approving ? 0.7 : 1 }}>
+              <Check size={14} strokeWidth={2.5} /> Duyệt & Embed vào RAG
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Knowledge() {
   const navigate    = useNavigate()
   const queryClient = useQueryClient()
   const isDesktop   = useIsDesktop()
+  const [previewId,  setPreviewId]  = useState(null)
   const [filter,     setFilter]     = useState('all')
   const [search,     setSearch]     = useState('')
   const [approving,  setApproving]  = useState(null)
@@ -315,6 +353,7 @@ export default function Knowledge() {
                 onApprove={handleApprove}
                 onArchive={handleArchive}
                 onDelete={handleDelete}
+                onPreview={setPreviewId}
                 approving={approving}
                 deleting={deleting}
               />
@@ -322,6 +361,15 @@ export default function Knowledge() {
           </div>
         )}
       </main>
+
+      {previewId && (
+        <DocPreviewModal
+          id={previewId}
+          onClose={() => setPreviewId(null)}
+          onApprove={handleApprove}
+          approving={approving === previewId}
+        />
+      )}
     </div>
   )
 }
@@ -358,4 +406,11 @@ const styles = {
   searchBox:      { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '8px 12px', marginBottom: 2 },
   searchInput:    { flex: 1, border: 'none', outline: 'none', fontSize: 14, color: '#0f172a', background: 'transparent', fontFamily: "'Noto Sans', sans-serif" },
   errorBanner:    { display: 'flex', alignItems: 'flex-start', gap: 6, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '8px 10px', color: '#dc2626', fontSize: 12, lineHeight: 1.5 },
+  btnView:        { display: 'flex', alignItems: 'center', gap: 4, padding: '7px 12px', fontSize: 13, fontWeight: 600, background: '#fdf8f5', color: '#4B230A', border: '1px solid #f0e0d0', borderRadius: 8, cursor: 'pointer' },
+  overlay:        { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  previewModal:   { background: '#fff', width: '100%', maxWidth: 640, maxHeight: '86dvh', borderRadius: 18, display: 'flex', flexDirection: 'column', boxShadow: '0 12px 40px rgba(0,0,0,0.22)' },
+  previewHead:    { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '14px 16px', borderBottom: '1px solid #f1f5f9' },
+  previewBody:    { flex: 1, overflowY: 'auto', padding: '14px 16px' },
+  previewText:    { margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: "'Noto Sans', sans-serif", fontSize: 14, lineHeight: 1.6, color: '#0f172a' },
+  previewFoot:    { padding: '12px 16px', borderTop: '1px solid #f1f5f9' },
 }
