@@ -129,6 +129,20 @@ export default function PostDetail() {
     deleteCommentMutation.mutate(commentId)
   }
 
+  function handleReportPost() {
+    if (!confirm('Báo cáo bài này cho quản trị viên?')) return
+    communityAPI.reportPost(id)
+      .then(() => toast.success('Đã gửi báo cáo. Cảm ơn bạn!'))
+      .catch(() => toast.error('Không gửi được báo cáo.'))
+  }
+
+  function handleReportComment(commentId) {
+    if (!confirm('Báo cáo bình luận này cho quản trị viên?')) return
+    communityAPI.reportComment(commentId)
+      .then(() => toast.success('Đã gửi báo cáo. Cảm ơn bạn!'))
+      .catch(() => toast.error('Không gửi được báo cáo.'))
+  }
+
   const badge = ROLE_BADGE[post?.users?.role]
 
   return (
@@ -168,6 +182,12 @@ export default function PostDetail() {
                   {post.users?.village && `${post.users.village} · `}{timeAgo(post.created_at)}
                 </div>
               </div>
+              {post.users?.id !== user?.id && (
+                <button onClick={handleReportPost} aria-label="Báo cáo bài đăng"
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-[#94a3b8]">
+                  <span className="material-symbols-outlined text-[20px]">flag</span>
+                </button>
+              )}
             </div>
 
             {/* Content */}
@@ -249,10 +269,15 @@ export default function PostDetail() {
                   </div>
                   <div className="flex items-center gap-3 mt-1 pl-1">
                     <span className="text-[11px] text-[#64748b]">{timeAgo(c.created_at)}</span>
-                    {isOwn && (
+                    {isOwn ? (
                       <button onClick={() => handleDeleteComment(c.id)}
                         className="text-[11px] text-[#ef4444] font-semibold">
                         Xóa
+                      </button>
+                    ) : (
+                      <button onClick={() => handleReportComment(c.id)}
+                        className="text-[11px] text-[#94a3b8] font-semibold">
+                        Báo cáo
                       </button>
                     )}
                   </div>

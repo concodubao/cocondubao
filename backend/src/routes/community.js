@@ -10,7 +10,7 @@
 import express from 'express'
 import multer  from 'multer'
 import sharp   from 'sharp'
-import { verifyJWT } from '../middleware/auth.js'
+import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase }  from '../services/supabase.js'
 import { notifyFarmer } from '../services/webpush.js'
 
@@ -185,8 +185,35 @@ router.delete('/posts/:id', verifyJWT, async (req, res) => {
   const path = storagePathFromUrl(post.image_url)
   if (path) supabase.storage.from('images').remove([path]).catch(() => {})
 
+  // Dọn báo cáo liên quan (target polymorphic, không có FK tự cascade)
+  supabase.from('content_reports').delete()
+    .eq('target_type', 'post').eq('target_id', req.params.id).then(() => {}, () => {})
+
   res.json({ success: true })
 })
+
+// ─── POST /community/posts/:id/report — báo cáo bài xấu ──────────────────────
+// ─── POST /community/comments/:id/report — báo cáo bình luận xấu ─────────────
+async function createReport(targetType, req, res) {
+  const targetId = req.params.id
+  const { reason } = req.body
+  const table = targetType === 'post' ? 'posts' : 'comments'
+
+  const { data: target } = await supabase.from(table).select('id').eq('id', targetId).single()
+  if (!target) return res.status(404).json({ error: 'Không tìm thấy nội dung.' })
+
+  const { error } = await supabase.from('content_reports').insert({
+    target_type: targetType,
+    target_id:   targetId,
+    reporter_id: req.user.userId,
+    reason:      reason?.trim()?.slice(0, 300) || null,
+  })
+  // 23505 = trùng unique → đã báo cáo rồi, coi như thành công (idempotent)
+  if (error && error.code !== '23505') return res.status(500).json({ error: error.message })
+  res.json({ success: true, already: error?.code === '23505' })
+}
+router.post('/posts/:id/report',    verifyJWT, (req, res) => createReport('post', req, res))
+router.post('/comments/:id/report', verifyJWT, (req, res) => createReport('comment', req, res))
 
 // ─── POST /community/posts/:id/like — toggle like ─────────────────────────────
 router.post('/posts/:id/like', verifyJWT, async (req, res) => {
@@ -268,6 +295,76 @@ router.delete('/comments/:id', verifyJWT, async (req, res) => {
   }
 
   const { error } = await supabase.from('comments').delete().eq('id', req.params.id)
+  if (error) return res.status(500).json({ error: error.message })
+
+  // Dọn báo cáo liên quan tới bình luận này
+  supabase.from('content_reports').delete()
+    .eq('target_type', 'comment').eq('target_id', req.params.id).then(() => {}, () => {})
+
+  res.json({ success: true })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ADMIN — DUYỆT BÁO CÁO
+// ══════════════════════════════════════════════════════════════════════════════
+
+// GET /community/reports — danh sách nội dung bị báo cáo (gộp theo nội dung, kèm preview)
+router.get('/reports', verifyJWT, requireRole('admin'), async (req, res) => {
+  try {
+    const { data: reports } = await supabase
+      .from('content_reports')
+      .select('target_type, target_id, reason, created_at')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+
+    // Gộp nhiều báo cáo về cùng 1 nội dung
+    const map = {}
+    for (const r of reports || []) {
+      const k = `${r.target_type}:${r.target_id}`
+      if (!map[k]) map[k] = { target_type: r.target_type, target_id: r.target_id, count: 0, reasons: [], firstAt: r.created_at }
+      map[k].count++
+      if (r.reason) map[k].reasons.push(r.reason)
+    }
+
+    const items   = Object.values(map)
+    const postIds = items.filter(x => x.target_type === 'post').map(x => x.target_id)
+    const cmtIds  = items.filter(x => x.target_type === 'comment').map(x => x.target_id)
+
+    const [{ data: posts }, { data: comments }] = await Promise.all([
+      postIds.length ? supabase.from('posts').select('id, content, image_url, users!posts_user_id_fkey ( name )').in('id', postIds)
+                     : Promise.resolve({ data: [] }),
+      cmtIds.length  ? supabase.from('comments').select('id, content, post_id, users!comments_user_id_fkey ( name )').in('id', cmtIds)
+                     : Promise.resolve({ data: [] }),
+    ])
+    const pMap = Object.fromEntries((posts || []).map(p => [p.id, p]))
+    const cMap = Object.fromEntries((comments || []).map(c => [c.id, c]))
+
+    const result = items.map(x => {
+      const src = x.target_type === 'post' ? pMap[x.target_id] : cMap[x.target_id]
+      return {
+        ...x,
+        content: src?.content ?? null,
+        author:  src?.users?.name ?? null,
+        postId:  x.target_type === 'post' ? x.target_id : src?.post_id ?? null,
+        deleted: !src, // nội dung đã bị xoá nhưng báo cáo còn → admin có thể bỏ qua
+      }
+    }).sort((a, b) => b.count - a.count)
+
+    res.json({ reports: result })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// PATCH /community/reports/dismiss — admin bỏ qua báo cáo (giữ nội dung)
+router.patch('/reports/dismiss', verifyJWT, requireRole('admin'), async (req, res) => {
+  const { targetType, targetId } = req.body
+  if (!['post', 'comment'].includes(targetType) || !targetId) {
+    return res.status(400).json({ error: 'Thiếu hoặc sai tham số.' })
+  }
+  const { error } = await supabase.from('content_reports')
+    .update({ status: 'dismissed', reviewed_by: req.user.userId, reviewed_at: new Date().toISOString() })
+    .eq('target_type', targetType).eq('target_id', targetId).eq('status', 'pending')
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })

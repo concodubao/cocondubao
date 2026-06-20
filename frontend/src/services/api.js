@@ -98,6 +98,10 @@ export const communityAPI = {
   getComments:    (id)           => api.get(`/community/posts/${id}/comments`),
   addComment:     (id, content)  => api.post(`/community/posts/${id}/comments`, { content }),
   deleteComment:  (id)           => api.delete(`/community/comments/${id}`),
+  reportPost:     (id, reason)   => api.post(`/community/posts/${id}/report`, { reason }),
+  reportComment:  (id, reason)   => api.post(`/community/comments/${id}/report`, { reason }),
+  getReports:     ()            => api.get('/community/reports'),
+  dismissReport:  (targetType, targetId) => api.patch('/community/reports/dismiss', { targetType, targetId }),
 }
 
 export const adminAPI = {

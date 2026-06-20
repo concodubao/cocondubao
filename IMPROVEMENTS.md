@@ -15,8 +15,8 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 | G8 | 🟠 Bảo mật | auth | `request-otp` lộ tồn tại số + vai trò (enumeration) | Bỏ `existingRole` + `isExistingUser` khỏi response | ✅ |
 | G9 | 🟠 Hạ tầng | storage | Xóa post/account không xóa ảnh → rác bucket | Xóa file storage kèm post; dọn ảnh user khi xóa account | ✅ |
 | G10 | 🟡 Quota | rag | Answer cache key chuỗi y hệt → miss nhiều, phí Gemini | Semantic cache theo embedding cosine ≥ 0.95 | ✅ |
-| G11 | 🟡 UX | community | Comment không báo chủ bài | `notifyFarmer` khi có comment (mở đúng bài). Kiểm duyệt/báo cáo: ⏳ cần migration | 🔶 |
-| G12 | 🟡 UX | chat | Chỉ có 👎 (report-error), thiếu 👍 + dedup báo lỗi | Dedup báo lỗi (idempotent). 👍 phản hồi tích cực: ⏳ cần bảng mới | 🔶 |
+| G11 | 🟡 UX | community | Comment không báo chủ bài + không kiểm duyệt | notify comment + báo cáo post/comment + trang admin duyệt (bảng `content_reports`) | ✅ |
+| G12 | 🟡 UX | chat | Chỉ có 👎 (report-error), thiếu 👍 + dedup báo lỗi | Dedup báo lỗi + nút 👍 (bảng `answer_feedback`) | ✅ |
 | G13 | 🟡 UX | engineer/admin | Hứa "trả lời trong 24h" nhưng không theo dõi quá hạn | ĐÃ CÓ SẴN: `overdueQueue` + StatCard "Chờ quá hạn 24h" | ✅ |
 | G14 | 🟡 Bảo mật | rate-limit | Chat 15/phút theo IP → cả xã chung NAT bị chặn nhầm | Key theo `userId` (JWT) + `ipKeyGenerator` fallback | ✅ |
 | G15 | 🟢 DX | repo | `knowledge.js` stub chết; không CI; không Sentry | Xóa stub + CI (vitest/lint/build) + fix eslint SW globals. Sentry: ⏳ cần DSN | 🔶 |
@@ -29,7 +29,13 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 - **Đợt 3** (trải nghiệm & quota): G4 → G10 → G11 → G12 → G13 → G14
 - **Đợt 4** (DX & mở rộng): G15 → G16
 
-## Follow-up cần migration DB (psql 17, hỏi user trước khi áp prod)
+## Đã làm xong (migration đã áp prod 2026-06-21)
 
-- **G11b** — Kiểm duyệt cộng đồng: bảng `post_reports`/`comment_reports` (hoặc cờ `reported`+`report_count`), endpoint báo cáo, hàng đợi duyệt cho admin.
-- **G12b** — Phản hồi tích cực 👍: bảng `answer_feedback` (message_id, user_id, helpful) + nút ở `AIResult.jsx`; câu nhiều 👍 + confidence cao → gợi ý kỹ sư duyệt thành curated QA.
+- **G11b** ✅ — `content_reports` (báo cáo post/comment, polymorphic, unique chống spam). Endpoint báo cáo + dọn khi xoá + trang admin `/admin/community-reports`.
+- **G12b** ✅ — `answer_feedback` (👍). Endpoint `POST /chat/feedback` + nút "Hữu ích" ở AIResult.
+
+## Follow-up còn lại
+
+- **Sentry** (G15): cần DSN của user (tạo project Node ở sentry.io) → wire vào backend.
+- **G12b mở rộng** (tuỳ chọn): trang admin xem câu nhiều 👍 + confidence cao → gợi ý kỹ sư duyệt thành curated QA.
+- **G11b mở rộng** (tuỳ chọn): nút báo cáo ở feed Community (hiện mới có ở PostDetail).

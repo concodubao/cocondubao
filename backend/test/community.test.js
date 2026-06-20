@@ -79,3 +79,56 @@ describe('GET /community/posts/:id — lấy 1 bài (deep-link / F5)', () => {
     expect(res.body.post.likedByMe).toBe(false)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('POST /community/posts/:id/report — báo cáo nội dung', () => {
+  it('200 khi báo cáo bài tồn tại', async () => {
+    sb.enqueue(
+      { data: { id: 'p1' }, error: null }, // select target
+      { error: null },                      // insert content_reports
+    )
+    const res = await request(app).post('/api/v1/community/posts/p1/report')
+      .send({ reason: 'spam' }).set(auth(tok('f1')))
+    expect(res.status).toBe(200)
+    expect(res.body.already).toBeFalsy()
+  })
+
+  it('idempotent khi đã báo cáo (unique 23505) → already', async () => {
+    sb.enqueue(
+      { data: { id: 'p1' }, error: null },
+      { error: { code: '23505' } },
+    )
+    const res = await request(app).post('/api/v1/community/posts/p1/report')
+      .send({}).set(auth(tok('f1')))
+    expect(res.status).toBe(200)
+    expect(res.body.already).toBe(true)
+  })
+
+  it('404 khi nội dung không tồn tại', async () => {
+    sb.enqueue({ data: null, error: null })
+    const res = await request(app).post('/api/v1/community/comments/c9/report')
+      .send({}).set(auth(tok('f1')))
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('PATCH /community/reports/dismiss — admin bỏ qua', () => {
+  it('403 với nông dân', async () => {
+    const res = await request(app).patch('/api/v1/community/reports/dismiss')
+      .send({ targetType: 'post', targetId: 'p1' }).set(auth(tok('f1', 'farmer')))
+    expect(res.status).toBe(403)
+  })
+
+  it('200 với admin', async () => {
+    sb.enqueue({ error: null })
+    const res = await request(app).patch('/api/v1/community/reports/dismiss')
+      .send({ targetType: 'post', targetId: 'p1' }).set(auth(tok('a1', 'admin')))
+    expect(res.status).toBe(200)
+  })
+
+  it('400 khi thiếu tham số', async () => {
+    const res = await request(app).patch('/api/v1/community/reports/dismiss')
+      .send({ targetType: 'invalid' }).set(auth(tok('a1', 'admin')))
+    expect(res.status).toBe(400)
+  })
+})
