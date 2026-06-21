@@ -39,3 +39,23 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 - **Sentry** (G15): cần DSN của user (tạo project Node ở sentry.io) → wire vào backend.
 - **G12b mở rộng** (tuỳ chọn): trang admin xem câu nhiều 👍 + confidence cao → gợi ý kỹ sư duyệt thành curated QA.
 - **G11b mở rộng** (tuỳ chọn): nút báo cáo ở feed Community (hiện mới có ở PostDetail).
+
+## Đợt rà soát 2026-06-22 (luồng kỹ sư + cài đặt thông báo)
+
+Rà toàn bộ backend + các trang frontend chính. Đã sửa & push (`de2c543..0a8e265`).
+
+| ID | Mức | Khu vực | Vấn đề | Hướng sửa | TT |
+|----|-----|---------|--------|-----------|----|
+| G17 | 🟠 UX | engineer/admin | Câu hỏi chuyển kỹ sư không rõ ai nhận (pool chung, UI chỉ ghi "kỹ sư khác") | Join `assigned_to→users`, hiện tên KS ở thẻ queue + dashboard admin | ✅ |
+| G18 | 🔴 Bug | push settings | Lưu cài đặt thông báo khi chưa bật push → trúng 0 dòng nhưng vẫn báo "đã lưu" (mất sạch). Quiet-hours hứa "gửi sau" nhưng thực ra rớt | Trả cờ `noSubscription` + UI báo rõ; sửa text quiet-hours đúng thực tế | ✅ |
+| G19 | 🟠 UX | notifications | Nông dân chưa chọn cây bị giấu cảnh báo gắn cây (vd sâu bệnh lúa) | Chưa chọn cây = xem tất cả; đã chọn = lọc như cũ | ✅ |
+| G20 | 🟠 Logic | weatherAlerts | Draft cảnh báo đông cứng ngày (dedup `wx:<kind>`) → admin duyệt muộn gửi sai ngày | Dedup gồm ngày (`wx:kind:date`) + dọn draft đã qua ngày | ✅ |
+| G21 | 🟠 UX | engineer queue | Xóa câu hỏi khỏi hàng đợi → nông dân chờ vô vọng 24h, không được báo | Chèn system message + push báo nông dân hỏi lại | ✅ |
+| G22 | 🟡 UX | chat/AIResult | Badge tin cậy chỉ hiện với `source==='rag'` (bỏ qa_direct/vision/bản cache); qa_direct bị disclaimer thừa | Chuẩn hoá baseSource, hiện tin cậy mọi nguồn AI, qa_direct = "Kỹ sư biên soạn" | ✅ |
+
+### Tồn đọng từ rà soát frontend (chưa sửa)
+
+- **G23** ⬜ 🟠 — `SendNotif`: ô "Gửi đến ai? (vùng/ấp)" KHÔNG lọc thật — `dispatchNotification` bỏ qua `region`; admin gõ vùng tưởng nhắm vùng nhưng gửi cho **tất cả**. Cũng thiếu UI chọn `crop_tags` (backend hỗ trợ). → cần làm region/crop lọc thật hoặc bỏ ô gây hiểu nhầm.
+- **G24** ⬜ 🟠 — `NotifDetail` vỡ khi F5 / mở deep-link (phụ thuộc hoàn toàn `location.state`, không có API lấy 1 thông báo theo id như PostDetail/Answer đã có).
+- **Nhỏ** ⬜ — `Profile`: lần đầu **đặt** mật khẩu hiện toast "Đổi mật khẩu thành công" thay vì "Đặt".
+- **OTP** — mọi vấn đề liên quan để mở rộng sau (Twilio không hỗ trợ tốt ở VN, sẽ đổi provider).
