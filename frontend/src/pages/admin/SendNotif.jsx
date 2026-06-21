@@ -34,7 +34,6 @@ function ScheduledList() {
               <p style={{ fontSize: 14, fontWeight: 600, color: '#0f172a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title}</p>
               <p style={{ fontSize: 12, color: '#92400e', margin: '2px 0 0' }}>
                 {new Date(n.scheduled_at).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                {n.region ? ` · ${n.region}` : ''}
               </p>
             </div>
             <button
@@ -148,7 +147,6 @@ export default function SendNotif() {
   const [title,      setTitle]      = useState('')
   const [body,       setBody]       = useState('')
   const [imageUrl,   setImageUrl]   = useState('')
-  const [region,     setRegion]     = useState('')
   const [scheduleAt, setScheduleAt] = useState('')
   const [result,     setResult]     = useState(null)
   const [error,      setError]      = useState('')
@@ -174,7 +172,6 @@ export default function SendNotif() {
       body:       body.trim(),
       type,
       imageUrl:   imageUrl.trim() || undefined,
-      region:     region.trim() || undefined,
       scheduleAt: scheduleAt || undefined,
     })
   }
@@ -260,14 +257,6 @@ export default function SendNotif() {
           <input type="url" placeholder="Link ảnh minh họa (không bắt buộc)" value={imageUrl}
             onChange={e => setImageUrl(e.target.value)}
             style={s.input} aria-label="URL ảnh minh họa" />
-        </section>
-
-        <section style={s.section}>
-          <p style={s.sLabel}>Gửi đến ai?</p>
-          <p style={s.sDesc}>Để trống = gửi tất cả nông dân</p>
-          <input type="text" placeholder="Vùng / ấp (ví dụ: Trường Khánh)" value={region}
-            onChange={e => setRegion(e.target.value)}
-            style={s.input} aria-label="Lọc theo vùng" />
         </section>
 
         <section style={s.section}>

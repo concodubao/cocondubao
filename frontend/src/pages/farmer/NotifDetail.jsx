@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
 import { pushAPI } from '../../services/api'
 import { ChevronLeft, MessageCircle, AlertTriangle, Tag, Cloud } from 'lucide-react'
@@ -11,23 +12,40 @@ const TYPE_CONFIG = {
 }
 
 export default function NotifDetail() {
-  const navigate = useNavigate()
-  const { id }   = useParams()
-  const location = useLocation()
-  const { user } = useAuthStore()
-  const notif    = location.state?.notif
+  const navigate   = useNavigate()
+  const { id }     = useParams()
+  const location   = useLocation()
+  const { user }   = useAuthStore()
+  const stateNotif = location.state?.notif
+
+  // F5 / mở deep-link / mở từ push: không có state → lấy từ danh sách thông báo
+  // của user rồi tìm theo id. Trước đây thiếu cái này nên refresh trang chi tiết
+  // là "không tìm thấy" (giống cách Answer/PostDetail đã được vá deep-link).
+  const { data: fetchedNotif, isLoading } = useQuery({
+    queryKey:  ['notif-detail', id, user?.id],
+    queryFn:   () => pushAPI.getNotifications(user.id)
+      .then(r => (r.data.notifications || []).find(n => String(n.id) === String(id)) || null),
+    enabled:   !stateNotif && !!user?.id,
+    staleTime: 30_000,
+  })
+
+  const notif = stateNotif || fetchedNotif
 
   useEffect(() => {
     if (notif && !notif.is_read && user?.id) {
       pushAPI.markRead(id, user.id).catch(() => {})
     }
-  }, [id])
+  }, [id, notif, user?.id])
 
   if (!notif) {
     return (
       <div style={{ padding: 32, textAlign: 'center' }}>
-        <p style={{ color: '#64748b' }}>Không tìm thấy thông báo.</p>
-        <button onClick={() => navigate('/notifications')} style={styles.backBtn}>← Quay lại</button>
+        <p style={{ color: '#64748b' }}>
+          {isLoading ? 'Đang tải thông báo...' : 'Không tìm thấy thông báo.'}
+        </p>
+        {!isLoading && (
+          <button onClick={() => navigate('/notifications')} style={styles.backBtn}>← Quay lại</button>
+        )}
       </div>
     )
   }
