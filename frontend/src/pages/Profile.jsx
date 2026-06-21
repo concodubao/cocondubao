@@ -218,6 +218,11 @@ export default function Profile() {
       {/* ── Form ──────────────────────────────────────────────── */}
       <main className="flex-1 flex flex-col gap-5 px-5 pb-8">
 
+        {/* ── Nhóm: Thông tin của bạn ── */}
+        {!isOnboard && (
+          <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider px-1 -mb-1">Thông tin của bạn</p>
+        )}
+
         {/* Identity card */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#f0e0d0] flex flex-col gap-5">
 
@@ -303,55 +308,12 @@ export default function Profile() {
           className="w-full h-[60px] rounded-full bg-[#4B230A] text-white text-[17px] font-bold
                      shadow-[0_4px_16px_rgba(75,35,10,0.3)] disabled:opacity-60 transition-opacity"
         >
-          {loading ? 'Đang lưu...' : isOnboard ? 'Bắt đầu dùng Cò Con →' : 'Lưu hồ sơ'}
+          {loading ? 'Đang lưu...' : isOnboard ? 'Bắt đầu dùng Cò Con →' : 'Lưu thông tin'}
         </button>
 
-        {/* Info rows */}
-        <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm divide-y divide-[#f0e0d0]">
-          <div className="flex items-center justify-between px-5 py-4">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">phone</span>
-              <span className="text-[14px] text-[#7a6358]">Số điện thoại</span>
-            </div>
-            <span className="text-[15px] font-semibold text-[#0b1c30]">{user?.phone || '—'}</span>
-          </div>
-          <div className="flex items-center justify-between px-5 py-4">
-            <div className="flex items-center gap-3">
-              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">badge</span>
-              <span className="text-[14px] text-[#7a6358]">Vai trò</span>
-            </div>
-            <span className="text-[15px] font-semibold text-[#0b1c30]">
-              {ROLE_LABELS[user?.role] || user?.role}
-            </span>
-          </div>
-        </div>
-
-        {/* Bảo mật */}
+        {/* ── Nhóm: Tuỳ chọn ── */}
         {!isOnboard && (
-          <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm">
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#f1f5f9]">
-              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">lock</span>
-              <span className="text-[14px] font-semibold text-[#0b1c30] flex-1">Bảo mật</span>
-            </div>
-            <button
-              onClick={() => { setPwSuccess(false); setPasswordModal(user?.hasPassword ? 'change' : 'set') }}
-              className="w-full flex items-center justify-between px-5 py-4 active:bg-[#fdf8f5] transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <span className="material-symbols-outlined text-[20px] text-[#7a6358]">key</span>
-                <span className="text-[14px] text-[#0b1c30]">
-                  {user?.hasPassword ? 'Đổi mật khẩu' : 'Đặt mật khẩu'}
-                </span>
-              </div>
-              <span className="material-symbols-outlined text-[18px] text-[#c4a898]">chevron_right</span>
-            </button>
-          </div>
-        )}
-
-        {pwSuccess && (
-          <p className="text-[13px] text-[#2e1505] bg-[#fdf6f0] border border-[#f5d5b0] px-4 py-3 rounded-2xl text-center">
-            ✓ {passwordModal === 'set' || !user?.hasPassword ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
-          </p>
+          <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider px-1 mt-1">Tuỳ chọn</p>
         )}
 
         {/* Cỡ chữ hiển thị — cho bà con lớn tuổi dễ đọc */}
@@ -405,6 +367,59 @@ export default function Profile() {
               <span className="material-symbols-outlined text-[18px] text-[#c4a898]">chevron_right</span>
             </button>
           </div>
+        )}
+
+        {/* ── Nhóm: Tài khoản ── */}
+        {!isOnboard && (
+          <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider px-1 mt-1">Tài khoản</p>
+        )}
+
+        {/* Số điện thoại + vai trò */}
+        <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm divide-y divide-[#f0e0d0]">
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">phone</span>
+              <span className="text-[14px] text-[#7a6358]">Số điện thoại</span>
+            </div>
+            <span className="text-[15px] font-semibold text-[#0b1c30]">{user?.phone || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between px-5 py-4">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">badge</span>
+              <span className="text-[14px] text-[#7a6358]">Vai trò</span>
+            </div>
+            <span className="text-[15px] font-semibold text-[#0b1c30]">
+              {ROLE_LABELS[user?.role] || user?.role}
+            </span>
+          </div>
+        </div>
+
+        {/* Bảo mật */}
+        {!isOnboard && (
+          <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#f1f5f9]">
+              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">lock</span>
+              <span className="text-[14px] font-semibold text-[#0b1c30] flex-1">Bảo mật</span>
+            </div>
+            <button
+              onClick={() => { setPwSuccess(false); setPasswordModal(user?.hasPassword ? 'change' : 'set') }}
+              className="w-full flex items-center justify-between px-5 py-4 active:bg-[#fdf8f5] transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[20px] text-[#7a6358]">key</span>
+                <span className="text-[14px] text-[#0b1c30]">
+                  {user?.hasPassword ? 'Đổi mật khẩu' : 'Đặt mật khẩu'}
+                </span>
+              </div>
+              <span className="material-symbols-outlined text-[18px] text-[#c4a898]">chevron_right</span>
+            </button>
+          </div>
+        )}
+
+        {pwSuccess && (
+          <p className="text-[13px] text-[#2e1505] bg-[#fdf6f0] border border-[#f5d5b0] px-4 py-3 rounded-2xl text-center">
+            ✓ {passwordModal === 'set' || !user?.hasPassword ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
+          </p>
         )}
 
         {/* Logout row */}
