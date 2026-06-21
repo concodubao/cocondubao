@@ -63,6 +63,10 @@ function MessageBubble({ msg, onReport, onSpeak, onEscalate, escalated, speaking
   const isUser         = msg.role === 'user'
   const isSystem       = msg.role === 'system'
   const isThisSpeaking = speakingMsgId === msg.id
+  // Bỏ hậu tố cache để xét đúng loại nguồn (đồng bộ với màn AIResult). qa_direct
+  // là câu kỹ sư biên soạn → coi như "kỹ sư", không gắn disclaimer thừa.
+  const baseSource     = (msg.source || '').replace(/_(sem)?cached$/, '')
+  const isCurated      = baseSource === 'engineer' || baseSource === 'qa_direct'
 
   return (
     <div className={`flex flex-col gap-1 mb-4 fade-up ${isUser ? 'items-end' : 'items-start'}`}>
@@ -80,13 +84,13 @@ function MessageBubble({ msg, onReport, onSpeak, onEscalate, escalated, speaking
             <div className="max-w-[80%] px-4 py-3 text-[15px] leading-relaxed text-[#0b1c30]
                             bg-white border border-[#f1f5f9] shadow-sm
                             rounded-[4px_18px_18px_18px]">
-              {msg.source === 'vision' && (
+              {baseSource === 'vision' && (
                 <div className="flex items-center gap-1 text-[11px] text-[#7c3aed] mb-1.5">
                   <span className="material-symbols-outlined text-[14px]">visibility</span>
                   Phân tích ảnh bằng AI Vision
                 </div>
               )}
-              <AnswerContent content={msg.content} showDisclaimer={msg.source !== 'faq' && msg.source !== 'engineer'} />
+              <AnswerContent content={msg.content} showDisclaimer={!isCurated && baseSource !== 'faq'} />
             </div>
           </div>
         </div>
