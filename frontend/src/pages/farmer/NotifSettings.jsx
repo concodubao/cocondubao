@@ -42,7 +42,13 @@ export default function NotifSettings() {
   async function handleSave() {
     setSaving(true)
     try {
-      await pushAPI.updateSettings({ notifTypes: types, quietStart, quietEnd })
+      const res = await pushAPI.updateSettings({ notifTypes: types, quietStart, quietEnd })
+      // Chưa bật thông báo → không có thiết bị nào để lưu cài đặt. Báo rõ thay vì
+      // giả vờ "đã lưu" rồi mất sạch khi nông dân quay lại.
+      if (res.data?.noSubscription) {
+        toast.error(res.data.error || 'Hãy bật thông báo trên thiết bị này trước khi lưu cài đặt.')
+        return
+      }
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch {
@@ -101,8 +107,8 @@ export default function NotifSettings() {
         </section>
 
         <section style={s.section}>
-          <p style={s.sTitle}>Khung giờ không gửi thông báo</p>
-          <p style={{ fontSize: 13, color: '#64748b', margin: '-4px 0 4px' }}>Trong khung giờ này, thông báo sẽ được giữ lại và gửi sau.</p>
+          <p style={s.sTitle}>Khung giờ không làm phiền</p>
+          <p style={{ fontSize: 13, color: '#64748b', margin: '-4px 0 4px' }}>Trong khung giờ này điện thoại sẽ không rung/chuông báo. Bạn vẫn xem được thông báo trong danh sách khi mở app.</p>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
             <div style={{ flex: 1 }}>
               <label style={{ fontSize: 13, color: '#64748b' }} htmlFor="qs">Từ</label>

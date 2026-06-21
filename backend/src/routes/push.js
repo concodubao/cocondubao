@@ -343,6 +343,10 @@ router.patch('/notifications/:id/read', verifyJWT, async (req, res) => {
 })
 
 // PATCH /notifications/settings — cài đặt thông báo cá nhân
+// Cài đặt lưu theo từng push_subscription (thiết bị). Nếu nông dân CHƯA bật thông
+// báo (không có subscription active) thì update sẽ trúng 0 dòng — trước đây vẫn trả
+// success → nông dân tưởng đã lưu nhưng thực ra mất sạch. Giờ trả cờ noSubscription
+// để UI nói rõ "bật thông báo trước". (Không có push thì cũng chẳng có gì để lọc.)
 router.patch('/notifications/settings', verifyJWT, async (req, res) => {
   const { notifTypes, cropsFilter, quietStart, quietEnd } = req.body
 
@@ -353,13 +357,23 @@ router.patch('/notifications/settings', verifyJWT, async (req, res) => {
     if (quietStart !== undefined) updates.quiet_start = quietStart
     if (quietEnd   !== undefined) updates.quiet_end   = quietEnd
 
-    await supabase
+    const { data, error } = await supabase
       .from('push_subscriptions')
       .update(updates)
       .eq('user_id', req.user.userId)
       .eq('active', true)
+      .select('endpoint')   // .select() để đếm số dòng thực sự được cập nhật
+    if (error) throw error
 
-    res.json({ success: true })
+    if (!data?.length) {
+      return res.json({
+        success:        false,
+        noSubscription: true,
+        error:          'Hãy bật thông báo trên thiết bị này trước khi lưu cài đặt.',
+      })
+    }
+
+    res.json({ success: true, updatedDevices: data.length })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
