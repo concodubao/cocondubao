@@ -42,6 +42,13 @@ function StatCard({ label, value, sub, color = '#0f172a', onClick }) {
   )
 }
 
+// Tên kỹ sư đang phụ trách câu hỏi (assigned_to). Để admin giám sát ai nhận câu nào.
+function assigneeName(item) {
+  const a = item.assignee
+  if (!a) return null
+  return a.name?.trim() || a.email?.split('@')[0] || 'Kỹ sư'
+}
+
 function WaitBadge({ minutes }) {
   const urgent = minutes > 60
   const warn   = minutes > 30
@@ -117,20 +124,24 @@ function QueueSection({ navigate, currentUserId }) {
             const farmer       = msg?.chat_sessions?.users
             const isMyItem     = item.status === 'in_progress' && item.assigned_to === currentUserId
             const isOthersItem = item.status === 'in_progress' && !isMyItem
+            const handler      = assigneeName(item)
+            const handlerLabel = isMyItem ? 'Bạn' : (handler ? `KS. ${handler}` : 'Kỹ sư')
             return (
               <div key={item.id} style={s.queueRow}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{farmer?.name || 'Nông dân'}</span>
                     <WaitBadge minutes={item.waitMinutes} />
-                    {isOthersItem && <span style={{ fontSize: 11, color: '#64748b' }}>· Đang xử lý</span>}
+                    {item.status === 'in_progress' && (
+                      <span style={{ fontSize: 11, color: '#00628d', fontWeight: 600 }}>· {handlerLabel} đang xử lý</span>
+                    )}
                   </div>
                   <p style={{ fontSize: 13, color: '#475569', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {msg?.content || '—'}
                   </p>
                 </div>
                 {isOthersItem ? (
-                  <span style={s.processingTag}>Đang xử lý</span>
+                  <span style={s.processingTag}>{handler ? `KS. ${handler}` : 'Đang xử lý'}</span>
                 ) : (
                   <button onClick={() => handleTake(item)} style={s.takeBtn}>
                     {isMyItem ? 'Tiếp tục' : 'Nhận'}

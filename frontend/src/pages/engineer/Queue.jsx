@@ -8,6 +8,14 @@ import { toast } from '../../stores/toastStore'
 const CROP_LABEL = { rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }
 const CROP_ICON  = { rice: 'grass', veggie: 'eco', fruit: 'forest', other: 'more_horiz' }
 
+// Tên kỹ sư đang phụ trách 1 câu (assigned_to). name có thể trống → lấy phần trước
+// @ của email, cuối cùng mới về "Kỹ sư". Dùng để hiện rõ ai là người nhận câu hỏi.
+function assigneeName(item) {
+  const a = item.assignee
+  if (!a) return null
+  return a.name?.trim() || a.email?.split('@')[0] || 'Kỹ sư'
+}
+
 function WaitBadge({ minutes }) {
   const urgent = minutes > 60
   const warn   = minutes > 30
@@ -27,6 +35,7 @@ function QueueCard({ item, onTake, onDelete, currentUserId, deleting }) {
   const isMyItem     = item.status === 'in_progress' && item.assigned_to === currentUserId
   const isOthersItem = item.status === 'in_progress' && item.assigned_to !== currentUserId
   const isDeleting   = deleting === item.id
+  const handler      = assigneeName(item)
 
   return (
     <div className="bg-white border border-[#f0e0d0] rounded-[20px] p-4 flex flex-col gap-3
@@ -74,6 +83,14 @@ function QueueCard({ item, onTake, onDelete, currentUserId, deleting }) {
             AI tin cậy {Math.round(msg.confidence * 100)}%
           </span>
         )}
+        {/* Người nhận: hiện rõ kỹ sư nào đang phụ trách câu hỏi */}
+        {item.status === 'in_progress' && handler && (
+          <span className="inline-flex items-center gap-1 text-[12px] font-semibold
+                           bg-[#eef6ff] text-[#00628d] px-2.5 py-0.5 rounded-full">
+            <span className="material-symbols-outlined text-[13px] ms-fill">badge</span>
+            {isMyItem ? 'Bạn đang xử lý' : `KS. ${handler}`}
+          </span>
+        )}
       </div>
 
       {/* Actions */}
@@ -81,7 +98,7 @@ function QueueCard({ item, onTake, onDelete, currentUserId, deleting }) {
         {isOthersItem ? (
           <div className="flex-1 h-[48px] bg-[#fdf8f5] text-[#7a6358] text-[14px] font-medium
                           rounded-2xl flex items-center justify-center">
-            Kỹ sư khác đang xử lý
+            {handler ? `KS. ${handler} đang xử lý` : 'Kỹ sư khác đang xử lý'}
           </div>
         ) : (
           <button

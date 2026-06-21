@@ -118,6 +118,7 @@ router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, re
       assigned_to,
       answer,
       add_to_knowledge,
+      assignee:users!engineer_queue_assigned_to_fkey ( id, name, email ),
       messages (
         id,
         content,
@@ -150,6 +151,7 @@ router.get('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (req
     .from('engineer_queue')
     .select(`
       id, status, created_at, resolved_at, assigned_to, answer, add_to_knowledge,
+      assignee:users!engineer_queue_assigned_to_fkey ( id, name, email ),
       messages (
         id, content, image_url, confidence, created_at,
         chat_sessions ( crop_type, users ( name, village, phone ) )
