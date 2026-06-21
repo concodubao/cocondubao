@@ -184,6 +184,22 @@ describe('DELETE /engineer/queue/:id', () => {
 
     expect(res.status).toBe(400)
   })
+
+  it('xóa câu pending → báo lại nông dân (system message + push)', async () => {
+    const { notifyFarmer } = await import('../src/services/webpush.js')
+    notifyFarmer.mockClear()
+    sb.enqueue(
+      { data: { id: 'q1', status: 'pending', assigned_to: null,
+                messages: { session_id: 's1', chat_sessions: { user_id: 'farmer1' } } }, error: null },
+      { error: null },             // delete engineer_queue
+      { data: null, error: null }, // insert system message
+    )
+
+    const res = await request(app).delete('/api/v1/engineer/queue/q1').set(auth(engToken()))
+
+    expect(res.status).toBe(200)
+    expect(notifyFarmer).toHaveBeenCalledOnce()
+  })
 })
 
 // ══════════════════════════════════════════════════════════════════════════════

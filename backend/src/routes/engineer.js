@@ -312,9 +312,10 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
 router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { id } = req.params
 
+  // Lấy kèm phiên + nông dân để báo lại cho họ sau khi xóa (tránh chờ vô vọng 24h).
   const { data: item } = await supabase
     .from('engineer_queue')
-    .select('id, status, assigned_to')
+    .select('id, status, assigned_to, messages ( session_id, chat_sessions ( user_id ) )')
     .eq('id', id)
     .single()
 
@@ -331,6 +332,26 @@ router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (
 
   const { error } = await supabase.from('engineer_queue').delete().eq('id', id)
   if (error) return res.status(500).json({ error: error.message })
+
+  // Báo nông dân: câu hỏi đã chuyển kỹ sư trước đó nhưng không được trả lời. Nếu
+  // im lặng, nông dân vẫn thấy "kỹ sư sẽ trả lời trong 24h" và chờ mãi không có gì.
+  const sessionId = item.messages?.session_id
+  const farmerId  = item.messages?.chat_sessions?.user_id
+  if (sessionId) {
+    await supabase.from('messages').insert({
+      session_id: sessionId,
+      role:       'system',
+      content:    'Rất tiếc, câu hỏi này chưa được kỹ sư trả lời. Bà con vui lòng hỏi lại rõ hơn hoặc đặt câu hỏi khác nhé.',
+    })
+  }
+  if (farmerId) {
+    notifyFarmer(
+      farmerId,
+      '🐦 Cập nhật câu hỏi của bạn',
+      'Câu hỏi vừa rồi chưa thể trả lời. Bà con thử hỏi lại rõ hơn nhé.',
+      { url: '/chat/history' }
+    ).catch(e => console.warn('[PUSH] notify farmer (deleted queue) failed:', e.message))
+  }
 
   res.json({ success: true })
 })
