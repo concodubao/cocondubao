@@ -302,12 +302,14 @@ router.get('/notifications/:userId', verifyJWT, async (req, res) => {
       .order('sent_at', { ascending: false })
       .limit(50)
 
-    if (!isStaff) {
-      // Chỉ nhận crop dạng chữ/gạch dưới — chặn nội suy ký tự lạ vào filter .or()
-      const safeCrops = userCrops.filter(c => typeof c === 'string' && /^[a-z_]+$/i.test(c))
-      const cropFilter = safeCrops.length > 0
-        ? `crop_tags.eq.{},${safeCrops.map(c => `crop_tags.cs.{${c}}`).join(',')}`
-        : 'crop_tags.eq.{}'
+    // Chỉ nhận crop dạng chữ/gạch dưới — chặn nội suy ký tự lạ vào filter .or()
+    const safeCrops = userCrops.filter(c => typeof c === 'string' && /^[a-z_]+$/i.test(c))
+    // Nông dân ĐÃ chọn cây → lọc theo cây của họ + thông báo chung (crop_tags rỗng).
+    // Nông dân CHƯA chọn cây (hoặc staff) → xem TẤT CẢ: trước đây người chưa chọn
+    // cây chỉ thấy thông báo chung, bị giấu mất cảnh báo gắn cây cụ thể (vd sâu
+    // bệnh lúa) → bỏ lỡ thông tin quan trọng.
+    if (!isStaff && safeCrops.length > 0) {
+      const cropFilter = `crop_tags.eq.{},${safeCrops.map(c => `crop_tags.cs.{${c}}`).join(',')}`
       notifQuery = notifQuery.or(cropFilter)
     }
 
