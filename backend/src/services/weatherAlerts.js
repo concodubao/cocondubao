@@ -53,9 +53,12 @@ export function evaluateWeather(daily) {
   const wind    = daily.wind_speed_10m_max?.[i] ?? 0
 
   const alerts = []
+  // date = ngày dự báo dạng YYYY-MM-DD — dùng làm khoá dedup theo NGÀY (mỗi ngày 1
+  // draft riêng) và để dọn draft đã qua ngày, tránh admin duyệt nhầm cảnh báo cũ.
   if (rainSum >= TH.rainSum || rainPb >= TH.rainProb) {
     alerts.push({
       kind:  'rain',
+      date:  d,
       title: `🌧️ Cảnh báo mưa to ngày ${ngay}`,
       body:  `Dự báo ${ngay} có mưa to (khoảng ${Math.round(rainSum)}mm). Bà con nên HOÃN phun thuốc và bón phân để tránh bị rửa trôi, che chắn nông sản đã thu hoạch.`,
     })
@@ -63,6 +66,7 @@ export function evaluateWeather(daily) {
   if (tMax !== null && tMax >= TH.heatMax) {
     alerts.push({
       kind:  'heat',
+      date:  d,
       title: `☀️ Cảnh báo nắng nóng ngày ${ngay}`,
       body:  `Dự báo ${ngay} nắng nóng gay gắt (tới ${Math.round(tMax)}°C). Bà con nhớ tưới đủ nước cho cây, tránh phun thuốc vào giữa trưa nắng.`,
     })
@@ -70,6 +74,7 @@ export function evaluateWeather(daily) {
   if (wind >= TH.windMax) {
     alerts.push({
       kind:  'wind',
+      date:  d,
       title: `💨 Cảnh báo gió mạnh ngày ${ngay}`,
       body:  `Dự báo ${ngay} có gió mạnh (tới ${Math.round(wind)} km/h). Bà con chằng chống cây, giàn leo; cân nhắc thu hoạch sớm nếu cây sắp tới kỳ.`,
     })
@@ -77,6 +82,7 @@ export function evaluateWeather(daily) {
   if (tMin !== null && tMin <= TH.coldMin) {
     alerts.push({
       kind:  'cold',
+      date:  d,
       title: `🥶 Cảnh báo trời lạnh ngày ${ngay}`,
       body:  `Dự báo ${ngay} nhiệt độ xuống thấp (khoảng ${Math.round(tMin)}°C). Bà con che chắn cho mạ non và cây con kẻo bị ảnh hưởng.`,
     })
@@ -84,9 +90,41 @@ export function evaluateWeather(daily) {
   return alerts
 }
 
+// Ngày hôm nay ở múi giờ VN, dạng YYYY-MM-DD (so sánh chuỗi lexicographic an toàn).
+function todayVN() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })
+}
+
+// Dọn các draft cảnh báo thời tiết đã qua ngày (hoặc theo định dạng cũ không có
+// ngày) mà admin chưa duyệt — để không còn duyệt nhầm cảnh báo lỗi thời.
+async function cleanupStaleDrafts() {
+  const today = todayVN()
+  const { data } = await supabase
+    .from('notifications')
+    .select('id, region')
+    .eq('type', 'weather')
+    .is('created_by', null)
+    .is('sent_at', null)
+    .is('scheduled_at', null)
+    .like('region', 'wx:%')
+
+  const staleIds = (data || []).filter(d => {
+    const date = d.region?.split(':')[2]  // wx:<kind>:<YYYY-MM-DD>
+    return !date || date < today          // không có ngày (format cũ) hoặc đã qua → dọn
+  }).map(d => d.id)
+
+  if (staleIds.length) {
+    await supabase.from('notifications').delete().in('id', staleIds)
+    console.log(`[WX] dọn ${staleIds.length} bản nháp cảnh báo lỗi thời`)
+  }
+  return staleIds.length
+}
+
 // Tạo draft cho 1 alert nếu chưa có draft cùng loại đang chờ duyệt (dedup theo region).
 async function createDraftIfAbsent(alert) {
-  const regionKey = `wx:${alert.kind}`
+  // Khoá dedup gồm cả NGÀY → mỗi ngày dự báo có draft riêng, không bị draft cũ
+  // (ngày khác) chặn việc tạo cảnh báo cho ngày mới.
+  const regionKey = `wx:${alert.kind}:${alert.date}`
   const { data: existing } = await supabase
     .from('notifications')
     .select('id')
@@ -112,6 +150,7 @@ async function createDraftIfAbsent(alert) {
 
 export async function runWeatherAlertCheck() {
   try {
+    await cleanupStaleDrafts()  // dọn draft lỗi thời trước khi tạo mới
     const daily  = await fetchDailyForecast()
     const alerts = evaluateWeather(daily)
     let created = 0
