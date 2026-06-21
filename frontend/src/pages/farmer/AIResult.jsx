@@ -25,6 +25,14 @@ export default function AIResult() {
   const isHighConf    = confidence >= 0.85
   const isMidConf     = confidence >= 0.7 && confidence < 0.85
 
+  // Nguồn có thể kèm hậu tố cache (_cached/_semcached) → bỏ để xét đúng loại.
+  const baseSource = (source || '').replace(/_(sem)?cached$/, '')
+  // qa_direct = câu trả lời do kỹ sư biên soạn, phục vụ thẳng → coi như "kỹ sư".
+  const isCurated  = baseSource === 'engineer' || baseSource === 'qa_direct'
+  // Hiện độ tin cậy cho mọi câu AI (rag/vision...) kể cả bản cache — trước đây chỉ
+  // khớp đúng 'rag' nên qa_direct/vision/bản cache đều không hiện độ tin cậy.
+  const showConf   = confidence != null && !isCurated && baseSource !== 'faq'
+
   async function handleReport(errorType) {
     try {
       await chatAPI.reportError({ messageId, errorType, userId: user?.id })
@@ -53,8 +61,9 @@ export default function AIResult() {
         {/* Vùng trên — badge + nội dung câu trả lời (cuộn được nếu dài) */}
         <div style={s.topContent}>
           <div style={s.sourceRow}>
-            {source === 'engineer' && <span style={s.engineerBadge}>Kỹ sư xác nhận</span>}
-            {source === 'rag' && confidence && (
+            {baseSource === 'engineer'  && <span style={s.engineerBadge}>Kỹ sư xác nhận</span>}
+            {baseSource === 'qa_direct' && <span style={s.engineerBadge}>Kỹ sư biên soạn</span>}
+            {showConf && (
               <span style={{
                 ...s.confBadge,
                 background: isHighConf ? '#fdf6f0' : isMidConf ? '#fffbeb' : '#eff6ff',
@@ -68,7 +77,7 @@ export default function AIResult() {
           <div style={s.answerBox}>
             <AnswerContent
               content={answer}
-              showDisclaimer={source !== 'engineer' && source !== 'faq'}
+              showDisclaimer={!isCurated && baseSource !== 'faq'}
               style={s.answerText}
             />
           </div>
