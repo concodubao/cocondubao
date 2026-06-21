@@ -35,7 +35,7 @@ function PasswordModal({ mode, onClose, onSuccess }) {
       } else {
         await authAPI.changePassword(current, newPw)
       }
-      onSuccess()
+      onSuccess(isSet ? 'set' : 'change')
     } catch (err) {
       setError(err.response?.data?.error || 'Không thực hiện được. Thử lại nhé.')
     } finally {
@@ -418,7 +418,7 @@ export default function Profile() {
 
         {pwSuccess && (
           <p className="text-[13px] text-[#2e1505] bg-[#fdf6f0] border border-[#f5d5b0] px-4 py-3 rounded-2xl text-center">
-            ✓ {passwordModal === 'set' || !user?.hasPassword ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
+            ✓ {pwSuccess === 'set' ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
           </p>
         )}
 
@@ -468,9 +468,9 @@ export default function Profile() {
         <PasswordModal
           mode={passwordModal}
           onClose={() => setPasswordModal(null)}
-          onSuccess={() => {
+          onSuccess={(mode) => {
             setPasswordModal(null)
-            setPwSuccess(true)
+            setPwSuccess(mode)
             setUser({ ...user, hasPassword: true })
           }}
         />

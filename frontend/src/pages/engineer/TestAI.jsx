@@ -110,6 +110,8 @@ export default function TestAI() {
         {messages.map(msg => {
           const isUser   = msg.role === 'user'
           const isSystem = msg.role === 'system'
+          const baseSource = (msg.source || '').replace(/_(sem)?cached$/, '')
+          const isCurated  = baseSource === 'engineer' || baseSource === 'qa_direct'
           return (
             <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 4, marginBottom: 12 }}>
               <div style={{
@@ -121,13 +123,13 @@ export default function TestAI() {
                 border: isSystem ? '1px solid #fde68a' : isUser ? 'none' : '1px solid #e2e8f0',
               }}>
                 {(!isUser && !isSystem)
-                  ? <AnswerContent content={msg.content} showDisclaimer={msg.source !== 'faq' && msg.source !== 'engineer'} />
+                  ? <AnswerContent content={msg.content} showDisclaimer={!isCurated && baseSource !== 'faq'} />
                   : msg.content}
               </div>
               {!isUser && !isSystem && (
                 <div style={{ display: 'flex', gap: 6, paddingLeft: 4, flexWrap: 'wrap' }}>
                   <ConfidenceBadge confidence={msg.confidence} />
-                  {msg.source === 'engineer' && (
+                  {baseSource === 'engineer' && (
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#fdf6f0', color: '#2e1505', fontWeight: 600 }}>
                       Kỹ sư xác nhận
                     </span>
