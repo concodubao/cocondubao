@@ -51,10 +51,13 @@ const chatLimiter = rateLimit({
   message:          { error: 'Bạn hỏi quá nhiều rồi, thử lại sau 1 phút nhé.' },
 })
 
-// Auth: 10 req/phút/IP (tránh brute-force OTP)
+// Auth: 30 req/phút/IP. Khoá theo IP (chưa có userId khi đăng nhập) nên cả xã dùng
+// chung 4G/NAT đếm chung — để 10 thì vài người đăng nhập cùng lúc đã bị chặn nhầm.
+// Brute-force vẫn được chặn bởi lớp riêng: otpLimiter (5/phút) cho OTP và khoá dò
+// PIN theo từng số (5 lần sai → khoá 10 phút) trong routes/auth.js.
 const authLimiter = rateLimit({
   windowMs:         60 * 1000,
-  max:              10,
+  max:              30,
   standardHeaders:  true,
   legacyHeaders:    false,
   message:          { error: 'Thử lại sau 1 phút nhé.' },

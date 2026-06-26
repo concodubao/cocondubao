@@ -26,7 +26,7 @@ function PasswordModal({ mode, isFarmer, onClose, onSuccess }) {
   const noun  = isPin ? 'mã PIN' : 'mật khẩu'
   const Noun  = isPin ? 'Mã PIN' : 'Mật khẩu'
 
-  const validNew  = isPin ? /^\d{6}$/.test(newPw) : newPw.length >= 6
+  const validNew  = isPin ? /^\d{6}$/.test(newPw) : newPw.length >= 8
   const tooShort  = newPw.length > 0 && !validNew
   const mismatch  = confirm.length > 0 && newPw !== confirm
   const canSubmit = validNew && newPw === confirm && (isSet || current.length > 0)
@@ -38,7 +38,7 @@ function PasswordModal({ mode, isFarmer, onClose, onSuccess }) {
     `text-center tracking-[0.4em] text-[#0b1c30] outline-none focus:border-[#4B230A] transition-colors`
 
   async function handleSubmit() {
-    if (!validNew)          return setError(isPin ? 'Mã PIN phải gồm đúng 6 chữ số.' : 'Mật khẩu cần ít nhất 6 ký tự.')
+    if (!validNew)          return setError(isPin ? 'Mã PIN phải gồm đúng 6 chữ số.' : 'Mật khẩu cần ít nhất 8 ký tự.')
     if (newPw !== confirm)  return setError(isPin ? 'Mã PIN nhập lại chưa khớp.' : 'Mật khẩu xác nhận không khớp.')
     if (!isSet && !current) return setError(`Vui lòng nhập ${noun} hiện tại.`)
     setError(''); setLoading(true)
@@ -92,7 +92,7 @@ function PasswordModal({ mode, isFarmer, onClose, onSuccess }) {
               value={newPw} onChange={onlyDigits(setNewPw)} maxLength={6}
               className={pinClass(tooShort ? 'border-[#f3b4b4]' : 'border-[#f0e0d0]')} />
           ) : (
-            <PasswordInput autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
+            <PasswordInput autoComplete="new-password" placeholder="Ít nhất 8 ký tự"
               value={newPw} onChange={e => setNewPw(e.target.value)}
               className={`w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] rounded-2xl text-[16px]
                           ${tooShort ? 'border-[#f3b4b4]' : 'border-[#f0e0d0]'}`} />
@@ -101,7 +101,7 @@ function PasswordModal({ mode, isFarmer, onClose, onSuccess }) {
             <span className="material-symbols-outlined text-[15px]">
               {validNew ? 'check_circle' : 'info'}
             </span>
-            {isPin ? 'Gồm đúng 6 chữ số' : 'Tối thiểu 6 ký tự'}
+            {isPin ? 'Gồm đúng 6 chữ số' : 'Tối thiểu 8 ký tự'}
           </p>
         </div>
 

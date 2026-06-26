@@ -24,6 +24,21 @@ function isValidPhone(normalized) {
   return /^\+84[3-9]\d{8}$/.test(normalized)
 }
 
+// Chuẩn độ mạnh bí mật theo vai trò, dùng chung cho set-password & change-password:
+//   - nông dân: mã PIN đúng 6 chữ số (khớp register-phone / login-phone)
+//   - kỹ sư/admin: mật khẩu ≥ 8 ký tự (khớp lúc tạo tài khoản ở register-email/admin)
+// Trước đây cả hai chỉ check ≥ 6 ký tự → staff có thể hạ mật khẩu xuống 6 ký tự qua
+// đổi mật khẩu (yếu hơn chuẩn tạo tài khoản), và nông dân có thể đặt "PIN" không phải số.
+function validateSecret(secret, role) {
+  if (!secret) return role === 'farmer' ? 'Vui lòng nhập mã PIN.' : 'Vui lòng nhập mật khẩu.'
+  if (role === 'farmer') {
+    if (!/^\d{6}$/.test(secret)) return 'Mã PIN phải gồm đúng 6 chữ số.'
+  } else if (secret.length < 8) {
+    return 'Mật khẩu cần ít nhất 8 ký tự.'
+  }
+  return null
+}
+
 function normalizePhone(raw) {
   const digits = raw.replace(/\D/g, '')
   if (digits.startsWith('84')) return '+' + digits
@@ -278,7 +293,8 @@ router.post('/login-phone', async (req, res) => {
 // ─── PATCH /auth/set-password — đặt mật khẩu lần đầu (chưa có password) ─────
 router.patch('/set-password', verifyJWT, async (req, res) => {
   const { password } = req.body
-  if (!password || password.length < 6) return res.status(400).json({ error: 'Mật khẩu cần ít nhất 6 ký tự.' })
+  const secretErr = validateSecret(password, req.user.role)
+  if (secretErr) return res.status(400).json({ error: secretErr })
 
   try {
     const { data: existing } = await supabase.from('users').select('password_hash').eq('id', req.user.userId).single()
@@ -296,7 +312,8 @@ router.patch('/set-password', verifyJWT, async (req, res) => {
 router.patch('/change-password', verifyJWT, async (req, res) => {
   const { currentPassword, newPassword } = req.body
   if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Thiếu thông tin.' })
-  if (newPassword.length < 6) return res.status(400).json({ error: 'Mật khẩu mới cần ít nhất 6 ký tự.' })
+  const secretErr = validateSecret(newPassword, req.user.role)
+  if (secretErr) return res.status(400).json({ error: secretErr })
   if (currentPassword === newPassword) return res.status(400).json({ error: 'Mật khẩu mới phải khác mật khẩu cũ.' })
 
   try {

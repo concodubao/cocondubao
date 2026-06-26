@@ -36,6 +36,20 @@ const uploadAudio = multer({
   },
 })
 
+// ─── Kiểm session có thuộc về user không (chặn IDOR) ────────────────────────
+// sessionId tới từ client; nếu không xác minh thì nông dân có thể truyền sessionId
+// của người khác để chèn tin nhắn vào phiên chat của họ và khiến lịch sử phiên đó
+// bị nạp làm ngữ cảnh cho LLM. UUID khó đoán nhưng đây vẫn là lỗ hổng phân quyền.
+async function isOwnSession(sessionId, userId) {
+  const { data } = await supabase
+    .from('chat_sessions')
+    .select('id')
+    .eq('id', sessionId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  return !!data
+}
+
 // ─── Hàm nội bộ: tạo/lấy session ────────────────────────────────────────────
 async function getOrCreateSession(userId, cropType, sessionId) {
   if (sessionId) return sessionId
@@ -101,6 +115,11 @@ router.post('/ask', verifyJWT, async (req, res) => {
   }
 
   try {
+    // Chặn IDOR: chỉ thao tác trên phiên chat của chính mình.
+    if (sessionId && !(await isOwnSession(sessionId, userId))) {
+      return res.status(403).json({ error: 'Không có quyền với phiên chat này.' })
+    }
+
     // Lấy lịch sử để AI nhớ ngữ cảnh
     const history = await getRecentHistory(sessionId)
     const result = await askRAG(text.trim(), cropType, history)
@@ -209,6 +228,11 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
   const userId = req.user.userId
 
   try {
+    // Chặn IDOR trước khi tốn công nén/upload ảnh (xem isOwnSession).
+    if (sessionId && !(await isOwnSession(sessionId, userId))) {
+      return res.status(403).json({ error: 'Không có quyền với phiên chat này.' })
+    }
+
     let imageUrl    = null
     let imageBuffer = null
 
