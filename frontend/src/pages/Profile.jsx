@@ -12,7 +12,7 @@ function roleHome(role) {
 }
 
 // ─── Modal đặt / đổi mật khẩu ────────────────────────────────────────────────
-function PasswordModal({ mode, onClose, onSuccess }) {
+function PasswordModal({ mode, isFarmer, onClose, onSuccess }) {
   const [current,  setCurrent]  = useState('')
   const [newPw,    setNewPw]    = useState('')
   const [confirm,  setConfirm]  = useState('')
@@ -20,21 +20,31 @@ function PasswordModal({ mode, onClose, onSuccess }) {
   const [error,    setError]    = useState('')
 
   const isSet = mode === 'set'
-  const tooShort  = newPw.length > 0 && newPw.length < 6
+  // Nông dân đăng nhập bằng PIN 6 số; kỹ sư/admin dùng mật khẩu chữ. Dùng đúng
+  // ngôn ngữ + kiểu nhập theo vai trò để nông dân không bị rối "mật khẩu".
+  const isPin = isFarmer
+  const noun  = isPin ? 'mã PIN' : 'mật khẩu'
+  const Noun  = isPin ? 'Mã PIN' : 'Mật khẩu'
+
+  const validNew  = isPin ? /^\d{6}$/.test(newPw) : newPw.length >= 6
+  const tooShort  = newPw.length > 0 && !validNew
   const mismatch  = confirm.length > 0 && newPw !== confirm
-  const canSubmit = newPw.length >= 6 && newPw === confirm && (isSet || current.length > 0)
+  const canSubmit = validNew && newPw === confirm && (isSet || current.length > 0)
+
+  // Ô nhập PIN: chỉ nhận số, tối đa 6 chữ số, hiện to & giãn chữ cho dễ đọc.
+  const onlyDigits = setter => e => setter(e.target.value.replace(/\D/g, '').slice(0, 6))
+  const pinClass = (border) =>
+    `w-full h-[54px] px-4 bg-[#fdf8f5] border-[1.5px] ${border} rounded-2xl text-[22px] font-bold ` +
+    `text-center tracking-[0.4em] text-[#0b1c30] outline-none focus:border-[#4B230A] transition-colors`
 
   async function handleSubmit() {
-    if (!newPw || newPw.length < 6) return setError('Mật khẩu cần ít nhất 6 ký tự.')
-    if (newPw !== confirm) return setError('Mật khẩu xác nhận không khớp.')
-    if (!isSet && !current) return setError('Vui lòng nhập mật khẩu hiện tại.')
+    if (!validNew)          return setError(isPin ? 'Mã PIN phải gồm đúng 6 chữ số.' : 'Mật khẩu cần ít nhất 6 ký tự.')
+    if (newPw !== confirm)  return setError(isPin ? 'Mã PIN nhập lại chưa khớp.' : 'Mật khẩu xác nhận không khớp.')
+    if (!isSet && !current) return setError(`Vui lòng nhập ${noun} hiện tại.`)
     setError(''); setLoading(true)
     try {
-      if (isSet) {
-        await authAPI.setPassword(newPw)
-      } else {
-        await authAPI.changePassword(current, newPw)
-      }
+      if (isSet) await authAPI.setPassword(newPw)
+      else       await authAPI.changePassword(current, newPw)
       onSuccess(isSet ? 'set' : 'change')
     } catch (err) {
       setError(err.response?.data?.error || 'Không thực hiện được. Thử lại nhé.')
@@ -51,49 +61,71 @@ function PasswordModal({ mode, onClose, onSuccess }) {
 
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-[18px] font-extrabold text-[#0b1c30]">
-            {isSet ? 'Đặt mật khẩu' : 'Đổi mật khẩu'}
+            {isSet ? `Đặt ${noun}` : `Đổi ${noun}`}
           </h2>
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-[#f1f5f9] flex items-center justify-center">
             <span className="material-symbols-outlined text-[20px] text-[#7a6358]">close</span>
           </button>
         </div>
 
+        {/* Hiện tại */}
         {!isSet && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-[14px] font-semibold text-[#0b1c30]">Mật khẩu hiện tại</label>
-            <PasswordInput autoComplete="current-password" placeholder="••••••••"
-              value={current} onChange={e => setCurrent(e.target.value)}
-              className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
+            <label className="text-[14px] font-semibold text-[#0b1c30]">{Noun} hiện tại</label>
+            {isPin ? (
+              <input inputMode="numeric" autoComplete="off" placeholder="6 số"
+                value={current} onChange={onlyDigits(setCurrent)} maxLength={6}
+                className={pinClass('border-[#f0e0d0]')} />
+            ) : (
+              <PasswordInput autoComplete="current-password" placeholder="••••••••"
+                value={current} onChange={e => setCurrent(e.target.value)}
+                className="w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] border-[#f0e0d0] rounded-2xl text-[16px]" />
+            )}
           </div>
         )}
 
+        {/* Mới */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-[14px] font-semibold text-[#0b1c30]">Mật khẩu mới</label>
-          <PasswordInput autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
-            value={newPw} onChange={e => setNewPw(e.target.value)}
-            className={`w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] rounded-2xl text-[16px]
-                        ${tooShort ? 'border-[#f3b4b4]' : 'border-[#f0e0d0]'}`} />
-          <p className={`text-[12.5px] flex items-center gap-1 ${newPw.length >= 6 ? 'text-[#4B230A]' : 'text-[#7a6358]'}`}>
+          <label className="text-[14px] font-semibold text-[#0b1c30]">{Noun} mới{isPin ? ' (6 chữ số)' : ''}</label>
+          {isPin ? (
+            <input inputMode="numeric" autoComplete="off" placeholder="6 số"
+              value={newPw} onChange={onlyDigits(setNewPw)} maxLength={6}
+              className={pinClass(tooShort ? 'border-[#f3b4b4]' : 'border-[#f0e0d0]')} />
+          ) : (
+            <PasswordInput autoComplete="new-password" placeholder="Ít nhất 6 ký tự"
+              value={newPw} onChange={e => setNewPw(e.target.value)}
+              className={`w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] rounded-2xl text-[16px]
+                          ${tooShort ? 'border-[#f3b4b4]' : 'border-[#f0e0d0]'}`} />
+          )}
+          <p className={`text-[12.5px] flex items-center gap-1 ${validNew ? 'text-[#4B230A]' : 'text-[#7a6358]'}`}>
             <span className="material-symbols-outlined text-[15px]">
-              {newPw.length >= 6 ? 'check_circle' : 'info'}
+              {validNew ? 'check_circle' : 'info'}
             </span>
-            Tối thiểu 6 ký tự
+            {isPin ? 'Gồm đúng 6 chữ số' : 'Tối thiểu 6 ký tự'}
           </p>
         </div>
 
+        {/* Xác nhận */}
         <div className="flex flex-col gap-1.5">
-          <label className="text-[14px] font-semibold text-[#0b1c30]">Xác nhận mật khẩu</label>
-          <PasswordInput autoComplete="new-password" placeholder="Nhập lại mật khẩu mới"
-            value={confirm} onChange={e => setConfirm(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && canSubmit && handleSubmit()}
-            className={`w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] rounded-2xl text-[16px]
-                        ${mismatch ? 'border-[#f3b4b4]' : confirm.length > 0 && !mismatch ? 'border-[#86c79a]' : 'border-[#f0e0d0]'}`} />
+          <label className="text-[14px] font-semibold text-[#0b1c30]">Nhập lại {noun} mới</label>
+          {isPin ? (
+            <input inputMode="numeric" autoComplete="off" placeholder="6 số"
+              value={confirm} onChange={onlyDigits(setConfirm)} maxLength={6}
+              onKeyDown={e => e.key === 'Enter' && canSubmit && handleSubmit()}
+              className={pinClass(mismatch ? 'border-[#f3b4b4]' : confirm.length > 0 && !mismatch ? 'border-[#86c79a]' : 'border-[#f0e0d0]')} />
+          ) : (
+            <PasswordInput autoComplete="new-password" placeholder="Nhập lại mật khẩu mới"
+              value={confirm} onChange={e => setConfirm(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && canSubmit && handleSubmit()}
+              className={`w-full h-[50px] px-4 bg-[#fdf8f5] border-[1.5px] rounded-2xl text-[16px]
+                          ${mismatch ? 'border-[#f3b4b4]' : confirm.length > 0 && !mismatch ? 'border-[#86c79a]' : 'border-[#f0e0d0]'}`} />
+          )}
           {confirm.length > 0 && (
             <p className={`text-[12.5px] flex items-center gap-1 ${mismatch ? 'text-[#c62828]' : 'text-[#15803d]'}`}>
               <span className="material-symbols-outlined text-[15px]">
                 {mismatch ? 'cancel' : 'check_circle'}
               </span>
-              {mismatch ? 'Mật khẩu chưa khớp' : 'Khớp rồi'}
+              {mismatch ? `${Noun} chưa khớp` : 'Khớp rồi'}
             </p>
           )}
         </div>
@@ -108,7 +140,7 @@ function PasswordModal({ mode, onClose, onSuccess }) {
                      disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100 transition-all">
           {loading
             ? <><span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Đang lưu...</>
-            : isSet ? 'Đặt mật khẩu' : 'Đổi mật khẩu'}
+            : isSet ? `Đặt ${noun}` : `Đổi ${noun}`}
         </button>
       </div>
     </div>
@@ -407,9 +439,16 @@ export default function Profile() {
             >
               <div className="flex items-center gap-3">
                 <span className="material-symbols-outlined text-[20px] text-[#7a6358]">key</span>
-                <span className="text-[14px] text-[#0b1c30]">
-                  {user?.hasPassword ? 'Đổi mật khẩu' : 'Đặt mật khẩu'}
-                </span>
+                <div className="text-left">
+                  <div className="text-[14px] text-[#0b1c30]">
+                    {isFarmer
+                      ? (user?.hasPassword ? 'Đổi mã PIN' : 'Đặt mã PIN')
+                      : (user?.hasPassword ? 'Đổi mật khẩu' : 'Đặt mật khẩu')}
+                  </div>
+                  {isFarmer && (
+                    <div className="text-[12px] text-[#7a6358]">Mã PIN 6 số để đăng nhập</div>
+                  )}
+                </div>
               </div>
               <span className="material-symbols-outlined text-[18px] text-[#c4a898]">chevron_right</span>
             </button>
@@ -418,7 +457,9 @@ export default function Profile() {
 
         {pwSuccess && (
           <p className="text-[13px] text-[#2e1505] bg-[#fdf6f0] border border-[#f5d5b0] px-4 py-3 rounded-2xl text-center">
-            ✓ {pwSuccess === 'set' ? 'Đặt mật khẩu thành công!' : 'Đổi mật khẩu thành công!'}
+            ✓ {pwSuccess === 'set'
+                ? (isFarmer ? 'Đặt mã PIN thành công!' : 'Đặt mật khẩu thành công!')
+                : (isFarmer ? 'Đổi mã PIN thành công!' : 'Đổi mật khẩu thành công!')}
           </p>
         )}
 
@@ -467,6 +508,7 @@ export default function Profile() {
       {passwordModal && (
         <PasswordModal
           mode={passwordModal}
+          isFarmer={isFarmer}
           onClose={() => setPasswordModal(null)}
           onSuccess={(mode) => {
             setPasswordModal(null)
