@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useWeather, getWMO, farmingTip } from '../../hooks/useWeather'
+import { useWeather, getWMO, farmingTip, rainTimingLabel } from '../../hooks/useWeather'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -33,6 +33,7 @@ function TipBanner({ tip }) {
 
 function DayCard({ day, index }) {
   const wmo = getWMO(day.weathercode)
+  const timing = rainTimingLabel(day)
   const isToday = index === 0
 
   return (
@@ -54,6 +55,10 @@ function DayCard({ day, index }) {
       <div className="flex-1 min-w-0">
         <div className={`text-[13px] font-semibold truncate ${isToday ? 'text-white' : 'text-[#0b1c30]'}`}>
           {wmo.label}
+          {/* Thời điểm mưa/giông để bà con biết lúc nào tạnh mà tranh thủ làm đồng */}
+          {timing && (
+            <span className={`ml-1.5 font-medium ${isToday ? 'text-white/75' : 'text-[#94a3b8]'}`}>· {timing}</span>
+          )}
         </div>
         {/* Xác suất mưa */}
         <div className={`text-[12px] mt-0.5 flex items-center gap-1 ${isToday ? 'text-white/80' : 'text-[#7a6358]'}`}>
@@ -88,6 +93,7 @@ export default function Weather() {
 
   const wmo = getWMO(today?.weathercode)
   const tip = farmingTip(today)
+  const todayTiming = rainTimingLabel(today)
 
   return (
     <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] md:max-w-[920px] mx-auto overflow-x-hidden">
@@ -137,7 +143,9 @@ export default function Weather() {
               <div className="flex items-end justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-black leading-none text-[clamp(3.25rem,17vw,4.5rem)]">{currentTemp}°</div>
-                  <div className="font-bold mt-1 text-[clamp(15px,4.5vw,18px)]">{wmo.label}</div>
+                  <div className="font-bold mt-1 text-[clamp(15px,4.5vw,18px)]">
+                    {wmo.label}{todayTiming && <span className="font-medium text-white/80"> · {todayTiming}</span>}
+                  </div>
                   <div className="text-white/75 text-[13px] mt-1">
                     {today.tmin}° – {today.tmax}°  ·  Mưa {today.rainProb}%
                     {current && <>{'  '}·  Cảm giác {current.feelsLike}°</>}

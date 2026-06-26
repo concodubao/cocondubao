@@ -35,19 +35,75 @@ export function getWMO(code) {
   return WMO_MAP[code] ?? WMO_MAP[Math.floor(code / 10) * 10] ?? WMO_MAP[0]
 }
 
-// Lời khuyên canh tác dựa trên thời tiết hôm nay
+// ─── Tổng hợp "điều kiện ban ngày đại diện" ─────────────────────────────────
+// Open-Meteo trả MÃ THỜI TIẾT NGÀY = giờ KHẮC NGHIỆT NHẤT trong ngày. Ở ĐBSCL mùa
+// mưa, một cơn giông chiều (1-2 giờ) khiến CẢ NGÀY hiện "Giông + mưa đá" dù sáng
+// trời quang → nông dân nhìn vào tưởng cả ngày mưa, ngại ra đồng. Dữ liệu KHÔNG sai
+// (các model bất đồng: ECMWF ẩm, GFS nắng), nên ta không đổi nguồn mà tổng hợp lại
+// từ dữ liệu theo giờ để icon/lời khuyên phản ánh đúng phần lớn thời gian ban ngày.
+function wmoBucket(code) {
+  if (code >= 95) return 'storm'
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rain'
+  if (code === 45 || code === 48) return 'fog'
+  if (code >= 2) return 'cloud'
+  return 'clear' // 0, 1
+}
+// Mã đại diện cho từng nhóm → chọn icon/nhãn nhẹ nhàng, đúng mức
+const BUCKET_CODE = { clear: 0, cloud: 2, fog: 45, rain: 63, storm: 95 }
+
+// Tóm tắt 1 ngày từ các giờ ban ngày (6h–18h): điều kiện đại diện + thời điểm mưa.
+function summarizeDay(hours) {
+  const day = (hours || []).filter(x => x.h >= 6 && x.h <= 18)
+  if (!day.length) return null
+
+  const counts = {}
+  for (const x of day) { const b = wmoBucket(x.code); counts[b] = (counts[b] || 0) + 1 }
+  const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]
+
+  const wet      = day.filter(x => ['rain', 'storm'].includes(wmoBucket(x.code)))
+  const hasStorm = day.some(x => wmoBucket(x.code) === 'storm')
+  let rainTiming = null
+  if (wet.length) {
+    const morning   = wet.filter(x => x.h < 12).length
+    const afternoon = wet.length - morning
+    rainTiming = wet.length >= 9 ? 'cả ngày'
+               : afternoon > morning ? 'chiều'
+               : morning > afternoon ? 'sáng'
+               : 'rải rác'
+  }
+  return { dayCode: BUCKET_CODE[dominant], hasStorm, rainTiming, wetCount: wet.length }
+}
+
+// Nhãn ngắn về mưa/giông để hiển thị cạnh icon (vd "giông chiều", "mưa sáng").
+export function rainTimingLabel(day) {
+  if (!day?.rainTiming) return null
+  return `${day.hasStorm ? 'giông' : 'mưa'} ${day.rainTiming}`
+}
+
+// Lời khuyên canh tác — theo THỜI ĐIỂM mưa, không "cấm cả ngày" khi chỉ mưa chiều.
 export function farmingTip(day) {
   if (!day) return null
-  const pp   = day.rainProb ?? 0
-  const wc   = day.weathercode ?? 0
-  const tmax = day.tmax ?? 30
+  const pp     = day.rainProb ?? 0
+  const tmax   = day.tmax ?? 30
+  // Tương thích cả dữ liệu cache cũ (chưa có tóm tắt theo giờ): suy ra từ mã ngày.
+  const storm  = day.hasStorm ?? ((day.weathercode ?? 0) >= 95)
+  const timing = day.rainTiming ?? null
+  const wet    = day.wetCount ?? 0
 
-  if (wc >= 95)         return { type: 'danger',  text: 'Có giông — tuyệt đối không ra đồng, cất máy móc vào nơi an toàn.' }
-  if (wc >= 61 || pp >= 70) return { type: 'warning', text: 'Mưa to — không nên phun thuốc hôm nay, chờ trời tạnh.' }
-  if (pp >= 40)         return { type: 'info',    text: 'Có khả năng mưa — theo dõi thời tiết trước khi phun thuốc.' }
-  if (tmax >= 38)       return { type: 'warning', text: 'Nắng nóng — tưới nước vào sáng sớm hoặc chiều mát, tránh trưa.' }
-  if (pp < 20 && wc <= 2) return { type: 'success', text: 'Thời tiết thuận lợi — phù hợp để phun thuốc và bón phân.' }
-  return { type: 'info', text: 'Thời tiết ổn định — có thể canh tác bình thường.' }
+  if (storm) {
+    if (timing === 'chiều') return { type: 'warning', text: 'Chiều có giông — tranh thủ làm đồng buổi sáng, đầu giờ chiều nên nghỉ và cất máy móc.' }
+    if (timing === 'sáng')  return { type: 'warning', text: 'Sáng có giông — nên ra đồng vào buổi chiều khi trời đã tạnh.' }
+    return { type: 'danger', text: 'Trong ngày có giông — hạn chế ra đồng, cất máy móc nơi an toàn, không trú dưới cây hay cột điện.' }
+  }
+  if (wet > 0 || pp >= 60) {
+    if (timing === 'chiều')   return { type: 'info',    text: 'Chiều có mưa — tranh thủ phun thuốc, bón phân vào buổi sáng cho kịp.' }
+    if (timing === 'sáng')    return { type: 'info',    text: 'Sáng có mưa — chờ buổi chiều trời tạnh hãy phun thuốc, bón phân.' }
+    if (timing === 'cả ngày') return { type: 'warning', text: 'Mưa nhiều trong ngày — nên hoãn phun thuốc và bón phân, tránh bị rửa trôi.' }
+    return { type: 'info', text: 'Có thể có mưa — theo dõi trời trước khi phun thuốc.' }
+  }
+  if (tmax >= 35) return { type: 'warning', text: 'Nắng nóng — tưới nước sáng sớm hoặc chiều mát, tránh phun thuốc giữa trưa.' }
+  if (tmax >= 33) return { type: 'info',    text: 'Trời nắng — nên làm đồng lúc sáng sớm hoặc chiều mát cho đỡ mệt.' }
+  return { type: 'success', text: 'Thời tiết thuận lợi — phù hợp để phun thuốc và bón phân.' }
 }
 
 async function getGPS() {
@@ -76,16 +132,42 @@ async function fetchWeather(lat, lon) {
   return res.json()
 }
 
+// Gom các giờ theo ngày (YYYY-MM-DD) để tổng hợp điều kiện ban ngày đại diện.
+function hourlyByDate(raw) {
+  const map = {}
+  if (!raw?.hourly?.time) return map
+  raw.hourly.time.forEach((t, i) => {
+    const date = t.slice(0, 10)
+    ;(map[date] ||= []).push({
+      h:    Number(t.slice(11, 13)),
+      code: raw.hourly.weather_code?.[i] ?? 0,
+      prob: raw.hourly.precipitation_probability?.[i] ?? 0,
+    })
+  })
+  return map
+}
+
 function parseDaily(raw) {
   if (!raw?.daily?.time) return []
-  return raw.daily.time.map((date, i) => ({
-    date,
-    weathercode: raw.daily.weathercode[i],
-    tmax:        Math.round(raw.daily.temperature_2m_max[i]),
-    tmin:        Math.round(raw.daily.temperature_2m_min[i]),
-    rain:        Math.round((raw.daily.precipitation_sum[i] ?? 0) * 10) / 10,
-    rainProb:    raw.daily.precipitation_probability_max[i] ?? 0,
-  }))
+  const byDate = hourlyByDate(raw)
+  return raw.daily.time.map((date, i) => {
+    const s = summarizeDay(byDate[date])
+    const peakCode = raw.daily.weathercode[i]
+    return {
+      date,
+      // Icon/nhãn dùng điều kiện ĐẠI DIỆN ban ngày (đỡ giật mình), không phải giờ
+      // khắc nghiệt nhất. peakCode giữ lại để tham chiếu nếu cần.
+      weathercode: s?.dayCode ?? peakCode,
+      peakCode,
+      hasStorm:    s?.hasStorm   ?? (peakCode >= 95),
+      rainTiming:  s?.rainTiming ?? null,
+      wetCount:    s?.wetCount   ?? 0,
+      tmax:        Math.round(raw.daily.temperature_2m_max[i]),
+      tmin:        Math.round(raw.daily.temperature_2m_min[i]),
+      rain:        Math.round((raw.daily.precipitation_sum[i] ?? 0) * 10) / 10,
+      rainProb:    raw.daily.precipitation_probability_max[i] ?? 0,
+    }
+  })
 }
 
 // Thời tiết hiện tại chi tiết (cảm giác như, độ ẩm, gió)
