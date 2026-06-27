@@ -26,6 +26,16 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
   }
 
   try {
+    // App tự re-sync subscription mỗi lần mở (usePush). Nếu lần nào cũng gửi push
+    // "đã bật thông báo" thì nông dân bị spam mỗi lần vào app. Chỉ chào mừng khi
+    // đây là đăng ký MỚI (chưa có endpoint này đang active trong DB).
+    const { data: existing } = await supabase
+      .from('push_subscriptions')
+      .select('active')
+      .eq('endpoint', subscription.endpoint)
+      .maybeSingle()
+    const isNewSubscription = !existing?.active
+
     const { error } = await supabase
       .from('push_subscriptions')
       .upsert({
@@ -40,14 +50,16 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
       throw error
     }
 
-    console.log('[PUSH] subscription saved for user:', req.user.userId, 'endpoint:', subscription.endpoint.slice(0, 60))
+    console.log('[PUSH] subscription saved for user:', req.user.userId, 'endpoint:', subscription.endpoint.slice(0, 60), '| new:', isNewSubscription)
 
-    const welcomeResult = await sendPush(subscription, {
-      title: 'Cò Con Dự Báo!',
-      body:  'Bạn đã bật thông báo thành công!',
-      url:   '/notifications',
-    })
-    console.log('[PUSH] welcome push result:', welcomeResult)
+    if (isNewSubscription) {
+      const welcomeResult = await sendPush(subscription, {
+        title: 'Cò Con Dự Báo!',
+        body:  'Bạn đã bật thông báo thành công!',
+        url:   '/notifications',
+      })
+      console.log('[PUSH] welcome push result:', welcomeResult)
+    }
 
     res.json({ success: true })
   } catch (err) {

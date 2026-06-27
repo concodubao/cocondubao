@@ -142,6 +142,13 @@
 /* ─── Reset ─────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
+html, body {
+  /* Chặn tràn ngang: font-scale dùng CSS `zoom` (App.jsx) trên iOS dễ làm content
+     rộng hơn viewport → tràn màn hình. Dùng `clip` thay `hidden` để KHÔNG biến
+     trục dọc thành scroll-container (giữ `position: sticky` của header hoạt động). */
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   font-family: 'Noto Sans', system-ui, sans-serif;
