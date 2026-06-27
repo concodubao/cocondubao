@@ -98,7 +98,7 @@ export default function Weather() {
   const heroTheme = weatherTheme(today?.weathercode)
 
   return (
-    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] md:max-w-[920px] mx-auto overflow-x-hidden">
+    <div className="min-h-dvh flex flex-col bg-[#fdf8f5] w-full max-w-[480px] md:max-w-[920px] mx-auto overflow-x-hidden">
 
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3
