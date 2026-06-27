@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/authStore'
@@ -66,10 +65,9 @@ export default function Home() {
   const navigate         = useNavigate()
   const { user } = useAuthStore()
   const { permission, isSubscribed, error: pushError, subscribe } = usePush(user?.id)
-
-  useEffect(() => {
-    if (permission === 'granted' && !isSubscribed && user?.id) subscribe()
-  }, [permission, isSubscribed, user?.id])
+  // KHÔNG auto-subscribe ở đây: mỗi lần vào Home, isSubscribed khởi tạo false rồi
+  // mới async kiểm tra → effect cũ gọi subscribe() tạo endpoint MỚI mỗi lần → spam
+  // welcome push + tích endpoint rác. usePush đã tự re-sync sub hiện có lên server.
 
   const { today, currentTemp, loading: weatherLoading } = useWeather()
   const wmo = getWMO(today?.weathercode)

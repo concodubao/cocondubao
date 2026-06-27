@@ -55,15 +55,28 @@ export function usePush(userId) {
       const registration = await navigator.serviceWorker.ready
       console.log('[PUSH] SW ready, scope:', registration.scope)
 
-      // Huỷ subscription cũ nếu có (tránh lỗi VAPID mismatch)
-      const existing = await registration.pushManager.getSubscription()
-      if (existing) await existing.unsubscribe()
+      const appKey = urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY)
 
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly:      true,
-        applicationServerKey: urlBase64ToUint8Array(import.meta.env.VITE_VAPID_PUBLIC_KEY),
-      })
-      console.log('[PUSH] browser subscription created, endpoint:', subscription.endpoint.slice(0, 60) + '...')
+      // Tái dùng subscription hiện có nếu ĐÚNG VAPID key. Trước đây luôn unsubscribe
+      // rồi subscribe lại → mỗi lần sinh endpoint MỚI → server gửi lại welcome push
+      // (spam) + tích endpoint rác trong DB. Chỉ tạo mới khi chưa có / key đã đổi.
+      let subscription = await registration.pushManager.getSubscription()
+      if (subscription) {
+        const cur = new Uint8Array(subscription.options?.applicationServerKey || [])
+        const sameKey = cur.length === appKey.length && cur.every((b, i) => b === appKey[i])
+        if (!sameKey) {
+          await pushAPI.unsubscribe({ endpoint: subscription.endpoint }).catch(() => {})
+          await subscription.unsubscribe()
+          subscription = null
+        }
+      }
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly:      true,
+          applicationServerKey: appKey,
+        })
+      }
+      console.log('[PUSH] browser subscription endpoint:', subscription.endpoint.slice(0, 60) + '...')
 
       await pushAPI.subscribe({ subscription })
       console.log('[PUSH] subscription saved to server ✓')
