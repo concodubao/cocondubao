@@ -80,6 +80,7 @@ export const engineerAPI = {
   uploadDoc:  (formData) => api.post('/knowledge/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  addQA:      (data)     => api.post('/knowledge/qa', data, { timeout: 120000 }),
   getDocs:    (status)   => api.get('/knowledge/docs' + (status ? `?status=${status}` : '')),
   getDoc:     (id)       => api.get(`/knowledge/docs/${id}`),
   approveDoc: (id)       => api.patch(`/knowledge/${id}/approve`, {}, { timeout: 120000 }),

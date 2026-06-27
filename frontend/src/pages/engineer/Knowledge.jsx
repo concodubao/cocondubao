@@ -97,6 +97,63 @@ function UploadForm({ onSuccess }) {
   )
 }
 
+// Form soạn 1 cặp Hỏi–Đáp chuẩn (kỹ sư/admin) — embed thẳng vào RAG.
+function QAForm({ onSuccess }) {
+  const [question, setQuestion] = useState('')
+  const [answer,   setAnswer]   = useState('')
+  const [crops,    setCrops]    = useState([])
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
+
+  function toggleCrop(id) {
+    setCrops(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
+  }
+
+  async function handleSave() {
+    if (!question.trim()) return setError('Nhập câu hỏi của nông dân.')
+    if (!answer.trim())   return setError('Nhập câu trả lời chuẩn.')
+    setLoading(true)
+    setError('')
+    try {
+      await engineerAPI.addQA({ question: question.trim(), answer: answer.trim(), cropTags: crops })
+      setQuestion(''); setAnswer(''); setCrops([])
+      onSuccess()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Không lưu được. Thử lại nhé.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={styles.uploadCard}>
+      <p style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', margin: 0 }}>Soạn cặp Hỏi–Đáp chuẩn</p>
+      <p style={{ fontSize: 12.5, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+        Khi nông dân hỏi câu tương tự, AI sẽ trả thẳng câu trả lời này (khỏi tốn quota). Dùng cho câu hay gặp, cần đáp án chính xác.
+      </p>
+      <textarea placeholder="Câu hỏi của nông dân — vd: Lúa bị vàng lá phải làm sao?"
+        value={question} onChange={e => setQuestion(e.target.value)} rows={2} style={styles.textarea} />
+      <textarea placeholder="Câu trả lời chuẩn — viết đúng, ngắn gọn, dễ hiểu cho bà con"
+        value={answer} onChange={e => setAnswer(e.target.value)} rows={5} style={styles.textarea} />
+      <div>
+        <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 6px' }}>Áp dụng cho cây trồng nào? (không bắt buộc)</p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {CROP_OPTIONS.map(c => (
+            <button key={c.id} onClick={() => toggleCrop(c.id)} aria-pressed={crops.includes(c.id)}
+              style={{ ...styles.cropBtn, background: crops.includes(c.id) ? '#fdf6f0' : '#fff', border: `1.5px solid ${crops.includes(c.id) ? '#4B230A' : '#e2e8f0'}`, color: crops.includes(c.id) ? '#4B230A' : '#64748b', fontWeight: crops.includes(c.id) ? 700 : 400 }}>
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {error && <p style={styles.errorText} role="alert">{error}</p>}
+      <button onClick={handleSave} disabled={loading} style={{ ...styles.btnUpload, opacity: loading ? 0.7 : 1 }}>
+        <Check size={16} strokeWidth={2.5} /> {loading ? 'Đang lưu & embed...' : 'Lưu vào kho tri thức'}
+      </button>
+    </div>
+  )
+}
+
 function DocCard({ doc, onApprove, onArchive, onDelete, onPreview, approving, deleting }) {
   const isApproving = approving === doc.id
   const isDeleting  = deleting  === doc.id
@@ -204,6 +261,7 @@ export default function Knowledge() {
   const [approving,  setApproving]  = useState(null)
   const [deleting,   setDeleting]   = useState(null)
   const [showUpload, setShowUpload] = useState(false)
+  const [showQA,     setShowQA]     = useState(false)
 
   const { data, isLoading } = useQuery({
     queryKey:  ['knowledge-docs', filter],
@@ -296,12 +354,26 @@ export default function Knowledge() {
       </div>
 
       <div style={{ padding: '0 14px' }}>
-        <button onClick={() => setShowUpload(v => !v)} style={styles.btnToggleUpload} aria-expanded={showUpload}>
-          {showUpload ? 'Đóng form upload' : '+ Upload tài liệu mới'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={() => { setShowUpload(v => !v); setShowQA(false) }}
+            style={{ ...styles.btnToggleUpload, margin: 0, flex: 1 }} aria-expanded={showUpload}>
+            {showUpload ? 'Đóng' : '+ Upload tài liệu'}
+          </button>
+          <button onClick={() => { setShowQA(v => !v); setShowUpload(false) }}
+            style={{ ...styles.btnToggleUpload, margin: 0, flex: 1 }} aria-expanded={showQA}>
+            {showQA ? 'Đóng' : '+ Soạn Hỏi–Đáp'}
+          </button>
+        </div>
         {showUpload && (
           <UploadForm onSuccess={() => {
             setShowUpload(false)
+            queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
+          }} />
+        )}
+        {showQA && (
+          <QAForm onSuccess={() => {
+            setShowQA(false)
+            toast.success('Đã lưu — đang embed cặp Hỏi–Đáp vào kho tri thức.')
             queryClient.invalidateQueries({ queryKey: ['knowledge-docs'] })
           }} />
         )}
@@ -387,6 +459,7 @@ const styles = {
   uploadCard:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: '14px', marginTop: 8, display: 'flex', flexDirection: 'column', gap: 10 },
   filePicker:     { display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#fdf8f5', border: '2px dashed #f5d5b0', borderRadius: 8, cursor: 'pointer', fontSize: 14, color: '#64748b', width: '100%', textAlign: 'left', overflow: 'hidden' },
   input:          { padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', width: '100%', boxSizing: 'border-box' },
+  textarea:       { padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1.5px solid #e2e8f0', outline: 'none', color: '#0f172a', background: '#fff', width: '100%', boxSizing: 'border-box', fontFamily: "'Noto Sans', sans-serif", resize: 'vertical', lineHeight: 1.5 },
   cropBtn:        { padding: '6px 12px', borderRadius: 99, cursor: 'pointer', fontSize: 13, transition: 'all 0.15s' },
   errorText:      { color: '#ef4444', fontSize: 13, background: '#fef2f2', padding: '8px 10px', borderRadius: 8, margin: 0 },
   btnUpload:      { padding: '11px', fontSize: 15, fontWeight: 700, background: '#4B230A', color: '#fff', border: 'none', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 },

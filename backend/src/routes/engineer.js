@@ -500,6 +500,44 @@ router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
   }
 )
 
+// POST /qa — kỹ sư/admin tự soạn 1 cặp Hỏi–Đáp chuẩn rồi embed ngay.
+// Lưu dạng "Câu hỏi: ... Câu trả lời: ..." y như QA biên soạn từ màn Soát AI →
+// RAG có thể trả thẳng câu trả lời này (qa_direct) khi nông dân hỏi tương tự,
+// khỏi tốn quota LLM. crop_tags để lọc theo cây trồng trong RAG.
+router.post('/qa', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
+  const { question, answer, cropTags } = req.body
+  if (!question?.trim() || !answer?.trim()) {
+    return res.status(400).json({ error: 'Cần nhập cả câu hỏi và câu trả lời.' })
+  }
+  const VALID_CROPS = ['rice', 'veggie', 'fruit', 'other']
+  const tags = Array.isArray(cropTags) ? cropTags.filter(c => VALID_CROPS.includes(c)) : []
+
+  try {
+    const { data: doc, error } = await supabase
+      .from('knowledge_docs')
+      .insert({
+        title:       `QA: ${question.trim().slice(0, 60)}`,
+        source:      'manual_qa',
+        crop_tags:   tags,
+        content:     `Câu hỏi: ${question.trim()}\n\nCâu trả lời: ${answer.trim()}`,
+        status:      'embedding',
+        uploaded_by: req.user.userId,
+      })
+      .select('id')
+      .single()
+    if (error) throw error
+
+    // Embed nền — trả lời ngay, UI poll trạng thái (giống luồng duyệt tài liệu).
+    // embedAndStoreDoc tự đặt lại status='draft' kèm error_message nếu embed lỗi.
+    embedAndStoreDoc(doc.id).catch(e => console.warn('[KNOWLEDGE] embed manual QA failed:', e.message))
+
+    res.json({ success: true, docId: doc.id })
+  } catch (err) {
+    console.error('[KNOWLEDGE] qa error:', err)
+    res.status(500).json({ error: 'Không lưu được cặp Hỏi–Đáp.' })
+  }
+})
+
 // GET /docs — danh sách tài liệu
 router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
   const { status, crop } = req.query
