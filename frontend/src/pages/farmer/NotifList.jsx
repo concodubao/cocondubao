@@ -4,8 +4,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
 import { pushAPI } from '../../services/api'
 import { usePush } from '../../hooks/usePush'
+import { toast } from '../../stores/toastStore'
 import { NotifCardSkeleton } from '../../components/Skeleton'
-import { ChevronLeft, Settings, Bell, AlertTriangle, Tag, Cloud, ChevronRight } from 'lucide-react'
+import { ChevronLeft, Settings, Bell, AlertTriangle, Tag, Cloud, Trash2 } from 'lucide-react'
+
+// Ẩn thông báo theo từng thiết bị (localStorage). Thông báo là broadcast (1 dòng
+// chung cho cả xã) nên không xóa thật cho riêng 1 người được — ta ẩn ở máy nông dân.
+const HIDDEN_KEY = 'cocon-notif-hidden'
+function loadHidden() {
+  try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_KEY) || '[]')) } catch { return new Set() }
+}
 
 const TYPE_CONFIG = {
   alert:     { label: 'Cảnh báo',   Icon: AlertTriangle, bg: '#fef2f2', border: '#fecaca', color: '#ef4444', dot: '#ef4444' },
@@ -13,7 +21,7 @@ const TYPE_CONFIG = {
   weather:   { label: 'Thời tiết',  Icon: Cloud,         bg: '#fffbeb', border: '#fde68a', color: '#f59e0b', dot: '#f59e0b' },
 }
 
-function NotifCard({ notif, onRead, onPress }) {
+function NotifCard({ notif, onRead, onPress, onHide }) {
   const [hovered, setHovered] = useState(false)
   const cfg     = TYPE_CONFIG[notif.type] || TYPE_CONFIG.alert
   const date    = new Date(notif.sent_at)
@@ -64,7 +72,13 @@ function NotifCard({ notif, onRead, onPress }) {
           </div>
         </div>
 
-        <ChevronRight size={16} color="#cbd5e1" style={{ flexShrink: 0, marginLeft: 4 }} />
+        <button
+          onClick={e => { e.stopPropagation(); onHide(notif.id) }}
+          aria-label="Xóa thông báo này"
+          style={styles.deleteBtn}
+        >
+          <Trash2 size={16} color="#cbd5e1" strokeWidth={2} />
+        </button>
       </div>
     </div>
   )
@@ -76,6 +90,16 @@ export default function NotifList() {
   const { user }    = useAuthStore()
   const { permission, isSubscribed, subscribe } = usePush(user?.id)
   const [filter, setFilter] = useState('all')
+  const [hidden, setHidden] = useState(loadHidden)
+
+  function hideNotif(id) {
+    setHidden(prev => {
+      const next = new Set(prev); next.add(id)
+      try { localStorage.setItem(HIDDEN_KEY, JSON.stringify([...next])) } catch { /* hết chỗ → bỏ qua */ }
+      return next
+    })
+    toast.success('Đã xóa thông báo.')
+  }
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications', user?.id],
@@ -89,12 +113,13 @@ export default function NotifList() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   })
 
-  const notifications = (data || []).filter(n => {
+  const visible = (data || []).filter(n => !hidden.has(n.id))
+  const notifications = visible.filter(n => {
     if (filter === 'all')    return true
     if (filter === 'unread') return !n.is_read
     return n.type === filter
   })
-  const unreadCount = (data || []).filter(n => !n.is_read).length
+  const unreadCount = visible.filter(n => !n.is_read).length
 
   const FILTERS = [
     { key: 'all',       label: 'Tất cả' },
@@ -181,6 +206,7 @@ export default function NotifList() {
             <div key={n.id} style={{ animationDelay: `${i * 0.04}s` }}>
               <NotifCard notif={n}
                 onRead={id => markRead.mutate(id)}
+                onHide={hideNotif}
                 onPress={notif => navigate(`/notifications/${notif.id}`, { state: { notif } })} />
             </div>
           ))
@@ -213,6 +239,7 @@ const styles = {
   typeBadge:      { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99 },
   cardDate:       { fontSize: 11, color: '#64748b' },
   unreadDot:      { width: 7, height: 7, borderRadius: '50%', display: 'inline-block', flexShrink: 0 },
+  deleteBtn:      { flexShrink: 0, marginLeft: 4, width: 34, height: 34, borderRadius: 9, border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
   emptyState:     { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '60px 20px 40px', textAlign: 'center' },
   emptyIconWrap:  { width: 72, height: 72, borderRadius: 22, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   emptyTitle:     { fontSize: 16, fontWeight: 700, color: '#374151', margin: 0 },
