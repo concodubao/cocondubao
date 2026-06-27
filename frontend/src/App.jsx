@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './stores/authStore'
-import { useDisplayStore } from './stores/displayStore'
 
 // ─── Pages tải ngay (nông dân, dùng nhiều nhất) ───────────────────────────────
 import Splash        from './pages/Splash'
@@ -87,27 +86,20 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 export default function App() {
-  const fontScale = useDisplayStore(s => s.fontScale)
   useEffect(() => {
-    // Phóng to UI cho người lớn tuổi bằng CSS `zoom`. NHƯNG nếu chỉ zoom mà không
-    // thu bề rộng thì nội dung rộng hơn màn hình `scale` lần → tràn/cắt mép phải
-    // (nhiều trình duyệt Android không tự reflow theo zoom). Bù lại: đặt bề rộng
-    // #root = 100%/scale (căn trái) → layout dồn vào, rồi zoom phóng ra VỪA KHÍT
-    // bề ngang màn hình. Các trang tự căn giữa nội dung của chúng nên vẫn cân.
+    // Tính năng "Cỡ chữ hiển thị" TẠM VÔ HIỆU HOÁ. App dùng 623 chỗ px cứng (0 rem)
+    // nên không thể phóng chữ kiểu co giãn layout; cách duy nhất là CSS `zoom` cả
+    // trang — mà `zoom` lệch/tràn không nhất quán giữa Android/iOS và không thật sự
+    // giúp đọc to hơn (chỉ phình button + vỡ layout). Reset zoom để dọn luôn giá trị
+    // người dùng đã lưu trước đó. (Muốn bật lại: khôi phục effect cũ + nút ở Profile.)
     const root = document.getElementById('root')
-    if (!root) return
-    if (fontScale === 1) {
+    if (root) {
       root.style.zoom = ''
       root.style.width = ''
       root.style.marginLeft = ''
       root.style.marginRight = ''
-    } else {
-      root.style.zoom = String(fontScale)
-      root.style.width = `${100 / fontScale}%`
-      root.style.marginLeft = '0'
-      root.style.marginRight = '0'
     }
-  }, [fontScale])
+  }, [])
 
   return (
     <QueryClientProvider client={queryClient}>
