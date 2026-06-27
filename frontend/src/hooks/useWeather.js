@@ -80,6 +80,28 @@ export function rainTimingLabel(day) {
   return `${day.hasStorm ? 'giông' : 'mưa'} ${day.rainTiming}`
 }
 
+// ─── Màu thẻ theo điều kiện thời tiết ───────────────────────────────────────
+// Thẻ trước đây luôn 1 màu xanh dù trời nắng hay mưa. Cho màu đổi theo điều kiện
+// để đỡ đơn điệu và bà con nhìn màu đoán được trời: nắng=cam, ít mây=xanh nhạt,
+// âm u=xám, mưa=xanh, giông=tím.
+const WEATHER_THEME = {
+  clear: ['#f59e0b', '#d97706'], // nắng
+  cloud: ['#38bdf8', '#0284c7'], // ít mây
+  fog:   ['#94a3b8', '#475569'], // âm u / sương mù
+  rain:  ['#3b82f6', '#1d4ed8'], // mưa
+  storm: ['#6366f1', '#4338ca'], // giông
+}
+export function weatherTheme(code) {
+  const c = code ?? 0
+  let key = 'cloud'
+  if (c >= 95)                                          key = 'storm'
+  else if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82)) key = 'rain'
+  else if (c === 3 || c === 45 || c === 48)             key = 'fog'
+  else if (c <= 1)                                      key = 'clear'
+  const [from, to] = WEATHER_THEME[key]
+  return { from, to, gradient: `linear-gradient(135deg, ${from}, ${to})` }
+}
+
 // Lời khuyên canh tác — theo THỜI ĐIỂM mưa, không "cấm cả ngày" khi chỉ mưa chiều.
 export function farmingTip(day) {
   if (!day) return null

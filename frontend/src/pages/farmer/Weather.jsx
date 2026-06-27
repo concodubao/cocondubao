@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useWeather, getWMO, farmingTip, rainTimingLabel } from '../../hooks/useWeather'
+import { useWeather, getWMO, farmingTip, rainTimingLabel, weatherTheme } from '../../hooks/useWeather'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuthStore } from '../../stores/authStore'
 
@@ -35,11 +35,12 @@ function DayCard({ day, index }) {
   const wmo = getWMO(day.weathercode)
   const timing = rainTimingLabel(day)
   const isToday = index === 0
+  const theme = weatherTheme(day.weathercode)
 
   return (
-    <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 border
-                     ${isToday ? 'bg-[#0369a1] border-[#075985]' : 'bg-white border-[#f0e0d0]'}
-                     shadow-sm`}>
+    <div className={`flex items-center gap-3 rounded-2xl px-4 py-3.5 border shadow-sm
+                     ${isToday ? '' : 'bg-white border-[#f0e0d0]'}`}
+         style={isToday ? { background: theme.gradient, borderColor: theme.to } : undefined}>
       {/* Ngày */}
       <div className={`w-16 flex-shrink-0 text-[13px] font-bold ${isToday ? 'text-white/90' : 'text-[#7a6358]'}`}>
         {formatDate(day.date, index)}
@@ -94,6 +95,7 @@ export default function Weather() {
   const wmo = getWMO(today?.weathercode)
   const tip = farmingTip(today)
   const todayTiming = rainTimingLabel(today)
+  const heroTheme = weatherTheme(today?.weathercode)
 
   return (
     <div className="min-h-dvh flex flex-col bg-[#fdf8f5] max-w-[480px] md:max-w-[920px] mx-auto overflow-x-hidden">
@@ -133,7 +135,7 @@ export default function Weather() {
             <div className="flex flex-col gap-4">
             {/* Hero card hôm nay */}
             <div className="rounded-3xl px-6 py-6 text-white shadow-lg"
-                 style={{ background: 'linear-gradient(135deg, #0ea5e9, #075985)' }}>
+                 style={{ background: heroTheme.gradient }}>
               {/* Vị trí */}
               <div className="flex items-center gap-1.5 text-white/80 text-[13px] mb-4">
                 <span className="material-symbols-outlined text-[15px]">location_on</span>
