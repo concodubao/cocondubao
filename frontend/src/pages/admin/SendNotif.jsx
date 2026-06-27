@@ -112,6 +112,13 @@ const TYPE_OPTIONS = [
   { id: 'weather',   Icon: Cloud,         label: 'Thời tiết nông vụ',  desc: 'Thời tiết ảnh hưởng mùa vụ',   color: '#f59e0b', bg: '#fffbeb' },
 ]
 
+const CROP_OPTIONS = [
+  { id: 'rice',   label: 'Lúa' },
+  { id: 'veggie', label: 'Rau màu' },
+  { id: 'fruit',  label: 'Cây ăn trái' },
+  { id: 'other',  label: 'Khác' },
+]
+
 function NotifPreview({ type, title, body }) {
   const cfg = TYPE_OPTIONS.find(t => t.id === type) || TYPE_OPTIONS[0]
   const { Icon } = cfg
@@ -146,10 +153,15 @@ export default function SendNotif() {
   const [type,       setType]       = useState('alert')
   const [title,      setTitle]      = useState('')
   const [body,       setBody]       = useState('')
+  const [crops,      setCrops]      = useState([])   // [] = gửi cho tất cả
   const [imageUrl,   setImageUrl]   = useState('')
   const [scheduleAt, setScheduleAt] = useState('')
   const [result,     setResult]     = useState(null)
   const [error,      setError]      = useState('')
+
+  function toggleCrop(id) {
+    setCrops(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
+  }
 
   const sendMutation = useMutation({
     mutationFn: (data) => pushAPI.send(data),
@@ -171,6 +183,7 @@ export default function SendNotif() {
       title:      title.trim(),
       body:       body.trim(),
       type,
+      cropTags:   crops,   // [] = tất cả; có cây = chỉ nông dân trồng cây đó
       imageUrl:   imageUrl.trim() || undefined,
       scheduleAt: scheduleAt || undefined,
     })
@@ -257,6 +270,26 @@ export default function SendNotif() {
           <input type="url" placeholder="Link ảnh minh họa (không bắt buộc)" value={imageUrl}
             onChange={e => setImageUrl(e.target.value)}
             style={s.input} aria-label="URL ảnh minh họa" />
+        </section>
+
+        <section style={s.section}>
+          <p style={s.sLabel}>Gửi cho nông dân trồng</p>
+          <p style={s.sDesc}>Không chọn = gửi cho tất cả. Chọn cây để chỉ gửi cho nông dân trồng cây đó (vd cảnh báo sâu lúa → chỉ người trồng lúa).</p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {CROP_OPTIONS.map(c => {
+              const active = crops.includes(c.id)
+              return (
+                <button key={c.id} type="button" onClick={() => toggleCrop(c.id)} aria-pressed={active}
+                  style={{ padding: '7px 14px', borderRadius: 99, cursor: 'pointer', fontSize: 13, fontWeight: active ? 700 : 400,
+                           border: `1.5px solid ${active ? '#4B230A' : '#e2e8f0'}`, background: active ? '#fdf6f0' : '#fff', color: active ? '#4B230A' : '#64748b' }}>
+                  {c.label}
+                </button>
+              )
+            })}
+          </div>
+          <p style={{ ...s.sDesc, marginTop: 2 }}>
+            {crops.length === 0 ? '→ Đang gửi cho: tất cả nông dân' : `→ Chỉ gửi cho nông dân trồng: ${crops.map(id => CROP_OPTIONS.find(c => c.id === id)?.label).join(', ')}`}
+          </p>
         </section>
 
         <section style={s.section}>
