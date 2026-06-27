@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './stores/authStore'
+import { useDisplayStore } from './stores/displayStore'
 
 // ─── Pages tải ngay (nông dân, dùng nhiều nhất) ───────────────────────────────
 import Splash        from './pages/Splash'
@@ -86,12 +87,10 @@ function ProtectedRoute({ children, allowedRoles }) {
 }
 
 export default function App() {
+  const readScale = useDisplayStore(s => s.fontScale)
+
   useEffect(() => {
-    // Tính năng "Cỡ chữ hiển thị" TẠM VÔ HIỆU HOÁ. App dùng 623 chỗ px cứng (0 rem)
-    // nên không thể phóng chữ kiểu co giãn layout; cách duy nhất là CSS `zoom` cả
-    // trang — mà `zoom` lệch/tràn không nhất quán giữa Android/iOS và không thật sự
-    // giúp đọc to hơn (chỉ phình button + vỡ layout). Reset zoom để dọn luôn giá trị
-    // người dùng đã lưu trước đó. (Muốn bật lại: khôi phục effect cũ + nút ở Profile.)
+    // Dọn sạch CSS `zoom` của bản font-scale CŨ (zoom cả trang gây vỡ/tràn layout).
     const root = document.getElementById('root')
     if (root) {
       root.style.zoom = ''
@@ -100,6 +99,13 @@ export default function App() {
       root.style.marginRight = ''
     }
   }, [])
+
+  useEffect(() => {
+    // Phóng CỠ CHỮ ĐỌC (câu trả lời AI + nội dung thông báo) qua biến CSS, KHÔNG
+    // zoom cả trang nên KHÔNG vỡ layout. Chỉ vài thành phần nội dung dùng biến này
+    // (AnswerContent, NotifDetail). Px cứng ở nút/khung giữ nguyên.
+    document.documentElement.style.setProperty('--read-scale', String(readScale))
+  }, [readScale])
 
   return (
     <QueryClientProvider client={queryClient}>

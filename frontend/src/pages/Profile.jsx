@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
+import { useDisplayStore } from '../stores/displayStore'
 import { authAPI } from '../services/api'
 import BottomNav from '../components/BottomNav'
 import PasswordInput from '../components/PasswordInput'
@@ -164,6 +165,7 @@ export default function Profile() {
   const [params]       = useSearchParams()
   const isOnboard      = params.get('onboard') === 'true'
   const { user, setUser, logout } = useAuthStore()
+  const { fontScale, setFontScale } = useDisplayStore()
 
   const isFarmer = user?.role === 'farmer'
 
@@ -344,6 +346,36 @@ export default function Profile() {
         {/* ── Nhóm: Tuỳ chọn ── */}
         {!isOnboard && (
           <p className="text-[13px] font-bold text-[#7a6358] uppercase tracking-wider px-1 mt-1">Tuỳ chọn</p>
+        )}
+
+        {/* Cỡ chữ câu trả lời — chỉ phóng to phần NỘI DUNG ĐỌC (câu trả lời AI +
+            nội dung thông báo), không zoom cả trang nên không vỡ giao diện. */}
+        {isFarmer && !isOnboard && (
+          <div className="bg-white rounded-3xl border border-[#f0e0d0] shadow-sm p-5 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <span className="material-symbols-outlined text-[20px] text-[#4B230A]">format_size</span>
+              <span className="text-[14px] font-semibold text-[#0b1c30] flex-1">Cỡ chữ câu trả lời</span>
+            </div>
+            <div className="flex gap-2">
+              {[['Thường', 1], ['Lớn', 1.25], ['Rất lớn', 1.5]].map(([label, val]) => (
+                <button
+                  key={val}
+                  onClick={() => setFontScale(val)}
+                  aria-pressed={fontScale === val}
+                  className={`flex-1 py-2.5 rounded-2xl border-[1.5px] font-semibold transition-all
+                    ${fontScale === val
+                      ? 'bg-[#fdf6f0] border-[#4B230A] text-[#4B230A]'
+                      : 'bg-white border-[#f0e0d0] text-[#7a6358]'}`}
+                  style={{ fontSize: val === 1 ? 14 : val === 1.25 ? 16 : 18 }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[12px] text-[#7a6358] m-0" style={{ fontSize: `calc(13px * ${fontScale})` }}>
+              Ví dụ: cỡ chữ câu trả lời sẽ trông như thế này.
+            </p>
+          </div>
         )}
 
         {/* Khác — cài đặt & chính sách */}

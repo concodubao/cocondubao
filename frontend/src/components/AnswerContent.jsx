@@ -26,8 +26,15 @@ function renderInline(text, prefix) {
 export default function AnswerContent({ content = '', showDisclaimer = false, style }) {
   const lines = stripDisclaimer(content).split('\n').map(l => l.trim()).filter(Boolean)
 
+  // Cỡ chữ đọc co giãn theo --read-scale (cài đặt của nông dân). Lấy fontSize cha
+  // làm gốc (mặc định 1em = thừa kế) rồi nhân biến → chữ trả lời to/nhỏ theo ý.
+  const base = style?.fontSize != null
+    ? (typeof style.fontSize === 'number' ? `${style.fontSize}px` : style.fontSize)
+    : '1em'
+  const rootStyle = { ...style, fontSize: `calc(${base} * var(--read-scale, 1))` }
+
   return (
-    <div style={style}>
+    <div style={rootStyle}>
       {lines.map((line, i) => {
         const li = /^(\d+\.|[-*])\s+(.*)$/.exec(line)
         if (li) {
