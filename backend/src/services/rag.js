@@ -122,6 +122,45 @@ export function setAnswerCache(question, cropType, result, embedding = null) {
   })
 }
 
+// ─── DB cache (L2) — bền qua deploy ──────────────────────────────────────────
+// In-memory (L1) mất khi redeploy; bảng answer_cache giữ lại câu phổ biến để khỏi
+// gọi Gemini lại. Mọi lỗi (bảng chưa có, DB chậm) đều nuốt → cache chỉ là tối ưu,
+// không bao giờ làm vỡ luồng trả lời.
+const CACHE_TABLE = 'answer_cache'
+
+async function dbGetCache(key) {
+  try {
+    const { data } = await supabase
+      .from(CACHE_TABLE)
+      .select('answer, confidence, source, expires_at')
+      .eq('cache_key', key)
+      .maybeSingle()
+    if (!data || new Date(data.expires_at) < new Date()) return null
+    return { answer: data.answer, confidence: data.confidence, needEngineer: false, source: data.source, chunksFound: 1 }
+  } catch {
+    return null
+  }
+}
+
+function dbSetCache(key, cropType, question, result) {
+  // fire-and-forget — không await, không chặn câu trả lời. try/catch bọc cả phần
+  // đồng bộ (vd môi trường test from() trả undefined → .upsert ném lỗi ngay).
+  try {
+    supabase
+      .from(CACHE_TABLE)
+      .upsert({
+        cache_key:  key,
+        crop_type:  cropType || null,
+        question,
+        answer:     result.answer,
+        confidence: result.confidence,
+        source:     result.source,
+        expires_at: new Date(Date.now() + CACHE_TTL).toISOString(),
+      }, { onConflict: 'cache_key' })
+      .then(() => {}, () => {})
+  } catch { /* nuốt mọi lỗi — cache chỉ là tối ưu */ }
+}
+
 // ─── Semantic cache — khớp câu hỏi cùng ý dù diễn đạt khác ───────────────────
 // Cache khoá theo chuỗi y hệt thì "bón phân lúa sao" và "lúa bón phân thế nào" là
 // 2 key khác → miss, tốn quota Gemini. Tận dụng embedding (đã tính ở bước 1) để
@@ -253,11 +292,20 @@ export async function askRAG(question, cropType = null, history = []) {
       return { answer: faqAnswer, confidence: 1.0, needEngineer: false, source: 'faq', chunksFound: 0 }
     }
 
-    // BƯỚC 0B: Kiểm tra cache — tránh gọi Gemini cho câu hỏi lặp lại
+    // BƯỚC 0B: Cache in-memory (L1) — tránh gọi Gemini cho câu hỏi lặp lại
     const cached = getAnswerCache(question, cropType)
     if (cached) {
-      console.log(`[RAG] cache hit for "${question.slice(0, 50)}..."`)
+      console.log(`[RAG] cache hit (L1) for "${question.slice(0, 50)}..."`)
       return { ...cached, source: cached.source + '_cached' }
+    }
+
+    // BƯỚC 0C: Cache DB (L2) — bền qua deploy. Nạp lại vào L1 nếu trúng.
+    const cacheKey = _cacheKey(question, cropType)
+    const dbCached = await dbGetCache(cacheKey)
+    if (dbCached) {
+      console.log(`[RAG] cache hit (L2/DB) for "${question.slice(0, 50)}..."`)
+      setAnswerCache(question, cropType, dbCached)
+      return { ...dbCached, source: dbCached.source + '_dbcached' }
     }
 
     // BƯỚC 1: Embed câu hỏi thành vector 1536 chiều
@@ -313,6 +361,7 @@ export async function askRAG(question, cropType = null, history = []) {
         chunksFound:  chunks.length,
       }
       setAnswerCache(question, cropType, result, queryEmbedding)
+      dbSetCache(cacheKey, cropType, question, result)
       return result
     }
 
@@ -348,8 +397,9 @@ export async function askRAG(question, cropType = null, history = []) {
       chunksFound:  chunks.length,
     }
 
-    // Cache câu trả lời tin cậy cao (confidence ≥ 0.7) để tái sử dụng
+    // Cache câu trả lời tin cậy cao (confidence ≥ 0.7) để tái sử dụng (L1 + L2/DB)
     setAnswerCache(question, cropType, result, queryEmbedding)
+    dbSetCache(cacheKey, cropType, question, result)
 
     return result
 
