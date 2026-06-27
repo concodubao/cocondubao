@@ -89,8 +89,24 @@ function ProtectedRoute({ children, allowedRoles }) {
 export default function App() {
   const fontScale = useDisplayStore(s => s.fontScale)
   useEffect(() => {
-    // `zoom` phóng to cả layout lẫn chữ; reset về '' khi = 1 cho gọn
-    document.documentElement.style.zoom = fontScale === 1 ? '' : String(fontScale)
+    // Phóng to UI cho người lớn tuổi bằng CSS `zoom`. NHƯNG nếu chỉ zoom mà không
+    // thu bề rộng thì nội dung rộng hơn màn hình `scale` lần → tràn/cắt mép phải
+    // (nhiều trình duyệt Android không tự reflow theo zoom). Bù lại: đặt bề rộng
+    // #root = 100%/scale (căn trái) → layout dồn vào, rồi zoom phóng ra VỪA KHÍT
+    // bề ngang màn hình. Các trang tự căn giữa nội dung của chúng nên vẫn cân.
+    const root = document.getElementById('root')
+    if (!root) return
+    if (fontScale === 1) {
+      root.style.zoom = ''
+      root.style.width = ''
+      root.style.marginLeft = ''
+      root.style.marginRight = ''
+    } else {
+      root.style.zoom = String(fontScale)
+      root.style.width = `${100 / fontScale}%`
+      root.style.marginLeft = '0'
+      root.style.marginRight = '0'
+    }
   }, [fontScale])
 
   return (
