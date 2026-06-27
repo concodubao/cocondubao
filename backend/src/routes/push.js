@@ -26,15 +26,17 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
   }
 
   try {
-    // App tự re-sync subscription mỗi lần mở (usePush). Nếu lần nào cũng gửi push
-    // "đã bật thông báo" thì nông dân bị spam mỗi lần vào app. Chỉ chào mừng khi
-    // đây là đăng ký MỚI (chưa có endpoint này đang active trong DB).
-    const { data: existing } = await supabase
+    // Welcome chỉ gửi LẦN ĐẦU user bật thông báo (chưa có endpoint active nào).
+    // Khoá theo USER chứ không theo endpoint: trình duyệt cũ / iOS Safari có thể
+    // sinh endpoint MỚI mỗi lần subscribe → nếu gửi welcome theo từng endpoint mới
+    // sẽ spam mỗi lần chuyển trang. Đã có bất kỳ endpoint active nào → không welcome.
+    const { data: userActive } = await supabase
       .from('push_subscriptions')
-      .select('active')
-      .eq('endpoint', subscription.endpoint)
-      .maybeSingle()
-    const isNewSubscription = !existing?.active
+      .select('endpoint')
+      .eq('user_id', req.user.userId)
+      .eq('active', true)
+      .limit(1)
+    const isFirstForUser = !userActive?.length
 
     const { error } = await supabase
       .from('push_subscriptions')
@@ -50,9 +52,9 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
       throw error
     }
 
-    console.log('[PUSH] subscription saved for user:', req.user.userId, 'endpoint:', subscription.endpoint.slice(0, 60), '| new:', isNewSubscription)
+    console.log('[PUSH] subscription saved for user:', req.user.userId, 'endpoint:', subscription.endpoint.slice(0, 60), '| firstForUser:', isFirstForUser)
 
-    if (isNewSubscription) {
+    if (isFirstForUser) {
       const welcomeResult = await sendPush(subscription, {
         title: 'Cò Con Dự Báo!',
         body:  'Bạn đã bật thông báo thành công!',
