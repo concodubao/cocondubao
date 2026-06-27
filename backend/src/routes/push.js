@@ -289,6 +289,32 @@ router.get('/notifications/settings', verifyJWT, async (req, res) => {
   }
 })
 
+// GET /notifications/item/:id — lấy 1 thông báo theo id (deep-link / tap push / F5).
+// PHẢI đứng trước '/notifications/:userId' kẻo :userId khớp "item". Thông báo là
+// broadcast (không riêng tư) nên user đăng nhập nào cũng xem được 1 thông báo đã gửi.
+router.get('/notifications/item/:id', verifyJWT, async (req, res) => {
+  try {
+    const { data: notif } = await supabase
+      .from('notifications')
+      .select('id, title, body, type, image_url, crop_tags, sent_at, created_at')
+      .eq('id', req.params.id)
+      .not('sent_at', 'is', null)
+      .maybeSingle()
+    if (!notif) return res.status(404).json({ error: 'Không tìm thấy thông báo.' })
+
+    const { data: read } = await supabase
+      .from('notification_reads')
+      .select('read_at')
+      .eq('notification_id', notif.id)
+      .eq('user_id', req.user.userId)
+      .maybeSingle()
+
+    res.json({ notification: { ...notif, read_at: read?.read_at || null, is_read: !!read?.read_at } })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // GET /notifications/:userId — danh sách thông báo của user
 router.get('/notifications/:userId', verifyJWT, async (req, res) => {
   const { userId } = req.params

@@ -18,14 +18,13 @@ export default function NotifDetail() {
   const { user }   = useAuthStore()
   const stateNotif = location.state?.notif
 
-  // F5 / mở deep-link / mở từ push: không có state → lấy từ danh sách thông báo
-  // của user rồi tìm theo id. Trước đây thiếu cái này nên refresh trang chi tiết
-  // là "không tìm thấy" (giống cách Answer/PostDetail đã được vá deep-link).
+  // F5 / mở deep-link / tap push: không có state → lấy thẳng 1 thông báo theo id.
+  // Trước đây quét danh sách 50 cái gần nhất (lọc theo cây) nên thông báo cũ / khác
+  // cây bị "không tìm thấy". Giờ fetch by-id chắc ăn (giống Answer/PostDetail).
   const { data: fetchedNotif, isLoading } = useQuery({
-    queryKey:  ['notif-detail', id, user?.id],
-    queryFn:   () => pushAPI.getNotifications(user.id)
-      .then(r => (r.data.notifications || []).find(n => String(n.id) === String(id)) || null),
-    enabled:   !stateNotif && !!user?.id,
+    queryKey:  ['notif-detail', id],
+    queryFn:   () => pushAPI.getNotification(id).then(r => r.data.notification),
+    enabled:   !stateNotif && !!id,
     staleTime: 30_000,
   })
 

@@ -56,6 +56,7 @@ export const pushAPI = {
   unsubscribe:      data    => api.delete('/push/unsubscribe', { data }),
   send:             data    => api.post('/push/send', data),
   getNotifications: userId  => api.get(`/push/notifications/${userId}`),
+  getNotification:  (id)    => api.get(`/push/notifications/item/${id}`),
   markRead:         (id)    => api.patch(`/push/notifications/${id}/read`),
   getSettings:      ()      => api.get('/push/notifications/settings'),
   updateSettings:   settings => api.patch('/push/notifications/settings', settings),
