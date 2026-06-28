@@ -26,6 +26,7 @@ Danh sách các quyết định và kiến thức đã ghi nhận:
 - **[Migration cần psql của user]** — .env không có mật khẩu Postgres; viết code degrade mềm, user tự áp migration bằng psql.
 - **[Phóng cỡ chữ = --read-scale]** — KHÔNG dùng CSS zoom cả trang; chỉ scale nội dung đọc.
 - **[Plan bỏ langchain + tắt thinking]** — Xem mục 3 bên dưới.
+- **[⚠️ Lockfile]** — Sau khi thêm/đổi dependency: PHẢI chạy `npm install` để đồng bộ `package-lock.json` rồi commit nó. Railway dùng `npm ci` (nghiêm ngặt) — lockfile lệch/thiếu transitive dep → deploy crash `ERR_MODULE_NOT_FOUND` lúc chạy (đã dính với @sentry, commit `1f1a2eb`).
 
 ---
 

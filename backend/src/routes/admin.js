@@ -349,6 +349,11 @@ router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
   res.json({ users: data })
 })
 
+// Test Sentry route
+router.get('/sentry-test', requireRole('admin'), (req, res) => {
+  throw new Error('Sentry test error from Cò Con Backend!')
+})
+
 // ── GET /admin/users/export — xuất danh sách user ra CSV (báo cáo cho xã) ──────
 router.get('/users/export', verifyJWT, requireRole('admin'), async (req, res) => {
   const { role } = req.query
