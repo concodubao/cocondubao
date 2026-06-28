@@ -19,7 +19,7 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 | G12 | 🟡 UX | chat | Chỉ có 👎 (report-error), thiếu 👍 + dedup báo lỗi | Dedup báo lỗi + nút 👍 (bảng `answer_feedback`) | ✅ |
 | G13 | 🟡 UX | engineer/admin | Hứa "trả lời trong 24h" nhưng không theo dõi quá hạn | ĐÃ CÓ SẴN: `overdueQueue` + StatCard "Chờ quá hạn 24h" | ✅ |
 | G14 | 🟡 Bảo mật | rate-limit | Chat 15/phút theo IP → cả xã chung NAT bị chặn nhầm | Key theo `userId` (JWT) + `ipKeyGenerator` fallback | ✅ |
-| G15 | 🟢 DX | repo | `knowledge.js` stub chết; không CI; không Sentry | Xóa stub + CI (vitest/lint/build) + fix eslint SW globals. Sentry: ⏳ cần DSN | 🔶 |
+| G15 | 🟢 DX | repo | `knowledge.js` stub chết; không CI; không Sentry | Xóa stub + CI + fix eslint SW globals. **Sentry ✅** (instrument.js ESM, gate prod, sampling 0.1, bỏ Replay) | ✅ |
 | G16 | 🟢 Nâng cấp | notifications | Đủ nguyên liệu cảnh báo thời tiết/mùa vụ tự động | Scheduler quét Open-Meteo (mưa/nắng/gió/rét) → tạo DRAFT cho admin duyệt rồi gửi | ✅ |
 
 ## Lộ trình theo đợt
@@ -36,7 +36,7 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 
 ## Follow-up còn lại
 
-- **Sentry** (G15): cần DSN của user (tạo project Node ở sentry.io) → wire vào backend. ⬜
+- **Sentry** (G15): ✅ — backend (instrument.js) + frontend, gate production, sampling 0.1, bỏ Replay. ⚠️ Railway cần `NODE_ENV=production`.
 - **G12b mở rộng** ✅ — tab "👍 Được khen" ở màn Soát AI: liệt kê câu nhiều 👍, nút "Duyệt thành QA" điền sẵn (`add85bd`).
 - **G11b mở rộng** ✅ — nút báo cáo ở feed Community (`add85bd`).
 

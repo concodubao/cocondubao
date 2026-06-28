@@ -61,10 +61,10 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 - ✅ G23/G24/Profile-toast; re-embed an toàn khi 429 + giảm nhiễu cảnh báo mưa — `8e41f79`.
 - ✅ **B — Kỹ năng chẩn đoán**: SYSTEM_PROMPT ép HỎI NGƯỢC 1 câu / XÚI CHỤP ẢNH khi triệu chứng mơ hồ (vàng lá...), trả thẳng khi câu rõ. Verify API thật: mơ hồ→xúi ảnh, cụ thể→trả thuốc+liều.
 - ✅ **Cron dọn ảnh**: `services/storageCleanup.js` xóa `pest-images/` > 30 ngày (mỗi 24h) + null `image_url` message tương ứng. KHÔNG đụng `community/`.
+- ✅ **Sentry** (G15): backend `instrument.js` (init ĐẦU TIÊN — ESM hoist), frontend `main.jsx`. Gate production (`NODE_ENV==='production'` / `import.meta.env.PROD`), sampling 0.1, bỏ Replay. DSN qua `SENTRY_DSN`/`VITE_SENTRY_DSN` (fallback hardcode). ⚠️ Railway cần `NODE_ENV=production` thì backend mới bật.
 - Tests **138/138 pass**.
 
 ### Còn lại
-- ⬜ **Sentry** (G15): cần user tạo project sentry.io + DSN.
 - ⬜ **OTP**: đổi provider (Twilio kém ở VN), giữ code hiện tại.
 - ⬜ **A — QA differential** cho triệu chứng mơ hồ: nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ LƯU Ý: prompt (B) chỉ tác động câu đi qua LLM; câu đã có **curated QA (qa_direct, sim≥0.80)** thì serve thẳng QA → muốn đổi hành vi phải SỬA QA đó (việc kỹ sư, nút "Soạn Hỏi–Đáp").
 - ⬜ **Scale** (trần 1 replica): Redis (cache L1/rate-limit/lockout) + leader-election scheduler (advisory lock PG) + billing Gemini + index pgvector. L2 `answer_cache` đã sẵn cross-replica.
