@@ -129,10 +129,11 @@ function getLLMModel() {
       systemInstruction: SYSTEM_PROMPT,
       generationConfig: {
         temperature: 0.2,
-        // Đã tắt thinking nên chỉ cần 500 tokens (trả lời ≤200 từ)
-        maxOutputTokens: 500,
-        // @google/generative-ai 0.24.1 truyền thẳng config này qua REST API
-        thinkingConfig: { thinkingBudgetTokens: 0 },
+        // SDK v0.24.1 chưa hỗ trợ thinkingConfig (lỗi 400 trên prod).
+        // gemini-2.5-flash là model "thinking" → token suy nghĩ TÍNH VÀO maxOutputTokens.
+        // Giữ 2048 để chừa đủ chỗ cho cả thinking + câu trả lời (≤200 từ).
+        // Muốn tắt thinking → cần nâng SDK lên version hỗ trợ thinkingConfig.
+        maxOutputTokens: 2048,
       },
     })
   }
