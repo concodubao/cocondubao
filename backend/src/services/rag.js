@@ -484,13 +484,35 @@ function buildMessages(context, question, history, lowConf) {
 
   // Thêm lịch sử hội thoại (tối đa 5 lượt gần nhất)
   const recentHistory = history.slice(-10) // 5 lượt = 10 messages
+  
+  let expectedRole = 'user'
+  
+  // Xử lý history để đảm bảo luân phiên user -> model -> user -> model
   for (const msg of recentHistory) {
-    if (msg.role === 'user' || msg.role === 'assistant') {
+    const mappedRole = msg.role === 'assistant' ? 'model' : 'user'
+    
+    // Nếu role không đúng thứ tự mong đợi, ta có thể bỏ qua hoặc gộp.
+    // Cách đơn giản nhất là chỉ push nếu đúng expectedRole.
+    // Nếu role hiện tại là model mà contents đang rỗng -> bỏ qua (phải bắt đầu bằng user)
+    if (mappedRole === expectedRole) {
       contents.push({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }],
+        role: mappedRole,
+        parts: [{ text: msg.content || ' ' }],
       })
+      expectedRole = expectedRole === 'user' ? 'model' : 'user'
+    } else if (contents.length > 0 && mappedRole === contents[contents.length - 1].role) {
+      // Nếu trùng role với tin nhắn trước, gộp nội dung lại để không mất context
+      contents[contents.length - 1].parts[0].text += `\n\n${msg.content || ' '}`
     }
+  }
+  
+  // Đảm bảo trước khi thêm câu hỏi hiện tại (user), role cuối cùng phải là model
+  if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+    // Nếu cuối cùng đang là user, thêm một câu trả lời model giả để giữ đúng luân phiên
+    contents.push({
+      role: 'model',
+      parts: [{ text: 'Vâng, tôi hiểu.' }]
+    })
   }
 
   // Câu hỏi hiện tại + context
