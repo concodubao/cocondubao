@@ -255,8 +255,8 @@ async function invokeLLM(contents, attempt = 0) {
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
-        maxOutputTokens: 2048,
-        // thinkingConfig: { thinkingBudgetTokens: 1024 } // Uncomment when ready
+        maxOutputTokens: 512,
+        thinkingConfig: { thinkingBudget: 0 }
       }
     })
     return { content: result.text }
