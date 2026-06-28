@@ -26,6 +26,8 @@ vi.mock('../src/services/notifications.js', () => ({
   sendPush: vi.fn().mockResolvedValue({ ok: true }),
   dispatchNotification: vi.fn().mockResolvedValue({ sent: 0, failed: 0, total: 0 }),
 }))
+// sharp là native module — mock để test không phụ thuộc binary theo nền tảng
+vi.mock('sharp', () => ({ default: vi.fn() }))
 
 const pushRoutes = (await import('../src/routes/push.js')).default
 const app = express()
