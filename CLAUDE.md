@@ -60,7 +60,7 @@ Cả hai deploy **tự động qua git push** (Railway watch backend, Vercel wat
 
 Tất cả qua `GOOGLE_API_KEY`. Free tier tính quota **riêng từng model**, rất thấp (~20 request/ngày/model nhóm generate) → đây là nguồn lỗi 429 chính ở production.
 
-- RAG answer LLM: `gemini-2.5-flash`, `maxOutputTokens: 2048`. Đây là model **thinking** — token suy nghĩ tính vào maxOutputTokens, để thấp sẽ bị cắt cụt câu trả lời.
+- RAG answer LLM: `gemini-2.5-flash`, `maxOutputTokens: 500`, thinking tắt (`thinkingBudgetTokens: 0`). Gọi trực tiếp qua SDK native `@google/generative-ai` (không còn dùng langchain). `SYSTEM_PROMPT` truyền qua `systemInstruction`.
 - Vision (chat ảnh, `routes/chat.js`): `gemini-2.5-flash`, `maxOutputTokens: 2048`. Trước dùng `gemini-2.0-flash` nhưng free tier model đó đã về `limit: 0` (Google bỏ free tier) → đổi sang 2.5-flash. **Lưu ý:** 2.5-flash CHUNG bucket quota với RAG answer LLM. Vision thất bại sẽ fallback mềm sang RAG (text-only).
 - Embedding: `gemini-embedding-001`, 1536-dim, gửi tuần tự 700ms/request. **Đổi model embedding = đổi không gian vector → phải re-embed toàn bộ:** `node scripts/reembed_all.js`.
 - `invokeLLM`/`isRateLimit` retry cả 429 (quota) lẫn 503 (overloaded), đọc `retry in Ns` từ message Gemini, có backoff + jitter.
@@ -88,6 +88,7 @@ Frontend (`frontend/.env.local`): `VITE_API_URL`, và Supabase keys cho `service
 
 ## Lưu ý khi viết test (vitest)
 
-- Mock Supabase/Gemini qua `vi.hoisted`. `GoogleGenerativeAI`/`ChatGoogleGenerativeAI` gọi bằng `new` → mock **phải là `function`** (arrow function không làm constructor được).
+- Mock Supabase/Gemini qua `vi.hoisted`. `GoogleGenerativeAI` gọi bằng `new` → mock **phải là `function`** (arrow function không làm constructor được). Mock `getGenerativeModel` trả về object có cả `embedContent` và `generateContent`.
+- LLM mock trả về `{ response: { text: () => '...' } }` (native SDK format), không phải `{ content: '...' }` (langchain format cũ).
 - Supabase query builder mock kiểu thenable/chainable: mỗi `await` lấy 1 result đã enqueue.
 - `rag.js` export sẵn `checkFAQ`, `extractCuratedAnswer`, `getAnswerCache`/`setAnswerCache`/`_clearAnswerCache`, `embedTexts` để test.

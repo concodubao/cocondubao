@@ -1,7 +1,68 @@
-import { ChatGoogleGenerativeAI }         from '@langchain/google-genai'
 import { GoogleGenerativeAI }             from '@google/generative-ai'
-import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { createClient } from '@supabase/supabase-js'
+
+// ─── Text splitter tự viết (thay thế langchain RecursiveCharacterTextSplitter) ──
+// Tách text thành các chunk có kích thước ≤ chunkSize, ưu tiên cắt theo separator
+// tự nhiên (đoạn, dòng, câu, từ). Logic tương đương RecursiveCharacterTextSplitter
+// của langchain nhưng không cần dependency ngoài.
+function splitTextRecursive(text, { chunkSize = 1000, chunkOverlap = 100, separators = ['\n\n', '\n', '。', '.', ' ', ''] } = {}) {
+  if (!text || text.length <= chunkSize) return text ? [text] : []
+
+  // Tìm separator phù hợp nhất (đầu tiên trong danh sách mà tồn tại trong text)
+  let sep = ''
+  for (const s of separators) {
+    if (s === '' || text.includes(s)) { sep = s; break }
+  }
+
+  // Tách theo separator đã chọn
+  const parts = sep ? text.split(sep) : [...text]
+  const chunks = []
+  let current = ''
+
+  for (const part of parts) {
+    const candidate = current ? current + sep + part : part
+
+    if (candidate.length <= chunkSize) {
+      current = candidate
+    } else {
+      // current đã đầy → lưu lại
+      if (current) chunks.push(current.trim())
+
+      // Nếu part đơn lẻ vẫn lớn hơn chunkSize → đệ quy với separator tiếp theo
+      if (part.length > chunkSize) {
+        const nextSeps = separators.slice(separators.indexOf(sep) + 1)
+        if (nextSeps.length > 0) {
+          const subChunks = splitTextRecursive(part, { chunkSize, chunkOverlap, separators: nextSeps })
+          chunks.push(...subChunks)
+          current = ''
+        } else {
+          // Hết separator → cắt cứng
+          for (let i = 0; i < part.length; i += chunkSize - chunkOverlap) {
+            chunks.push(part.slice(i, i + chunkSize).trim())
+          }
+          current = ''
+        }
+      } else {
+        current = part
+      }
+    }
+  }
+  if (current.trim()) chunks.push(current.trim())
+
+  // Áp dụng overlap: mỗi chunk lấy thêm phần đuôi của chunk trước
+  if (chunkOverlap > 0 && chunks.length > 1) {
+    const result = [chunks[0]]
+    for (let i = 1; i < chunks.length; i++) {
+      const prev = chunks[i - 1]
+      const overlap = prev.slice(-chunkOverlap)
+      const merged = overlap + sep + chunks[i]
+      result.push(merged.length <= chunkSize ? merged.trim() : chunks[i])
+    }
+    return result.filter(c => c.length > 0)
+  }
+
+  return chunks.filter(c => c.length > 0)
+}
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -57,21 +118,26 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   return results
 }
 
-// ─── LLM: gemini-2.5-flash ────────────────────────────────────────────────────
-// Free tier tính quota RIÊNG theo từng model (~5 RPM / ~20 RPD/model cho nhóm
-// generate). gemini-2.0-flash & flash-lite cùng cạn nhanh; gemini-2.5-flash có
-// bucket quota riêng và chất lượng trả lời cao hơn. Vision (chat.js) vẫn dùng
-// gemini-2.0-flash → quota tách biệt. Hết 429 hẳn thì cần bật billing.
-const llm = new ChatGoogleGenerativeAI({
-  model:           'gemini-2.5-flash',
-  temperature:     0.2,
-  // 2.5-flash là model "thinking": token suy nghĩ nội bộ TÍNH VÀO maxOutputTokens.
-  // Để 500 thì thinking ăn hết → câu trả lời bị cắt cụt. Nâng lên 2048 để chừa đủ
-  // chỗ cho cả thinking + câu trả lời (system prompt đã giới hạn ≤200 từ).
-  // (langchain 0.1.3 quá cũ, chưa hỗ trợ thinkingConfig để tắt hẳn thinking.)
-  maxOutputTokens: 2048,
-  apiKey:          process.env.GOOGLE_API_KEY,
-})
+let _llmModel = null
+function getLLMModel() {
+  if (!_llmModel) {
+    const key = process.env.GOOGLE_API_KEY
+    if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
+    const genAI = new GoogleGenerativeAI(key.trim())
+    _llmModel = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: SYSTEM_PROMPT,
+      generationConfig: {
+        temperature: 0.2,
+        // Đã tắt thinking nên chỉ cần 500 tokens (trả lời ≤200 từ)
+        maxOutputTokens: 500,
+        // @google/generative-ai 0.24.1 truyền thẳng config này qua REST API
+        thinkingConfig: { thinkingBudgetTokens: 0 },
+      },
+    })
+  }
+  return _llmModel
+}
 
 const SYSTEM_PROMPT = `Bạn là Cò Con, trợ lý nông nghiệp AI của nông dân xã Trường Khánh, Sóc Trăng.
 
@@ -189,9 +255,11 @@ export function getSemanticCache(embedding, cropType) {
 }
 
 // ─── LLM invoke với retry khi gặp 429 ────────────────────────────────────────
-async function invokeLLM(messages, attempt = 0) {
+async function invokeLLM(contents, attempt = 0) {
   try {
-    return await llm.invoke(messages)
+    const model = getLLMModel()
+    const result = await model.generateContent({ contents })
+    return { content: result.response.text() }
   } catch (err) {
     const msg = err.message || ''
     // Retry khi 429 (quota) HOẶC 503 (high demand/overloaded — quá tải tạm thời phía Google)
@@ -208,7 +276,7 @@ async function invokeLLM(messages, attempt = 0) {
       const wait = base + Math.random() * 1000
       console.warn(`[RAG] LLM 429/503 — chờ ${Math.round(wait / 1000)}s (attempt ${attempt + 1}/4)`)
       await new Promise(r => setTimeout(r, wait))
-      return invokeLLM(messages, attempt + 1)
+      return invokeLLM(contents, attempt + 1)
     }
     throw err
   }
@@ -368,8 +436,8 @@ export async function askRAG(question, cropType = null, history = []) {
     if (confidence < 0.7) {
       // Có chunk nhưng không đủ tin → thử LLM với context hạn chế, kèm cảnh báo
       const context  = chunks.slice(0, 2).map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`).join('\n\n')
-      const messages = buildMessages(SYSTEM_PROMPT, context, question, history, true)
-      const response = await invokeLLM(messages)
+      const contents = buildMessages(context, question, history, true)
+      const response = await invokeLLM(contents)
       // Không cache low-confidence answers
       return {
         answer:       response.content,
@@ -386,8 +454,8 @@ export async function askRAG(question, cropType = null, history = []) {
       .join('\n\n')
 
     // BƯỚC 5: Gọi Gemini sinh câu trả lời (với retry tự động nếu 429)
-    const messages = buildMessages(SYSTEM_PROMPT, context, question, history, false)
-    const response = await invokeLLM(messages)
+    const contents = buildMessages(context, question, history, false)
+    const response = await invokeLLM(contents)
 
     const result = {
       answer:       response.content,
@@ -410,14 +478,17 @@ export async function askRAG(question, cropType = null, history = []) {
 }
 
 // ─── buildMessages: tạo messages array với history ────────────────────────────
-function buildMessages(systemPrompt, context, question, history, lowConf) {
-  const messages = [{ role: 'system', content: systemPrompt }]
+function buildMessages(context, question, history, lowConf) {
+  const contents = []
 
   // Thêm lịch sử hội thoại (tối đa 5 lượt gần nhất)
   const recentHistory = history.slice(-10) // 5 lượt = 10 messages
   for (const msg of recentHistory) {
     if (msg.role === 'user' || msg.role === 'assistant') {
-      messages.push({ role: msg.role, content: msg.content })
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }],
+      })
     }
   }
 
@@ -426,12 +497,12 @@ function buildMessages(systemPrompt, context, question, history, lowConf) {
     ? '\n\n⚠️ Lưu ý: tài liệu tham khảo không hoàn toàn khớp câu hỏi. Hãy trả lời thận trọng và gợi ý hỏi thêm kỹ sư nếu cần.'
     : ''
 
-  messages.push({
+  contents.push({
     role: 'user',
-    content: `Thông tin tham khảo từ kho tài liệu:\n\n${context}\n\n---\nCâu hỏi của nông dân: ${question}\n\nHãy trả lời dựa vào tài liệu trên.${confNote}`,
+    parts: [{ text: `Thông tin tham khảo từ kho tài liệu:\n\n${context}\n\n---\nCâu hỏi của nông dân: ${question}\n\nHãy trả lời dựa vào tài liệu trên.${confNote}` }],
   })
 
-  return messages
+  return contents
 }
 
 // ─── embedAndStoreDoc: embed tài liệu khi kỹ sư nhấn "Duyệt" ─────────────────
@@ -449,12 +520,11 @@ export async function embedAndStoreDoc(docId) {
   // giữa chừng, nếu đã xoá trước thì tài liệu mất sạch chunks → biến khỏi RAG. Chỉ
   // xoá+thay sau khi embed THÀNH CÔNG (ngay trước insert bên dưới).
 
-  const splitter = new RecursiveCharacterTextSplitter({
+  const chunks = splitTextRecursive(doc.content, {
     chunkSize:    1000,
     chunkOverlap: 100,
     separators:   ['\n\n', '\n', '。', '.', ' ', ''],
   })
-  const chunks = await splitter.splitText(doc.content)
   if (!chunks.length) throw new Error('Không tách được chunks từ nội dung tài liệu.')
 
   let vectors

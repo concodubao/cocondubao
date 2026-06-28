@@ -55,7 +55,7 @@ Rà toàn bộ backend + các trang frontend chính. Đã sửa & push (`de2c543
 
 ### Tồn đọng từ rà soát frontend (chưa sửa)
 
-- **G23** ⬜ 🟠 — `SendNotif`: ô "Gửi đến ai? (vùng/ấp)" KHÔNG lọc thật — `dispatchNotification` bỏ qua `region`; admin gõ vùng tưởng nhắm vùng nhưng gửi cho **tất cả**. Cũng thiếu UI chọn `crop_tags` (backend hỗ trợ). → cần làm region/crop lọc thật hoặc bỏ ô gây hiểu nhầm.
-- **G24** ⬜ 🟠 — `NotifDetail` vỡ khi F5 / mở deep-link (phụ thuộc hoàn toàn `location.state`, không có API lấy 1 thông báo theo id như PostDetail/Answer đã có).
-- **Nhỏ** ⬜ — `Profile`: lần đầu **đặt** mật khẩu hiện toast "Đổi mật khẩu thành công" thay vì "Đặt".
+- **G23** ✅ 🟠 — `SendNotif`: Đã thêm UI `cropTags` lọc thật và gỡ bỏ giao diện chọn vùng/ấp không cần thiết.
+- **G24** ✅ 🟠 — `NotifDetail`: Đã sử dụng API lấy chi tiết 1 thông báo theo ID (`pushAPI.getNotification`).
+- **Nhỏ** ✅ — `Profile`: Lỗi text toast đã được khắc phục đúng logic ("Đặt mật khẩu thành công!").
 - **OTP** — mọi vấn đề liên quan để mở rộng sau (Twilio không hỗ trợ tốt ở VN, sẽ đổi provider).

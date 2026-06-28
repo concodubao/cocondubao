@@ -136,7 +136,6 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
     type       = 'alert',
     imageUrl,
     cropTags   = [],
-    region,
     scheduleAt,
   } = req.body
 
@@ -163,7 +162,6 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
         type,
         image_url:    imageUrl || null,
         crop_tags:    cropTags,
-        region:       region || null,
         created_by:   req.user.userId,
         scheduled_at: scheduledAt,
         sent_at:      scheduledAt ? null : new Date().toISOString(),

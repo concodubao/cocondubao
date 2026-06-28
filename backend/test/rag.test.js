@@ -12,17 +12,15 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({ rpc: mocks.rpc, from: vi.fn() })),
 }))
 
-// ChatGoogleGenerativeAI & GoogleGenerativeAI được gọi bằng `new` → mock phải là
-// function (arrow function không dùng được làm constructor).
-vi.mock('@langchain/google-genai', () => ({
-  ChatGoogleGenerativeAI: vi.fn(function () {
-    return { invoke: mocks.invoke }
-  }),
-}))
-
+// Lõi GoogleGenerativeAI
 vi.mock('@google/generative-ai', () => ({
   GoogleGenerativeAI: vi.fn(function () {
-    return { getGenerativeModel: () => ({ embedContent: mocks.embedContent }) }
+    return { 
+      getGenerativeModel: () => ({ 
+        embedContent: mocks.embedContent,
+        generateContent: mocks.invoke 
+      }) 
+    }
   }),
 }))
 
@@ -35,7 +33,7 @@ beforeEach(() => {
   process.env.GOOGLE_API_KEY = 'test-key'
   mocks.rpc.mockReset()
   mocks.embedContent.mockReset().mockResolvedValue(fakeVector())
-  mocks.invoke.mockReset().mockResolvedValue({ content: 'Trả lời mẫu từ Cò Con' })
+  mocks.invoke.mockReset().mockResolvedValue({ response: { text: () => 'Trả lời mẫu từ Cò Con' } })
   _clearAnswerCache()
 })
 
