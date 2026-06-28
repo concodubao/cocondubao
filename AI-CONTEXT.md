@@ -29,38 +29,46 @@ Danh sách các quyết định và kiến thức đã ghi nhận:
 
 ---
 
-## 3. Kế hoạch bỏ Langchain & tắt thinking
+## 3. LLM stack — đã gỡ Langchain & TẮT thinking (DONE, verify API thật)
 
-### Lộ trình
-| Pha | Nội dung | Trạng thái |
-|-----|----------|------------|
-| **Pha 0** | Validate tốc độ: tắt thinking + bỏ langchain bọc ngoài giảm 6s → ~1.9s | ✅ Done |
-| **Pha 1** | Thay `ChatGoogleGenerativeAI` bằng SDK native `@google/generative-ai` trong `rag.js` | ✅ Done (Antigravity, 2026-06-28) |
-| **Pha 2** | Gỡ `@langchain/google-genai`, `@langchain/core`, `@langchain/community` khỏi `package.json` | ✅ Done (Antigravity, 2026-06-28) |
-| **Pha 3** | Tự viết `splitTextRecursive` thay `langchain/text_splitter`, gỡ meta `langchain` | ✅ Done (Antigravity, 2026-06-28) |
+Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), KHÔNG còn langchain (kể cả splitter — tự viết `splitTextRecursive` trong `rag.js`).
 
-### Lưu ý kỹ thuật
-- SDK `@google/generative-ai` hiện là **v0.24.1**. Chưa có TypeScript type cho `thinkingConfig` nhưng REST API nhận bình thường.
-- `@langchain/google-genai` là bản **0.1.3** (chỉ wrapper gọi Gemini). Lõi langchain là **0.3.37**. Comment cũ trong code ghi "langchain 0.1.3" là nhầm.
-- Đã cấu hình `thinkingConfig: { thinkingBudgetTokens: 0 }` + giảm `maxOutputTokens` từ 2048 xuống **500**.
-- `SYSTEM_PROMPT` chuyển vào `systemInstruction` của model config (thay vì message system).
-- Format messages: đổi từ `{ role, content }` (Langchain) sang `{ role: 'user'|'model', parts: [{ text }] }` (Gemini native).
+| Việc | Trạng thái |
+|-----|------------|
+| Gỡ langchain (generate + splitter) | ✅ (Antigravity, 2026-06-28) `3fcda0b` |
+| Native SDK → đi tiếp lên **`@google/genai`** (KHÔNG dừng ở `@google/generative-ai`) | ✅ `d736363` |
+| Tắt thinking → `thinkingConfig:{ thinkingBudget:0 }`, `maxOutputTokens:512` → **~1.8s** (trước ~6s) | ✅ `6b1f0d6` |
+
+### ⚠️ Lưu ý kỹ thuật (ĐỪNG làm sai lại)
+- **thinkingConfig CHỈ chạy trên `@google/genai`.** SDK cũ `@google/generative-ai` v0.24.1 set thinkingConfig → **LỖI 400 TRÊN PROD** (dù test local có vẻ ok) → chính là lý do phải lên `@google/genai`. Đã verify GỌI API THẬT trên genai: không 400, ~1.8s, `thoughtsTokenCount` mất, chất lượng giữ.
+- Cú pháp tắt đúng: **`thinkingConfig: { thinkingBudget: 0 }`** (KHÔNG phải `thinkingBudgetTokens`).
+- **Embed:** `ai.models.embedContent({ model:'gemini-embedding-001', contents, config:{ taskType, outputDimensionality:1536 } })` → parse **`result.embeddings[0].values`**. Giữ model/dims/taskType → **đổi SDK KHÔNG cần re-embed**.
+- **Generate:** `ai.models.generateContent({ model:'gemini-2.5-flash', contents, config:{ systemInstruction, temperature, maxOutputTokens:512, thinkingConfig:{thinkingBudget:0} } })` → parse **`result.text`** (property, KHÔNG `.text()`).
+- **Vision + STT** (chat.js): cũng `ai.models.generateContent` với `inlineData` base64.
+- Messages: `{ role:'user'|'model', parts:[{text}] }`, **bắt buộc luân phiên user/model** (gộp message liền cùng role — `fedd39c`).
 
 ---
 
 ## 4. Trạng thái hiện tại của codebase
 
-### Đã hoàn thành gần đây (2026-06-28)
-- ✅ G23 (SendNotif cropTags), G24 (NotifDetail fetch by ID), Nhỏ (Profile toast) — đánh dấu done trong IMPROVEMENTS.md.
-- ✅ Loại bỏ biến `region` thừa trong `push.js`.
-- ✅ Pha 1 bỏ Langchain: `rag.js` giờ dùng native SDK.
-- ✅ Pha 2: Gỡ 4 package langchain khỏi dependencies (−141 packages).
-- ✅ Pha 3: Thay `RecursiveCharacterTextSplitter` bằng hàm `splitTextRecursive` tự viết. **Không còn bất kỳ dependency langchain nào.**
-- Tests 130/130 pass.
+### Đã làm gần đây (2026-06-28)
+- ✅ Migrate `@google/genai` + TẮT thinking (~1.8s), verify API thật — `d736363`, `6b1f0d6`.
+- ✅ Gỡ HẲN langchain (generate + splitter tự viết `splitTextRecursive`) — `3fcda0b`.
+- ✅ RAG hiểu câu nối/câu đế: `checkFAQ` bắt "vậy hả"/"ờ"; `contextualizeQuery` ghép chủ đề trước khi embed (fix lạc đề) — `db181d6`.
+- ✅ Answer cache L2 DB (`answer_cache`, bền qua deploy, giảm 429) — `a087535`.
+- ✅ Admin tải ảnh thông báo trực tiếp — `66d90c5`. Khép vòng 👍→QA + báo cáo bài ở feed — `add85bd`.
+- ✅ Phóng cỡ chữ đọc `--read-scale` (không zoom cả trang) — `d56cb31`. Fix tràn Weather/Notif — `5383c53`. Chặn spam push + auto-reload SW — `f667c17`.
+- ✅ G23/G24/Profile-toast; re-embed an toàn khi 429 + giảm nhiễu cảnh báo mưa — `8e41f79`.
+- Tests **135/135 pass**.
 
 ### Còn lại
-- ⬜ **Sentry** (G15): cần user tạo project trên sentry.io, cung cấp DSN.
-- ⬜ **OTP**: đổi provider (Twilio kém ở VN), giữ nguyên code hiện tại.
+- ⬜ **Sentry** (G15): cần user tạo project sentry.io + DSN.
+- ⬜ **OTP**: đổi provider (Twilio kém ở VN), giữ code hiện tại.
+- ⬜ **A — QA differential** cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị từng loại. (việc kỹ sư, dùng nút "Soạn Hỏi–Đáp")
+- ⬜ **B — SYSTEM_PROMPT** ép differential + gợi ý gửi ảnh khi 1 triệu chứng nhiều bệnh, không chốt 1 bệnh. (user: "để đó")
+- ⬜ **Scale** (trần 1 replica): Redis (cache L1/rate-limit/lockout) + leader-election scheduler (advisory lock PG) + billing Gemini + index pgvector. L2 `answer_cache` đã sẵn cross-replica.
+- ⬜ **Realtime engineer queue** nghi no-op (RLS + anon `auth.uid()`=NULL) → verify hoặc dựa polling.
+- ⬜ **Dọn ảnh chat sâu bệnh cũ** — không tự xoá (chỉ khi user xoá account) → storage phình dần.
 
 ---
 

@@ -36,9 +36,9 @@ Trạng thái: ⬜ chưa làm · 🔧 đang làm · ✅ xong.
 
 ## Follow-up còn lại
 
-- **Sentry** (G15): cần DSN của user (tạo project Node ở sentry.io) → wire vào backend.
-- **G12b mở rộng** (tuỳ chọn): trang admin xem câu nhiều 👍 + confidence cao → gợi ý kỹ sư duyệt thành curated QA.
-- **G11b mở rộng** (tuỳ chọn): nút báo cáo ở feed Community (hiện mới có ở PostDetail).
+- **Sentry** (G15): cần DSN của user (tạo project Node ở sentry.io) → wire vào backend. ⬜
+- **G12b mở rộng** ✅ — tab "👍 Được khen" ở màn Soát AI: liệt kê câu nhiều 👍, nút "Duyệt thành QA" điền sẵn (`add85bd`).
+- **G11b mở rộng** ✅ — nút báo cáo ở feed Community (`add85bd`).
 
 ## Đợt rà soát 2026-06-22 (luồng kỹ sư + cài đặt thông báo)
 
@@ -59,3 +59,28 @@ Rà toàn bộ backend + các trang frontend chính. Đã sửa & push (`de2c543
 - **G24** ✅ 🟠 — `NotifDetail`: Đã sử dụng API lấy chi tiết 1 thông báo theo ID (`pushAPI.getNotification`).
 - **Nhỏ** ✅ — `Profile`: Lỗi text toast đã được khắc phục đúng logic ("Đặt mật khẩu thành công!").
 - **OTP** — mọi vấn đề liên quan để mở rộng sau (Twilio không hỗ trợ tốt ở VN, sẽ đổi provider).
+
+## Đợt 2026-06-28 (bảo mật + UX field + LLM stack + RAG hội thoại)
+
+| ID | Mức | Khu vực | Vấn đề | Hướng sửa | TT |
+|----|-----|---------|--------|-----------|----|
+| H1 | 🟠 Bảo mật | chat | IDOR: `getOrCreateSession` không kiểm chủ phiên → chèn tin nhắn vào phiên người khác qua `sessionId` | `isOwnSession` check ở `/ask` + `/ask-with-image` | ✅ |
+| H2 | 🟡 Bảo mật | auth | Đổi mật khẩu hạ được xuống 6 ký tự (tạo tài khoản yêu cầu ≥8) | `validateSecret` theo vai trò (farmer PIN 6 số / staff ≥8) | ✅ |
+| H3 | 🟡 UX | rate-limit | Auth 10/phút/IP → cả xã chung NAT bị chặn nhầm | Nâng 30/phút (đã có chống dò PIN + otpLimiter) | ✅ |
+| H4 | 🟡 UX | weather | Hero/thẻ luôn 1 màu xanh + nhãn "giờ xấu nhất" → tưởng cả ngày mưa | Màu theo điều kiện + tổng hợp ban ngày + nhãn "giông chiều" | ✅ |
+| H5 | 🔴 Bug | push | Spam welcome push mỗi lần mở app (Home auto-subscribe + churn endpoint) | usePush tái dùng sub; welcome chỉ khi user chưa có sub active; bỏ auto-subscribe | ✅ |
+| H6 | 🔴 Bug | layout | Weather/NotifList tràn ngang màn hẹp (flex item `mx-auto` co theo nội dung) | `width:100%` ở gốc trang (verify Playwright @360px) | ✅ |
+| H7 | 🟡 UX | TTS | Giọng vi-VN đọc sai viết tắt EN (NPK, pH, kg, AI...) | `normalizeForSpeech`: bóc markdown + phiên âm + đánh vần | ✅ |
+| H8 | 🟡 UX | notifications | Nông dân không tự xóa được thông báo | Ẩn theo thiết bị (localStorage) + nút thùng rác | ✅ |
+| H9 | 🟢 Nâng cấp | knowledge | Soạn QA chỉ từ màn Soát AI | Nút "Soạn Hỏi–Đáp" trong Kho tri thức (`POST /knowledge/qa`) | ✅ |
+| H10 | 🟡 Quota | rag | Cache in-memory mất mỗi deploy | L2 DB `answer_cache` (cần migration, degrade mềm) | ✅ |
+| H11 | 🟡 UX | font-scale | CSS `zoom` cả trang gây vỡ layout Android/iOS | Biến `--read-scale` chỉ phóng nội dung đọc (AnswerContent + NotifDetail) | ✅ |
+| H12 | 🟢 Nâng cấp | LLM | Langchain khoá bản cũ, thinking ăn quota/chậm | Gỡ langchain → `@google/genai` + tắt thinking (~1.8s) — xem AI-CONTEXT mục 3 | ✅ |
+| H13 | 🔴 Bug | rag | Câu nối/câu đế ("còn cách khác", "vậy hả") mất ngữ cảnh → trả lời lạc đề | `checkFAQ` bắt câu đế + `contextualizeQuery` ghép chủ đề trước embed | ✅ |
+
+### Còn mở (ngoài Sentry/OTP)
+- ⬜ **A** — soạn QA *differential* cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị.
+- ⬜ **B** — SYSTEM_PROMPT ép differential + gợi ý gửi ảnh, không chốt 1 bệnh. (user: "để đó")
+- ⬜ **Scale** — Redis + leader-election scheduler + billing Gemini + index pgvector (trần 1 replica).
+- ⬜ **Realtime engineer queue** nghi no-op (RLS + anon auth.uid NULL) → verify.
+- ⬜ **Dọn ảnh chat sâu bệnh cũ** (storage phình dần).

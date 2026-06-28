@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> 📌 **Đọc `PROGRESS.md` (gốc repo) trước khi làm** — nhật ký tiến độ CHUNG giữa Claude Code và Antigravity: trạng thái hiện tại, việc còn lại, gotchas. **Cập nhật nó sau mỗi đợt việc.** (CLAUDE.md = kiến trúc; PROGRESS.md = trạng thái + việc đang/đã/sẽ làm.)
+> 📌 **Đọc `AI-CONTEXT.md` + `IMPROVEMENTS.md` (gốc repo) trước khi làm** — bộ nhớ CHUNG giữa Claude Code và Antigravity: AI-CONTEXT = trạng thái hiện tại + LLM stack + gotchas; IMPROVEMENTS = backlog/đợt rà soát + việc còn lại. **Cập nhật chúng sau mỗi đợt việc** (ghi rõ AI nào + ngày). (CLAUDE.md = kiến trúc; 2 file kia = trạng thái + tiến độ.)
 
 Cò Con là PWA tư vấn nông nghiệp cho nông dân xã Trường Khánh, Sóc Trăng: nông dân hỏi (text/giọng nói/ảnh) → AI trả lời bằng RAG, câu khó được chuyển cho kỹ sư. Có 3 vai trò: `farmer`, `engineer`, `admin`.
 
