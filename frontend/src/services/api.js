@@ -55,6 +55,7 @@ export const pushAPI = {
   subscribe:        data    => api.post('/push/subscribe', data),
   unsubscribe:      data    => api.delete('/push/unsubscribe', { data }),
   send:             data    => api.post('/push/send', data),
+  uploadImage:      formData => api.post('/push/upload-image', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getNotifications: userId  => api.get(`/push/notifications/${userId}`),
   getNotification:  (id)    => api.get(`/push/notifications/item/${id}`),
   markRead:         (id)    => api.patch(`/push/notifications/${id}/read`),

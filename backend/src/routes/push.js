@@ -7,11 +7,23 @@
 // PATCH /api/v1/notifications/settings   — cài đặt thông báo cá nhân
 
 import express   from 'express'
+import multer    from 'multer'
+import sharp     from 'sharp'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
 import { sendPush, dispatchNotification } from '../services/notifications.js'
 
 const router = express.Router()
+
+// Upload ảnh minh hoạ thông báo (admin) — nén bằng sharp rồi đưa lên Supabase
+// Storage (bucket 'images', thư mục notifications/). Dùng chung pattern với
+// community/chat. Admin chọn ảnh từ máy thay vì phải tự host link.
+const uploadImg = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_, file, cb) =>
+    file.mimetype.startsWith('image/') ? cb(null, true) : cb(new Error('Chỉ hỗ trợ file ảnh')),
+})
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ĐĂNG KÝ / HUỶ ĐĂNG KÝ
@@ -87,6 +99,34 @@ router.delete('/unsubscribe', verifyJWT, async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // ADMIN GỬI THÔNG BÁO
 // ══════════════════════════════════════════════════════════════════════════════
+
+// POST /push/upload-image — admin tải ảnh minh hoạ từ máy → trả về public URL
+router.post('/upload-image', verifyJWT, requireRole('admin'),
+  (req, res, next) => uploadImg.single('image')(req, res, err =>
+    err ? res.status(400).json({ error: 'Lỗi ảnh: ' + err.message }) : next()),
+  async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'Chưa chọn ảnh.' })
+    try {
+      let buf = await sharp(req.file.buffer)
+        .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80 })
+        .toBuffer()
+      if (buf.length > 500 * 1024) {
+        buf = await sharp(buf).resize(800, 800, { fit: 'inside' }).jpeg({ quality: 65 }).toBuffer()
+      }
+      const fileName = `notifications/${req.user.userId}/${Date.now()}.jpg`
+      const { error } = await supabase.storage
+        .from('images')
+        .upload(fileName, buf, { contentType: 'image/jpeg', upsert: false })
+      if (error) throw error
+      const { data } = supabase.storage.from('images').getPublicUrl(fileName)
+      res.json({ url: data.publicUrl })
+    } catch (err) {
+      console.error('[PUSH] upload-image error:', err.message)
+      res.status(500).json({ error: 'Upload ảnh thất bại: ' + err.message })
+    }
+  }
+)
 
 // POST /push/send — Admin gửi broadcast thông báo
 router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {

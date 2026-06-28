@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { pushAPI } from '../../services/api'
@@ -155,12 +155,31 @@ export default function SendNotif() {
   const [body,       setBody]       = useState('')
   const [crops,      setCrops]      = useState([])   // [] = gửi cho tất cả
   const [imageUrl,   setImageUrl]   = useState('')
+  const [uploading,  setUploading]  = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
   const [result,     setResult]     = useState(null)
   const [error,      setError]      = useState('')
+  const fileRef = useRef(null)
 
   function toggleCrop(id) {
     setCrops(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
+  }
+
+  async function handlePickImage(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true); setError('')
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      const res = await pushAPI.uploadImage(fd)
+      setImageUrl(res.data.url)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Tải ảnh thất bại. Thử lại nhé.')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
   }
 
   const sendMutation = useMutation({
@@ -267,9 +286,27 @@ export default function SendNotif() {
             value={body} onChange={e => setBody(e.target.value)} rows={4}
             style={{ ...s.input, resize: 'vertical', minHeight: 100 }}
             aria-label="Nội dung thông báo" aria-required="true" />
-          <input type="url" placeholder="Link ảnh minh họa (không bắt buộc)" value={imageUrl}
-            onChange={e => setImageUrl(e.target.value)}
-            style={s.input} aria-label="URL ảnh minh họa" />
+          {/* Ảnh minh hoạ — tải trực tiếp từ máy (hoặc dán link) */}
+          {imageUrl ? (
+            <div style={{ position: 'relative' }}>
+              <img src={imageUrl} alt="Ảnh minh hoạ" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid #e2e8f0' }} />
+              <button onClick={() => setImageUrl('')} type="button"
+                style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: 8, padding: '5px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                Gỡ ảnh
+              </button>
+            </div>
+          ) : (
+            <>
+              <input ref={fileRef} type="file" accept="image/*" onChange={handlePickImage} style={{ display: 'none' }} />
+              <button onClick={() => fileRef.current?.click()} type="button" disabled={uploading}
+                style={{ ...s.input, cursor: 'pointer', textAlign: 'left', color: uploading ? '#94a3b8' : '#4B230A', fontWeight: 600, background: '#fdf6f0', border: '1.5px dashed #f5d5b0' }}>
+                {uploading ? 'Đang tải ảnh...' : '📷 Tải ảnh minh hoạ từ máy (không bắt buộc)'}
+              </button>
+              <input type="url" placeholder="hoặc dán link ảnh" value={imageUrl}
+                onChange={e => setImageUrl(e.target.value)}
+                style={s.input} aria-label="URL ảnh minh họa" />
+            </>
+          )}
         </section>
 
         <section style={s.section}>
