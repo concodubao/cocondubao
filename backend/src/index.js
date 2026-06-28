@@ -1,5 +1,9 @@
 // backend/src/index.js
 
+// ⚠️ PHẢI đứng ĐẦU TIÊN — khởi tạo Sentry trước khi nạp express/route (ESM hoist).
+import './instrument.js'
+
+import * as Sentry from '@sentry/node'
 import 'dotenv/config'
 
 import express        from 'express'
@@ -95,6 +99,9 @@ app.get('/health', (_, res) => res.json({
   timestamp: new Date().toISOString(),
   env:       process.env.NODE_ENV,
 }))
+
+// Cần gọi hàm này SAU tất cả các routes để Sentry có thể tóm được mọi lỗi unhandled
+Sentry.setupExpressErrorHandler(app)
 
 app.use(function(req, res) {
   res.status(404).json({ error: 'Endpoint không tồn tại' })
