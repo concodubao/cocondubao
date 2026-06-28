@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> 📌 **Đọc `PROGRESS.md` (gốc repo) trước khi làm** — nhật ký tiến độ CHUNG giữa Claude Code và Antigravity: trạng thái hiện tại, việc còn lại, gotchas. **Cập nhật nó sau mỗi đợt việc.** (CLAUDE.md = kiến trúc; PROGRESS.md = trạng thái + việc đang/đã/sẽ làm.)
+
 Cò Con là PWA tư vấn nông nghiệp cho nông dân xã Trường Khánh, Sóc Trăng: nông dân hỏi (text/giọng nói/ảnh) → AI trả lời bằng RAG, câu khó được chuyển cho kỹ sư. Có 3 vai trò: `farmer`, `engineer`, `admin`.
 
 ## Monorepo layout
