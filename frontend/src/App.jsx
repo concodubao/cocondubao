@@ -5,27 +5,30 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './stores/authStore'
 import { useDisplayStore } from './stores/displayStore'
 
-// ─── Pages tải ngay (nông dân, dùng nhiều nhất) ───────────────────────────────
+// ─── Pages tải ngay (luồng lõi nông dân: mở app → đăng nhập → trang chủ → hỏi) ──
 import Splash        from './pages/Splash'
 import Login         from './pages/Login'
 import Home          from './pages/Home'
-import Profile       from './pages/Profile'
-import Policies      from './pages/Policies'
 import ChatMain      from './pages/farmer/ChatMain'
-import VoiceRecord   from './pages/farmer/VoiceRecord'
-import ImageUpload   from './pages/farmer/ImageUpload'
-import AIResult      from './pages/farmer/AIResult'
-import WaitEngineer  from './pages/farmer/WaitEngineer'
-import ChatHistory   from './pages/farmer/ChatHistory'
-import Weather       from './pages/farmer/Weather'
-import Community     from './pages/farmer/Community'
-import PostDetail    from './pages/farmer/PostDetail'
-import NotifList     from './pages/farmer/NotifList'
-import NotifDetail   from './pages/farmer/NotifDetail'
-import NotifSettings from './pages/farmer/NotifSettings'
 import ToastContainer from './components/Toast'
 import OfflineBanner  from './components/OfflineBanner'
 import DesktopLayout  from './components/DesktopLayout'
+
+// ─── Pages nông dân lazy (ít khi là màn đầu: nhập ảnh/giọng nói, kết quả, cộng đồng,
+// thời tiết, thông báo, hồ sơ) → tách khỏi bundle khởi động cho mạng 3G quê nhanh hơn ─
+const Profile       = lazy(() => import('./pages/Profile'))
+const Policies      = lazy(() => import('./pages/Policies'))
+const VoiceRecord   = lazy(() => import('./pages/farmer/VoiceRecord'))
+const ImageUpload   = lazy(() => import('./pages/farmer/ImageUpload'))
+const AIResult      = lazy(() => import('./pages/farmer/AIResult'))
+const WaitEngineer  = lazy(() => import('./pages/farmer/WaitEngineer'))
+const ChatHistory   = lazy(() => import('./pages/farmer/ChatHistory'))
+const Weather       = lazy(() => import('./pages/farmer/Weather'))
+const Community     = lazy(() => import('./pages/farmer/Community'))
+const PostDetail    = lazy(() => import('./pages/farmer/PostDetail'))
+const NotifList     = lazy(() => import('./pages/farmer/NotifList'))
+const NotifDetail   = lazy(() => import('./pages/farmer/NotifDetail'))
+const NotifSettings = lazy(() => import('./pages/farmer/NotifSettings'))
 
 // ─── Pages lazy (kỹ sư + admin, ít dùng hơn) ─────────────────────────────────
 const Queue     = lazy(() => import('./pages/engineer/Queue'))
@@ -112,6 +115,7 @@ export default function App() {
       <OfflineBanner />
       <ToastContainer />
       <BrowserRouter>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           {/* Chung — không cần đăng nhập */}
           <Route path="/"        element={<Splash />} />
@@ -229,6 +233,7 @@ export default function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </QueryClientProvider>
   )

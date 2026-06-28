@@ -68,6 +68,22 @@ export default defineConfig({
       }
     })
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        // Tách vendor nặng & ít đổi (react/supabase/sentry/query) thành chunk riêng để
+        // trình duyệt cache lâu dài — mỗi lần sửa code app KHÔNG bắt tải lại cả đống lib.
+        // Trước đây gộp hết vào 1 chunk ~653KB. (Trang nông dân được lazy-load ở App.jsx.)
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (/[\\/]react(-dom|-router-dom)?[\\/]|[\\/]scheduler[\\/]/.test(id)) return 'react-vendor'
+          if (id.includes('@supabase')) return 'supabase'
+          if (id.includes('@sentry'))   return 'sentry'
+          if (id.includes('@tanstack')) return 'query'
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     // Proxy để tránh CORS khi dev
