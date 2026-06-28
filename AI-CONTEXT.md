@@ -54,6 +54,8 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 
 ### Đã làm gần đây (2026-06-29)
 - ✅ **Realtime engineer queue → polling** (Claude): verify no-op (RLS chặn anon) rồi thay bằng polling ở Queue/Dashboard/WaitEngineer + gỡ helper chết. Lint 0 error, build OK.
+- ✅ **Đợt hoàn thiện 5 phase** (Claude): (1) Nén ảnh client `utils/compressImage.js` (canvas ≤1280px JPEG, fallback file gốc) áp ImageUpload+Community. (2) Giảm bundle: `manualChunks` tách react/supabase/sentry/query + lazy-load trang nông dân phụ → entry **653KB→137KB** (gz 200→44). (3) **Test frontend** (vitest 4 + Testing Library, 12 test: compressImage/AnswerContent/WaitEngineer) + nối CI (`npm test`, node 22). (4) Security review: upload+auth đã chắc (userId từ JWT, isOwnSession, sharp re-encode); vá 2 lỗ high vite dev-server (`npm audit fix`, 0 vuln). (5) **Bookmark câu hữu ích** + **tìm sâu nội dung** lịch sử — xem mục Còn lại về migration.
+- ⚠️ **MIGRATION CHƯA ÁP**: `supabase/migrations/20260629000000_message_bookmarks.sql` — user cần áp bằng psql. Backend degrade mềm (isMissingTable) nên không crash; nút "Lưu" sẽ no-op tới khi áp.
 
 ### Đã làm gần đây (2026-06-28)
 - ✅ Migrate `@google/genai` + TẮT thinking (~1.8s), verify API thật — `d736363`, `6b1f0d6`.

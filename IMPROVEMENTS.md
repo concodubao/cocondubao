@@ -80,6 +80,19 @@ Rà toàn bộ backend + các trang frontend chính. Đã sửa & push (`de2c543
 | H14 | 🟢 Nâng cấp | rag | Triệu chứng mơ hồ ("vàng lá") → AI xổ list bệnh, bà con rối | SYSTEM_PROMPT: triệu chứng chung chung → HỎI NGƯỢC 1 câu / XÚI CHỤP ẢNH; câu rõ → trả thẳng. Verify API thật | ✅ |
 | H15 | 🟢 Hạ tầng | storage | Ảnh chat sâu bệnh lưu vĩnh viễn → bucket phình, tốn tiền | `storageCleanup.js`: cron 24h xóa `pest-images/` > 30 ngày + null `image_url`. KHÔNG đụng `community/` | ✅ |
 
+## Đợt 2026-06-29 (hoàn thiện: ảnh/bundle/test/security/bookmark)
+
+| ID | Mức | Khu vực | Vấn đề | Hướng sửa | TT |
+|----|-----|---------|--------|-----------|----|
+| I1 | 🟢 Hạ tầng | realtime | Realtime engineer_queue no-op (RLS chặn anon, auth.uid()=NULL) | Verify + thay bằng polling (Queue 20s/Dashboard 30s/WaitEngineer 12s, pause khi tab ẩn) | ✅ |
+| I2 | 🟡 UX/quota | upload | Ảnh camera 3–8MB → upload lâu, phình bucket, tốn token vision | `utils/compressImage.js` (canvas ≤1280px JPEG, fallback gốc) ở ImageUpload+Community | ✅ |
+| I3 | 🟢 Perf | bundle | 1 chunk ~653KB, trang nông dân import thẳng | manualChunks tách vendor + lazy-load trang phụ → entry 137KB (gz 44) | ✅ |
+| I4 | 🟢 DX | test | Frontend 0 test | vitest 4 + Testing Library, 12 test critical-path + nối CI (node 22) | ✅ |
+| I5 | 🟢 Bảo mật | deps | 2 lỗ high vite (dev-server) | `npm audit fix` → 0 vuln; upload/auth rà thủ công đã chắc | ✅ |
+| I6 | 🟢 UX | history | Thiếu lưu câu hữu ích; search chỉ khớp preview | Bookmark (`message_bookmarks`) + tab "Đã lưu" + getSessions trả `searchText` tìm sâu | ✅ |
+
+⚠️ **I6 cần áp migration** `20260629000000_message_bookmarks.sql` bằng psql (backend degrade mềm tới khi áp).
+
 ### Còn mở (ngoài Sentry/OTP)
 - ⬜ **A** — soạn QA *differential* cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ B (prompt, H14) chỉ tác động câu qua LLM; câu có curated QA (qa_direct) thì serve thẳng QA → sửa hành vi phải sửa QA (việc kỹ sư).
 - ⬜ **Scale** — Redis + leader-election scheduler + billing Gemini + index pgvector (trần 1 replica). (H15 cron cũng cần leader-election khi >1 replica.)
