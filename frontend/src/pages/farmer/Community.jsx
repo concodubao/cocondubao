@@ -50,6 +50,16 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
   const isOwn     = post.users?.id === currentUserId
   const [likedByMe,  setLikedByMe]  = useState(post.likedByMe)
   const [likeCount,  setLikeCount]  = useState(Number(post.likeCount))
+  const [reported,   setReported]   = useState(false)
+
+  function handleReport(e) {
+    e.stopPropagation()
+    if (reported) return
+    if (!confirm('Báo cáo bài này cho quản trị viên?')) return
+    communityAPI.reportPost(post.id)
+      .then(() => { setReported(true); toast.success('Đã gửi báo cáo. Cảm ơn bạn!') })
+      .catch(() => toast.error('Không gửi được báo cáo.'))
+  }
 
   function handleLike(e) {
     e.stopPropagation()
@@ -83,7 +93,7 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
             {post.users?.village && `${post.users.village} · `}{timeAgo(post.created_at)}
           </div>
         </div>
-        {isOwn && (
+        {isOwn ? (
           <button
             onClick={e => { e.stopPropagation(); onDelete(post.id) }}
             aria-label="Xóa bài"
@@ -91,6 +101,17 @@ function PostCard({ post, onLike, onDelete, currentUserId }) {
                        hover:bg-[#fef2f2] hover:text-[#ef4444] transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">delete</span>
+          </button>
+        ) : (
+          <button
+            onClick={handleReport}
+            disabled={reported}
+            aria-label="Báo cáo bài đăng"
+            title="Báo cáo bài xấu"
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-[#94a3b8]
+                       hover:bg-[#fef2f2] hover:text-[#ef4444] transition-colors disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">{reported ? 'flag' : 'outlined_flag'}</span>
           </button>
         )}
       </div>

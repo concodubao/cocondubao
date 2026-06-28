@@ -223,19 +223,53 @@ router.get('/ai-review', verifyJWT, requireRole('admin', 'engineer'), async (req
   const { filter = 'all', limit = 40 } = req.query
   try {
     const since = new Date(Date.now() - 30 * 86400000).toISOString()
-    let q = supabase
-      .from('messages')
-      .select('content, confidence, source, session_id, created_at')
-      .eq('role', 'assistant')
-      .not('confidence', 'is', null)
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(Number(limit))
-    if (filter === 'low')      q = q.lt('confidence', 0.5)
-    else if (filter === 'mid') q = q.gte('confidence', 0.5).lt('confidence', 0.7)
+    let answers = []
 
-    const { data: ans } = await q
-    const answers    = ans || []
+    if (filter === 'helpful') {
+      // Câu nông dân bấm 👍 nhiều nhất → ứng viên "duyệt thành QA" chuẩn (khép vòng
+      // phản hồi tích cực thành tri thức). Đếm 👍 theo message rồi lấy top.
+      const { data: fb } = await supabase
+        .from('answer_feedback')
+        .select('message_id')
+        .eq('helpful', true)
+        .gte('created_at', since)
+      const counts = {}
+      for (const f of fb || []) counts[f.message_id] = (counts[f.message_id] || 0) + 1
+      const ids = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, Number(limit))
+      if (ids.length) {
+        const { data } = await supabase
+          .from('messages')
+          .select('id, content, confidence, source, session_id, created_at')
+          .in('id', ids)
+        answers = (data || [])
+          .map(m => ({ ...m, helpfulCount: counts[m.id] || 0 }))
+          .sort((a, b) => b.helpfulCount - a.helpfulCount)
+      }
+    } else {
+      let q = supabase
+        .from('messages')
+        .select('id, content, confidence, source, session_id, created_at')
+        .eq('role', 'assistant')
+        .not('confidence', 'is', null)
+        .gte('created_at', since)
+        .order('created_at', { ascending: false })
+        .limit(Number(limit))
+      if (filter === 'low')      q = q.lt('confidence', 0.5)
+      else if (filter === 'mid') q = q.gte('confidence', 0.5).lt('confidence', 0.7)
+
+      const { data: ans } = await q
+      answers = ans || []
+      // Gắn số 👍 để hiện badge ngay cả ở các tab khác
+      const aIds = answers.map(a => a.id).filter(Boolean)
+      if (aIds.length) {
+        const { data: fb } = await supabase
+          .from('answer_feedback').select('message_id').eq('helpful', true).in('message_id', aIds)
+        const counts = {}
+        for (const f of fb || []) counts[f.message_id] = (counts[f.message_id] || 0) + 1
+        answers = answers.map(a => ({ ...a, helpfulCount: counts[a.id] || 0 }))
+      }
+    }
+
     const sessionIds = [...new Set(answers.map(a => a.session_id).filter(Boolean))]
     let userMsgs = []
     if (sessionIds.length) {
@@ -250,11 +284,12 @@ router.get('/ai-review', verifyJWT, requireRole('admin', 'engineer'), async (req
     const items = answers.map(a => {
       const before = userMsgs.filter(m => m.session_id === a.session_id && m.created_at <= a.created_at)
       return {
-        question:   before.length ? before[before.length - 1].content : null,
-        answer:     a.content,
-        confidence: a.confidence,
-        source:     a.source,
-        created_at: a.created_at,
+        question:     before.length ? before[before.length - 1].content : null,
+        answer:       a.content,
+        confidence:   a.confidence,
+        source:       a.source,
+        helpfulCount: a.helpfulCount || 0,
+        created_at:   a.created_at,
       }
     })
     res.json({ items })

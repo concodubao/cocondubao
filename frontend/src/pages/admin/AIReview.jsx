@@ -33,6 +33,9 @@ function ReviewCard({ item, onCompose }) {
           Tin cậy {Math.round((item.confidence || 0) * 100)}%
         </span>
         {item.source && <span style={s.sourceTag}>{SOURCE_LABEL[item.source] || item.source}</span>}
+        {item.helpfulCount > 0 && (
+          <span style={{ ...s.confBadge, color: '#15803d', background: '#dcfce7' }}>👍 {item.helpfulCount}</span>
+        )}
         <span style={s.date}>{date}</span>
       </div>
 
@@ -48,26 +51,32 @@ function ReviewCard({ item, onCompose }) {
         <p style={s.aText}>{item.answer?.slice(0, 280)}{(item.answer?.length || 0) > 280 ? '…' : ''}</p>
       </div>
 
-      <button onClick={() => onCompose(item)} style={s.btnFix}>
-        <BookOpen size={14} strokeWidth={2} /> Sai? Soạn câu trả lời đúng
+      <button onClick={() => onCompose(item)} style={item.helpfulCount > 0 ? s.btnCurate : s.btnFix}>
+        <BookOpen size={14} strokeWidth={2} />
+        {item.helpfulCount > 0 ? ' Duyệt thành QA' : ' Sai? Soạn câu trả lời đúng'}
       </button>
     </div>
   )
 }
 
 function ComposeModal({ item, onClose, onSubmit, saving }) {
+  // Câu được nông dân khen 👍 → điền sẵn câu trả lời AI để kỹ sư xem/chỉnh rồi duyệt
+  // thẳng thành QA (khỏi gõ lại). Câu sai (không 👍) → để trống cho soạn mới.
+  const curate = (item.helpfulCount || 0) > 0
   const [question, setQuestion] = useState(item.question || '')
-  const [answer,   setAnswer]   = useState('')
+  const [answer,   setAnswer]   = useState(curate ? (item.answer || '') : '')
   return (
     <div style={s.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={s.modal}>
         <div style={s.modalHead}>
-          <span style={s.modalTitle}>Thêm vào kho tri thức</span>
+          <span style={s.modalTitle}>{curate ? 'Duyệt thành QA chuẩn' : 'Thêm vào kho tri thức'}</span>
           <button onClick={onClose} aria-label="Đóng" style={s.modalClose}><X size={20} /></button>
         </div>
         <div style={s.modalBody}>
           <p style={s.modalHint}>
-            Câu hỏi + câu trả lời đúng sẽ được lưu thành QA biên soạn và embed để AI trả lời tốt hơn lần sau.
+            {curate
+              ? 'Câu này được nông dân bấm 👍. Xem lại / chỉnh cho chuẩn rồi lưu thành QA — AI sẽ trả thẳng câu này khi có người hỏi tương tự (khỏi tốn quota).'
+              : 'Câu hỏi + câu trả lời đúng sẽ được lưu thành QA biên soạn và embed để AI trả lời tốt hơn lần sau.'}
           </p>
           <label style={s.fieldLabel}>Câu hỏi chuẩn</label>
           <textarea value={question} onChange={e => setQuestion(e.target.value)}
@@ -91,9 +100,10 @@ function ComposeModal({ item, onClose, onSubmit, saving }) {
 }
 
 const FILTERS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'low', label: 'Tin cậy thấp (<50%)' },
-  { key: 'mid', label: 'Trung bình (50–70%)' },
+  { key: 'all',     label: 'Tất cả' },
+  { key: 'helpful', label: '👍 Được khen' },
+  { key: 'low',     label: 'Tin cậy thấp (<50%)' },
+  { key: 'mid',     label: 'Trung bình (50–70%)' },
 ]
 
 export default function AIReview() {
@@ -129,7 +139,7 @@ export default function AIReview() {
         <h1 style={s.title}>Soát chất lượng AI</h1>
       </header>
 
-      <p style={s.intro}>Xem lại câu trả lời AI gần đây để bắt câu sai. Câu nào sai, bấm "Soạn câu trả lời đúng" để dạy lại AI.</p>
+      <p style={s.intro}>Xem lại câu trả lời AI gần đây: câu sai → "Soạn câu trả lời đúng" để dạy lại AI; tab <strong>👍 Được khen</strong> → câu nông dân khen, "Duyệt thành QA" để AI trả thẳng lần sau (tiết kiệm quota).</p>
 
       <div style={s.tabs} role="tablist">
         {FILTERS.map(f => (
@@ -188,6 +198,7 @@ const s = {
   aLabel:     { fontSize: 12, color: '#64748b', margin: '0 0 4px', fontWeight: 600 },
   aText:      { fontSize: 14, color: '#0f172a', margin: 0, lineHeight: 1.6 },
   btnFix:     { alignSelf: 'flex-start', padding: '9px 14px', fontSize: 13, fontWeight: 700, background: '#fdf6f0', color: '#4B230A', border: '1px solid #f5d5b0', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
+  btnCurate:  { alignSelf: 'flex-start', padding: '9px 14px', fontSize: 13, fontWeight: 700, background: '#dcfce7', color: '#15803d', border: '1px solid #86efac', borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
   overlay:    { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   modal:      { background: '#fff', width: '100%', maxWidth: 520, maxHeight: '92dvh', borderRadius: '18px 18px 0 0', display: 'flex', flexDirection: 'column', boxShadow: '0 -4px 24px rgba(0,0,0,0.18)' },
   modalHead:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid #f1f5f9' },
