@@ -59,13 +59,14 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 - ✅ Admin tải ảnh thông báo trực tiếp — `66d90c5`. Khép vòng 👍→QA + báo cáo bài ở feed — `add85bd`.
 - ✅ Phóng cỡ chữ đọc `--read-scale` (không zoom cả trang) — `d56cb31`. Fix tràn Weather/Notif — `5383c53`. Chặn spam push + auto-reload SW — `f667c17`.
 - ✅ G23/G24/Profile-toast; re-embed an toàn khi 429 + giảm nhiễu cảnh báo mưa — `8e41f79`.
+- ✅ **B — Kỹ năng chẩn đoán**: SYSTEM_PROMPT ép HỎI NGƯỢC 1 câu / XÚI CHỤP ẢNH khi triệu chứng mơ hồ (vàng lá...), trả thẳng khi câu rõ. Verify API thật: mơ hồ→xúi ảnh, cụ thể→trả thuốc+liều.
 - Tests **135/135 pass**.
 
 ### Còn lại
 - ⬜ **Sentry** (G15): cần user tạo project sentry.io + DSN.
 - ⬜ **OTP**: đổi provider (Twilio kém ở VN), giữ code hiện tại.
-- ⬜ **A — QA differential** cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị từng loại. (việc kỹ sư, dùng nút "Soạn Hỏi–Đáp")
-- ⬜ **B — SYSTEM_PROMPT** ép differential + gợi ý gửi ảnh khi 1 triệu chứng nhiều bệnh, không chốt 1 bệnh. (user: "để đó")
+- ⬜ **A — QA differential** cho triệu chứng mơ hồ: nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ LƯU Ý: prompt (B) chỉ tác động câu đi qua LLM; câu đã có **curated QA (qa_direct, sim≥0.80)** thì serve thẳng QA → muốn đổi hành vi phải SỬA QA đó (việc kỹ sư, nút "Soạn Hỏi–Đáp").
+- ⬜ **#1 Cron dọn ảnh `pest-images/` > 30 ngày** (đã đánh giá: đáng làm, vệ sinh, chưa cấp).
 - ⬜ **Scale** (trần 1 replica): Redis (cache L1/rate-limit/lockout) + leader-election scheduler (advisory lock PG) + billing Gemini + index pgvector. L2 `answer_cache` đã sẵn cross-replica.
 - ⬜ **Realtime engineer queue** nghi no-op (RLS + anon `auth.uid()`=NULL) → verify hoặc dựa polling.
 - ⬜ **Dọn ảnh chat sâu bệnh cũ** — không tự xoá (chỉ khi user xoá account) → storage phình dần.

@@ -77,10 +77,10 @@ Rà toàn bộ backend + các trang frontend chính. Đã sửa & push (`de2c543
 | H11 | 🟡 UX | font-scale | CSS `zoom` cả trang gây vỡ layout Android/iOS | Biến `--read-scale` chỉ phóng nội dung đọc (AnswerContent + NotifDetail) | ✅ |
 | H12 | 🟢 Nâng cấp | LLM | Langchain khoá bản cũ, thinking ăn quota/chậm | Gỡ langchain → `@google/genai` + tắt thinking (~1.8s) — xem AI-CONTEXT mục 3 | ✅ |
 | H13 | 🔴 Bug | rag | Câu nối/câu đế ("còn cách khác", "vậy hả") mất ngữ cảnh → trả lời lạc đề | `checkFAQ` bắt câu đế + `contextualizeQuery` ghép chủ đề trước embed | ✅ |
+| H14 | 🟢 Nâng cấp | rag | Triệu chứng mơ hồ ("vàng lá") → AI xổ list bệnh, bà con rối | SYSTEM_PROMPT: triệu chứng chung chung → HỎI NGƯỢC 1 câu / XÚI CHỤP ẢNH; câu rõ → trả thẳng. Verify API thật | ✅ |
 
 ### Còn mở (ngoài Sentry/OTP)
-- ⬜ **A** — soạn QA *differential* cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị.
-- ⬜ **B** — SYSTEM_PROMPT ép differential + gợi ý gửi ảnh, không chốt 1 bệnh. (user: "để đó")
+- ⬜ **A** — soạn QA *differential* cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ B (prompt, H14) chỉ tác động câu qua LLM; câu có curated QA (qa_direct) thì serve thẳng QA → sửa hành vi phải sửa QA (việc kỹ sư).
+- ⬜ **#1 Cron dọn ảnh `pest-images/` > 30 ngày** — đáng làm (vệ sinh Storage), chưa cấp ở quy mô thí điểm.
 - ⬜ **Scale** — Redis + leader-election scheduler + billing Gemini + index pgvector (trần 1 replica).
 - ⬜ **Realtime engineer queue** nghi no-op (RLS + anon auth.uid NULL) → verify.
-- ⬜ **Dọn ảnh chat sâu bệnh cũ** (storage phình dần).
