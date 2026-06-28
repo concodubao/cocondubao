@@ -24,7 +24,7 @@ vi.mock('@google/genai', () => ({
   }),
 }))
 
-const { askRAG, checkFAQ, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache } =
+const { askRAG, checkFAQ, contextualizeQuery, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache } =
   await import('../src/services/rag.js')
 
 const fakeVector = () => ({ embeddings: [{ values: new Array(1536).fill(0.01) }] })
@@ -55,6 +55,33 @@ describe('checkFAQ', () => {
 
   it('khớp lời tạm biệt', () => {
     expect(checkFAQ('tạm biệt')).toBeTypeOf('string')
+  })
+
+  it('câu đế ngắn "vậy hả" / "ờ" → FAQ (không thả vào RAG)', () => {
+    expect(checkFAQ('vậy hả')).toBeTypeOf('string')
+    expect(checkFAQ('thế à?')).toBeTypeOf('string')
+    expect(checkFAQ('ờ')).toBeTypeOf('string')
+    // nhưng câu có nội dung thật KHÔNG bị bắt nhầm
+    expect(checkFAQ('vậy còn đạo ôn thì sao')).toBeNull()
+  })
+})
+
+describe('contextualizeQuery — ghép chủ đề cho câu nối', () => {
+  const hist = [
+    { role: 'user', content: 'lúa bị vàng lá là bệnh gì' },
+    { role: 'assistant', content: '...' },
+  ]
+  it('câu nối "còn cách khác" → ghép câu hỏi chủ đề trước đó', () => {
+    expect(contextualizeQuery('còn cách khác hông', hist)).toBe('lúa bị vàng lá là bệnh gì còn cách khác hông')
+  })
+  it('câu "đạo ôn thì sao" (kết thúc "thì sao") → ghép chủ đề', () => {
+    expect(contextualizeQuery('đạo ôn thì sao', hist)).toContain('lúa bị vàng lá là bệnh gì')
+  })
+  it('câu hỏi độc lập đủ dài → GIỮ NGUYÊN', () => {
+    expect(contextualizeQuery('cách trị rầy nâu trên lúa', hist)).toBe('cách trị rầy nâu trên lúa')
+  })
+  it('không có lịch sử chủ đề → giữ nguyên', () => {
+    expect(contextualizeQuery('còn cách khác', [])).toBe('còn cách khác')
   })
 })
 

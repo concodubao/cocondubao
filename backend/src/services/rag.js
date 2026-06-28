@@ -324,6 +324,17 @@ Với những quyết định quan trọng như phun thuốc liều cao hay xử
     patterns: [/bạn tên (gì|là gì)/i, /tên (bạn|mày|mi) là/i],
     answer: `Mình tên là Cò Con 🐦 — trợ lý nông nghiệp của bà con. Bà con cần hỏi gì về cây trồng cứ nói nhé!`,
   },
+  {
+    // Câu đế / xác nhận ngắn, KHÔNG có nội dung hỏi ("vậy hả", "thế à", "ờ", "ừ"...).
+    // Nếu thả vào RAG, embed một mình → kéo chunk vớ vẩn → trả lời lạc đề (vd hỏi
+    // "vậy hả" lại đi nói về lem lép hạt). Bắt ở đây, hỏi lại cho rõ thay vì bịa.
+    patterns: [
+      /^(vậy|thế|zậy)\s*(hả|à|ạ|hử|hen|hôn|ha)?\s*[?.!]*$/i,
+      /^(ờ|ừ|ừm|à|á|dạ|vâng|uh|uhm|hmm+|ờm)\s*[?.!]*$/i,
+      /^(thật (không|hông|hả)|thiệt (hả|không|hông))\s*[?.!]*$/i,
+    ],
+    answer: `Dạ! Bà con còn thắc mắc gì về cây trồng nữa không? Cứ hỏi rõ Cò Con một câu nghe, ví dụ "lúa bị vàng lá trị sao" 😊`,
+  },
 ]
 
 export function checkFAQ(question) {
@@ -332,6 +343,35 @@ export function checkFAQ(question) {
     if (faq.patterns.some(p => p.test(q))) return faq.answer
   }
   return null
+}
+
+// ─── Ghép ngữ cảnh cho câu NỐI trước khi RETRIEVE ───────────────────────────
+// Retrieval chỉ embed câu hiện tại; câu nối ("còn cách khác", "đạo ôn thì sao")
+// mất chủ đề câu trước → pgvector kéo chunk sai → trả lời lạc đề. Heuristic: câu
+// bắt đầu bằng từ nối / kết thúc "thì sao" / quá ngắn → ghép câu hỏi NÔNG DÂN có
+// nội dung gần nhất vào trước khi embed. Chỉ ảnh hưởng retrieval, KHÔNG tốn quota.
+const FOLLOWUP_RE = /^(còn|vậy|thế|thì|ngoài ra|thêm|cách khác|còn cách|vậy còn|thế còn|còn gì|còn nữa)\b/i
+
+function lastTopicQuestion(history) {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const m = history[i]
+    if (m?.role !== 'user') continue
+    const t = (m.content || '').trim()
+    // "Câu chủ đề" = đủ dài + không phải câu nối (để bám đúng đề tài, bỏ qua câu đế)
+    if (t.split(/\s+/).length >= 4 && !FOLLOWUP_RE.test(t)) return t
+  }
+  return null
+}
+
+export function contextualizeQuery(question, history = []) {
+  const q = (question || '').trim()
+  const looksFollowUp =
+    FOLLOWUP_RE.test(q) ||
+    /\bthì (sao|làm sao|làm gì|thế nào)\b/i.test(q) ||
+    q.split(/\s+/).length <= 2
+  if (!looksFollowUp) return question
+  const topic = lastTopicQuestion(history)
+  return topic ? `${topic} ${question}` : question
 }
 
 // ─── Trả thẳng câu trả lời từ chunk QA đã biên soạn (tiết kiệm quota LLM) ─────
@@ -376,8 +416,12 @@ export async function askRAG(question, cropType = null, history = []) {
       return { ...dbCached, source: dbCached.source + '_dbcached' }
     }
 
-    // BƯỚC 1: Embed câu hỏi thành vector 1536 chiều
-    const [queryEmbedding] = await embedTexts([question], 'RETRIEVAL_QUERY')
+    // BƯỚC 1: Embed câu hỏi (đã ghép ngữ cảnh nếu là câu nối) thành vector 1536 chiều
+    const retrievalQuery = contextualizeQuery(question, history)
+    if (retrievalQuery !== question) {
+      console.log(`[RAG] contextualize "${question}" → "${retrievalQuery.slice(0, 60)}..."`)
+    }
+    const [queryEmbedding] = await embedTexts([retrievalQuery], 'RETRIEVAL_QUERY')
 
     // BƯỚC 1.5: Semantic cache — câu hỏi cùng ý dù diễn đạt khác → trả thẳng cache,
     // bỏ qua pgvector + LLM (tiết kiệm quota Gemini).
