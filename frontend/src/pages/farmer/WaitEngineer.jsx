@@ -7,37 +7,52 @@ export default function WaitEngineer() {
   const navigate = useNavigate()
   const location = useLocation()
   const { sessionId } = location.state || {}
-  // Số message 'engineer' đã có lúc vào màn này; nhiều hơn = kỹ sư vừa trả lời.
+  // Mốc thời gian (ms) câu trả lời kỹ sư MỚI NHẤT lúc vào màn này; xuất hiện câu mới hơn
+  // = kỹ sư vừa trả lời. So theo thời điểm thay vì đếm số lượng để bền với phân trang
+  // (câu mới luôn là tin mới nhất) và với việc xoá tin cũ.
   const baselineRef = useRef(null)
 
   // Realtime Supabase ở đây là no-op: client dùng anon key (không đăng nhập Supabase
   // Auth) nên auth.uid()=NULL, mà engineer_queue bật RLS không policy → bị chặn → không
-  // nhận UPDATE. Thay bằng polling getMessages: khi xuất hiện message 'engineer' mới →
-  // tự nhảy về chat. (Nông dân vẫn nhận push song song; đây là lối tự động khi mở app.)
+  // nhận UPDATE. Thay bằng polling getMessages: khi có câu trả lời 'engineer' mới hơn
+  // mốc → tự nhảy về chat. Tạm dừng hẳn khi tab ẩn (cùng pattern với Queue.jsx).
+  // (Nông dân vẫn nhận push song song; đây là lối tự động khi đang mở app.)
   useEffect(() => {
     if (!sessionId) return
-    let stopped = false
+    let timer = null
+    let navigated = false
+
+    const start = () => { if (!timer) timer = setInterval(check, 12_000) }
+    const stop  = () => { if (timer) { clearInterval(timer); timer = null } }
 
     async function check() {
-      if (document.visibilityState !== 'visible') return
       try {
         const res = await chatAPI.getMessages(sessionId)
         // getMessages trả raw (select('*')) → message kỹ sư có role/source = 'engineer'.
         const msgs = res.data.messages || []
-        const engineerCount = msgs.filter(m => m.role === 'engineer' || m.source === 'engineer').length
-        if (baselineRef.current === null) { baselineRef.current = engineerCount; return }
-        if (!stopped && engineerCount > baselineRef.current) {
-          stopped = true
+        const latestEngineerMs = msgs.reduce((max, m) => {
+          if (m.role !== 'engineer' && m.source !== 'engineer') return max
+          const t = Date.parse(m.created_at)
+          return t > max ? t : max
+        }, 0)
+        // Lần đầu: ghi mốc câu trả lời kỹ sư mới nhất hiện có (thường chưa có → 0).
+        if (baselineRef.current === null) { baselineRef.current = latestEngineerMs; return }
+        if (!navigated && latestEngineerMs > baselineRef.current) {
+          navigated = true
+          stop()
           navigate('/chat', { state: { sessionId, scrollToBottom: true } })
         }
       } catch { /* lỗi mạng tạm thời: bỏ qua, lần poll sau thử lại */ }
     }
 
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') { check(); start() } else stop()
+    }
+
     check()
-    const timer = setInterval(check, 12_000)
-    const onVisible = () => { if (document.visibilityState === 'visible') check() }
+    start()
     document.addEventListener('visibilitychange', onVisible)
-    return () => { stopped = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisible) }
   }, [sessionId])
 
   return (
