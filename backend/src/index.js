@@ -18,6 +18,7 @@ import communityRoutes from './routes/community.js'
 import { startNotificationScheduler } from './services/notifications.js'
 import { startUserStatusSync } from './middleware/auth.js'
 import { startWeatherAlertScheduler } from './services/weatherAlerts.js'
+import { startStorageCleanupScheduler } from './services/storageCleanup.js'
 
 const app = express()
 
@@ -113,4 +114,7 @@ app.listen(PORT, () => {
 
   // Quét thời tiết tạo bản nháp cảnh báo cho admin duyệt (mỗi 6h).
   startWeatherAlertScheduler()
+
+  // Dọn ảnh sâu bệnh (chat) cũ > 30 ngày để bucket khỏi phình (mỗi 24h).
+  startStorageCleanupScheduler()
 })
