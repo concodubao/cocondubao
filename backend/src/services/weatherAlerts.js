@@ -16,8 +16,7 @@ const LON = 105.9740
 
 // Ngưỡng cảnh báo — chỉnh ở đây nếu cần
 const TH = {
-  rainSum:   20,  // mm/ngày → mưa to
-  rainProb:  70,  // % xác suất mưa
+  rainSum:   20,  // mm/ngày → mưa đáng kể (đủ rửa trôi thuốc/phân, nên hoãn phun bón)
   heatMax:   35,  // °C → nắng nóng
   windMax:   40,  // km/h → gió mạnh
   coldMin:   18,  // °C → rét (hiếm ở Sóc Trăng)
@@ -47,7 +46,6 @@ export function evaluateWeather(daily) {
   const ngay = mm && dd ? `${dd}/${mm}` : 'ngày mai'
 
   const rainSum = daily.precipitation_sum?.[i] ?? 0
-  const rainPb  = daily.precipitation_probability_max?.[i] ?? 0
   const tMax    = daily.temperature_2m_max?.[i] ?? null
   const tMin    = daily.temperature_2m_min?.[i] ?? null
   const wind    = daily.wind_speed_10m_max?.[i] ?? 0
@@ -55,7 +53,10 @@ export function evaluateWeather(daily) {
   const alerts = []
   // date = ngày dự báo dạng YYYY-MM-DD — dùng làm khoá dedup theo NGÀY (mỗi ngày 1
   // draft riêng) và để dọn draft đã qua ngày, tránh admin duyệt nhầm cảnh báo cũ.
-  if (rainSum >= TH.rainSum || rainPb >= TH.rainProb) {
+  // Chỉ cảnh báo theo LƯỢNG mưa dự báo. Trước đây kích hoạt cả khi xác suất ĐỈNH GIỜ
+  // ≥70% → mùa mưa gần như ngày nào cũng sinh draft (chỉ 1 cơn mưa thoáng qua) → nhiễu
+  // cho admin. Xác suất cao mà lượng nhỏ KHÔNG phải "mưa to".
+  if (rainSum >= TH.rainSum) {
     alerts.push({
       kind:  'rain',
       date:  d,

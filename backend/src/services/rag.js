@@ -445,7 +445,9 @@ export async function embedAndStoreDoc(docId) {
   if (error || !doc) throw new Error(`Doc ${docId} not found`)
   if (!doc.content)  throw new Error(`Doc ${docId} has no content`)
 
-  await supabase.from('knowledge_chunks').delete().eq('doc_id', docId)
+  // KHÔNG xoá chunks cũ ở đây. Khi DUYỆT LẠI tài liệu đang dùng mà embed dính 429
+  // giữa chừng, nếu đã xoá trước thì tài liệu mất sạch chunks → biến khỏi RAG. Chỉ
+  // xoá+thay sau khi embed THÀNH CÔNG (ngay trước insert bên dưới).
 
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize:    1000,
@@ -495,6 +497,10 @@ export async function embedAndStoreDoc(docId) {
     embedding:   vectors[i],
     chunk_index: i,
   }))
+
+  // Embed đã xong & hợp lệ → giờ mới thay chunks: xoá cũ rồi chèn mới (cửa sổ trống
+  // chỉ vài mili giây, an toàn hơn nhiều so với xoá trước rồi embed lâu/có thể 429).
+  await supabase.from('knowledge_chunks').delete().eq('doc_id', docId)
 
   const { error: insertError } = await supabase
     .from('knowledge_chunks')

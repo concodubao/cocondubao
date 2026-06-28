@@ -28,8 +28,8 @@ describe('evaluateWeather', () => {
     expect(kinds(evaluateWeather(daily({ rainSum: 30 })))).toContain('rain')
   })
 
-  it('mưa to theo xác suất (≥70%)', () => {
-    expect(kinds(evaluateWeather(daily({ rainProb: 80 })))).toContain('rain')
+  it('xác suất cao nhưng lượng mưa nhỏ → KHÔNG cảnh báo (tránh nhiễu mùa mưa)', () => {
+    expect(kinds(evaluateWeather(daily({ rainProb: 95, rainSum: 2 })))).not.toContain('rain')
   })
 
   it('nắng nóng (≥35°C)', () => {
