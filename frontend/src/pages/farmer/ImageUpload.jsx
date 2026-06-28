@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../stores/authStore'
 import { chatAPI } from '../../services/api'
+import { compressImage } from '../../utils/compressImage'
 import { useSTT } from '../../hooks/useSTT'
 import { ChevronLeft, Camera, X, Mic } from 'lucide-react'
 
@@ -33,8 +34,9 @@ export default function ImageUpload() {
     setLoading(true)
     setError('')
     try {
+      const sending = await compressImage(file)
       const formData = new FormData()
-      formData.append('image',    file)
+      formData.append('image',    sending)
       formData.append('text',     text.trim() || 'Cây bị bệnh gì?')
       formData.append('userId',   user.id)
       formData.append('cropType', user.crops?.[0] || '')

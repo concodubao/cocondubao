@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
 import { communityAPI } from '../../services/api'
+import { compressImage } from '../../utils/compressImage'
 import { toast } from '../../stores/toastStore'
 import BottomNav from '../../components/BottomNav'
 
@@ -201,7 +202,7 @@ function NewPostSheet({ onClose, onPosted, user }) {
       const fd = new FormData()
       fd.append('content', content.trim())
       fd.append('cropTags', JSON.stringify(crops))
-      if (image) fd.append('image', image)
+      if (image) fd.append('image', await compressImage(image))
       const res = await communityAPI.createPost(fd)
       onPosted(res.data.post)
       onClose()
