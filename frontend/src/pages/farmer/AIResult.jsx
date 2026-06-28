@@ -3,7 +3,7 @@ import { useTTS } from '../../hooks/useTTS'
 import { chatAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
 import { useState } from 'react'
-import { ChevronLeft, Volume2, VolumeX, MessageCircle, Home, ThumbsUp } from 'lucide-react'
+import { ChevronLeft, Volume2, VolumeX, MessageCircle, Home, ThumbsUp, Bookmark } from 'lucide-react'
 import AnswerContent from '../../components/AnswerContent'
 
 export default function AIResult() {
@@ -17,6 +17,7 @@ export default function AIResult() {
   const [reported,   setReported]   = useState(false)
   const [showReport, setShowReport] = useState(false)
   const [helpful,    setHelpful]    = useState(false)
+  const [saved,      setSaved]      = useState(false)
 
   if (!answer && !engineerQueued) return <Navigate to="/chat" replace />
   if (engineerQueued) return <Navigate to="/chat/waiting" state={{ sessionId, messageId }} replace />
@@ -46,6 +47,17 @@ export default function AIResult() {
   async function handleHelpful() {
     setHelpful(true) // phản hồi lạc quan, không chặn UI nếu mạng chậm
     try { await chatAPI.feedback(messageId, true) } catch { /* im lặng — không phiền nông dân */ }
+  }
+
+  async function handleSave() {
+    const next = !saved
+    setSaved(next) // lạc quan
+    try {
+      if (next) await chatAPI.addBookmark(messageId)
+      else      await chatAPI.removeBookmark(messageId)
+    } catch {
+      setSaved(!next) // hoàn tác nếu lỗi
+    }
   }
 
   return (
@@ -112,6 +124,13 @@ export default function AIResult() {
               ) : (
                 <span style={s.helpfulDone}><ThumbsUp size={15} strokeWidth={2.5} /> Cảm ơn bạn!</span>
               )}
+              <button onClick={handleSave}
+                style={saved ? s.savedBtn : s.saveBtn}
+                aria-pressed={saved}
+                aria-label={saved ? 'Bỏ lưu' : 'Lưu câu trả lời'}>
+                <Bookmark size={16} strokeWidth={2} fill={saved ? '#4B230A' : 'none'} />
+                {saved ? 'Đã lưu' : 'Lưu'}
+              </button>
               {!reported ? (
                 <button onClick={() => setShowReport(true)} style={s.reportLink}>
                   Chưa đúng?
@@ -163,6 +182,8 @@ const s = {
   feedbackRow:   { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, paddingTop: 2 },
   helpfulBtn:    { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#4B230A', background: '#fdf6f0', border: '1px solid #f5d5b0', borderRadius: 99, padding: '7px 16px', cursor: 'pointer' },
   helpfulDone:   { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#4B230A' },
+  saveBtn:       { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#4B230A', background: '#fff', border: '1px solid #f5d5b0', borderRadius: 99, padding: '7px 16px', cursor: 'pointer' },
+  savedBtn:      { display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600, color: '#fff', background: '#4B230A', border: '1px solid #4B230A', borderRadius: 99, padding: '7px 16px', cursor: 'pointer' },
   reportLink:    { fontSize: 13, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', textAlign: 'center', padding: '4px 0' },
   reportedText:  { fontSize: 13, color: '#64748b' },
   overlay:       { position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end' },

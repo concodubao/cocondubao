@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../../stores/authStore'
 import { chatAPI } from '../../services/api'
 
@@ -77,7 +77,9 @@ function SessionCard({ session, onClick }) {
 export default function ChatHistory() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const [tab,    setTab]    = useState('sessions') // 'sessions' | 'saved'
 
   const { data, isLoading } = useQuery({
     queryKey:  ['chat-sessions', user?.id],
@@ -86,14 +88,35 @@ export default function ChatHistory() {
     staleTime: 30_000,
   })
 
+  const { data: bookmarkData, isLoading: loadingSaved } = useQuery({
+    queryKey:  ['chat-bookmarks', user?.id],
+    queryFn:   () => chatAPI.getBookmarks().then(r => r.data.bookmarks),
+    enabled:   !!user?.id && tab === 'saved',
+    staleTime: 30_000,
+  })
+
   const sessions = data || []
   const q = normalize(search.trim())
+  // Tìm SÂU: lọc theo toàn bộ nội dung hỏi+đáp (searchText), không chỉ preview.
   const filtered = q
-    ? sessions.filter(s => normalize(`${s.preview || ''} ${CROP_LABEL[s.crop_type] || ''}`).includes(q))
+    ? sessions.filter(s => normalize(`${s.searchText || s.preview || ''} ${CROP_LABEL[s.crop_type] || ''}`).includes(q))
     : sessions
+
+  const bookmarks = bookmarkData || []
+  const filteredSaved = q
+    ? bookmarks.filter(b => normalize(`${b.content || ''} ${b.question || ''} ${CROP_LABEL[b.cropType] || ''}`).includes(q))
+    : bookmarks
 
   function openSession(session) {
     navigate('/chat', { state: { sessionId: session.id } })
+  }
+
+  async function unsave(messageId) {
+    try {
+      await chatAPI.removeBookmark(messageId)
+      queryClient.setQueryData(['chat-bookmarks', user?.id], (prev) =>
+        (prev || []).filter(b => b.messageId !== messageId))
+    } catch { /* im lặng */ }
   }
 
   return (
@@ -115,70 +138,145 @@ export default function ChatHistory() {
         </button>
       </header>
 
-      {/* Ô tìm kiếm — chỉ hiện khi có lịch sử */}
-      {!isLoading && sessions.length > 0 && (
-        <div className="px-4 pt-3 pb-1 bg-[#fdf8f5]">
-          <div className="flex items-center gap-2 bg-white border border-[#f0e0d0] rounded-2xl px-4 h-11
-                          focus-within:border-[#4B230A] transition-colors">
-            <span className="material-symbols-outlined text-[20px] text-[#c4a898]">search</span>
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Tìm trong lịch sử (vd: lúa, vàng lá...)"
-              className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#0b1c30] placeholder:text-[#c4a898]"
-            />
-            {search && (
-              <button onClick={() => setSearch('')} aria-label="Xoá tìm kiếm"
-                className="w-6 h-6 flex items-center justify-center text-[#c4a898] flex-shrink-0">
-                <span className="material-symbols-outlined text-[18px]">close</span>
-              </button>
-            )}
-          </div>
+      {/* Tab Lịch sử / Đã lưu */}
+      <div className="flex gap-2 px-4 pt-3 bg-[#fdf8f5]" role="tablist">
+        {[{ k: 'sessions', label: 'Lịch sử' }, { k: 'saved', label: 'Đã lưu' }].map(t => (
+          <button key={t.k} role="tab" aria-selected={tab === t.k}
+            onClick={() => setTab(t.k)}
+            className={`px-4 py-2 rounded-full text-[14px] font-bold transition-all
+              ${tab === t.k ? 'bg-[#4B230A] text-white shadow-sm' : 'bg-white text-[#7a6358] border border-[#f0e0d0]'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Ô tìm kiếm */}
+      <div className="px-4 pt-3 pb-1 bg-[#fdf8f5]">
+        <div className="flex items-center gap-2 bg-white border border-[#f0e0d0] rounded-2xl px-4 h-11
+                        focus-within:border-[#4B230A] transition-colors">
+          <span className="material-symbols-outlined text-[20px] text-[#c4a898]">search</span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={tab === 'saved' ? 'Tìm trong câu đã lưu...' : 'Tìm trong lịch sử (vd: lúa, vàng lá...)'}
+            className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-[#0b1c30] placeholder:text-[#c4a898]"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} aria-label="Xoá tìm kiếm"
+              className="w-6 h-6 flex items-center justify-center text-[#c4a898] flex-shrink-0">
+              <span className="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       <main className="flex-1 flex flex-col gap-3 px-4 py-4">
 
-        {isLoading && (
-          <div className="flex flex-col items-center gap-2 pt-16 text-[#64748b]">
-            <span className="material-symbols-outlined text-[40px] animate-spin">refresh</span>
-            <p className="text-[14px]">Đang tải...</p>
-          </div>
-        )}
+        {/* ─── Tab Lịch sử ─── */}
+        {tab === 'sessions' && (<>
+          {isLoading && <Loading />}
 
-        {!isLoading && sessions.length === 0 && (
-          <div className="flex flex-col items-center gap-4 pt-16 text-center">
-            <span className="material-symbols-outlined text-[56px] text-[#e2e8f0]">chat_bubble_outline</span>
-            <div>
-              <p className="text-[16px] font-bold text-[#0b1c30]">Chưa có cuộc hội thoại nào</p>
-              <p className="text-[13px] text-[#7a6358] mt-1">Hỏi Cò Con bất kỳ điều gì về cây trồng!</p>
-            </div>
-            <button onClick={() => navigate('/chat')}
-              className="px-6 py-2.5 bg-[#4B230A] text-white text-[14px] font-bold rounded-full">
-              Bắt đầu hỏi
-            </button>
-          </div>
-        )}
+          {!isLoading && sessions.length === 0 && (
+            <Empty icon="chat_bubble_outline" title="Chưa có cuộc hội thoại nào"
+              sub="Hỏi Cò Con bất kỳ điều gì về cây trồng!"
+              action={<button onClick={() => navigate('/chat')}
+                className="px-6 py-2.5 bg-[#4B230A] text-white text-[14px] font-bold rounded-full">Bắt đầu hỏi</button>} />
+          )}
 
-        {!isLoading && sessions.length > 0 && filtered.length === 0 && (
-          <div className="flex flex-col items-center gap-2 pt-12 text-center">
-            <span className="material-symbols-outlined text-[44px] text-[#e2e8f0]">search_off</span>
-            <p className="text-[14px] text-[#7a6358]">Không tìm thấy cuộc hội thoại nào khớp "{search}"</p>
-          </div>
-        )}
+          {!isLoading && sessions.length > 0 && filtered.length === 0 && (
+            <NoMatch search={search} />
+          )}
 
-        {filtered.map(session => (
-          <SessionCard key={session.id} session={session} onClick={() => openSession(session)} />
-        ))}
+          {filtered.map(session => (
+            <SessionCard key={session.id} session={session} onClick={() => openSession(session)} />
+          ))}
 
-        {sessions.length > 0 && filtered.length > 0 && (
-          <p className="text-center text-[12px] text-[#c4a898] pb-2 pt-1">
-            {q
-              ? `${filtered.length} kết quả khớp "${search}"`
-              : `Hiển thị ${sessions.length} cuộc hội thoại gần nhất`}
-          </p>
-        )}
+          {sessions.length > 0 && filtered.length > 0 && (
+            <p className="text-center text-[12px] text-[#c4a898] pb-2 pt-1">
+              {q ? `${filtered.length} kết quả khớp "${search}"` : `Hiển thị ${sessions.length} cuộc hội thoại gần nhất`}
+            </p>
+          )}
+        </>)}
+
+        {/* ─── Tab Đã lưu ─── */}
+        {tab === 'saved' && (<>
+          {loadingSaved && <Loading />}
+
+          {!loadingSaved && bookmarks.length === 0 && (
+            <Empty icon="bookmark" title="Chưa lưu câu trả lời nào"
+              sub='Bấm "Lưu" ở câu trả lời để xem nhanh lại sau này.' />
+          )}
+
+          {!loadingSaved && bookmarks.length > 0 && filteredSaved.length === 0 && (
+            <NoMatch search={search} />
+          )}
+
+          {filteredSaved.map(b => (
+            <SavedCard key={b.messageId} item={b}
+              onOpen={() => navigate('/chat', { state: { sessionId: b.sessionId } })}
+              onRemove={() => unsave(b.messageId)} />
+          ))}
+        </>)}
       </main>
+    </div>
+  )
+}
+
+function Loading() {
+  return (
+    <div className="flex flex-col items-center gap-2 pt-16 text-[#64748b]">
+      <span className="material-symbols-outlined text-[40px] animate-spin">refresh</span>
+      <p className="text-[14px]">Đang tải...</p>
+    </div>
+  )
+}
+
+function Empty({ icon, title, sub, action }) {
+  return (
+    <div className="flex flex-col items-center gap-4 pt-16 text-center">
+      <span className="material-symbols-outlined text-[56px] text-[#e2e8f0]">{icon}</span>
+      <div>
+        <p className="text-[16px] font-bold text-[#0b1c30]">{title}</p>
+        <p className="text-[13px] text-[#7a6358] mt-1">{sub}</p>
+      </div>
+      {action}
+    </div>
+  )
+}
+
+function NoMatch({ search }) {
+  return (
+    <div className="flex flex-col items-center gap-2 pt-12 text-center">
+      <span className="material-symbols-outlined text-[44px] text-[#e2e8f0]">search_off</span>
+      <p className="text-[14px] text-[#7a6358]">Không tìm thấy kết quả khớp "{search}"</p>
+    </div>
+  )
+}
+
+// Thẻ 1 câu trả lời đã lưu: câu hỏi gốc (nếu có) + trích đoạn câu trả lời, bấm mở lại phiên.
+function SavedCard({ item, onOpen, onRemove }) {
+  return (
+    <div className="bg-white border border-[#f0e0d0] rounded-[20px] px-4 py-4
+                    shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col gap-2">
+      <button onClick={onOpen} className="text-left flex flex-col gap-2 w-full">
+        {item.question && (
+          <div className="flex items-center gap-1.5 text-[13px] font-bold text-[#4B230A]">
+            <span className="material-symbols-outlined text-[15px]">help</span>
+            <span className="line-clamp-1">{item.question}</span>
+          </div>
+        )}
+        <p className="text-[14px] text-[#0b1c30] leading-snug m-0 line-clamp-3">{item.content}</p>
+        <div className="flex items-center gap-2 text-[11px] text-[#64748b]">
+          <span className="material-symbols-outlined text-[12px]">bookmark</span>
+          Đã lưu · {formatDate(item.savedAt)}
+        </div>
+      </button>
+      <button onClick={onRemove} aria-label="Bỏ lưu"
+        className="self-end flex items-center gap-1 text-[12px] font-semibold text-[#ef4444]
+                   bg-[#fef2f2] border border-[#fecaca] rounded-full px-3 py-1 active:scale-95 transition-transform">
+        <span className="material-symbols-outlined text-[14px]">bookmark_remove</span>
+        Bỏ lưu
+      </button>
     </div>
   )
 }

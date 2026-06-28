@@ -16,6 +16,13 @@ function isRateLimit(err) {
 }
 const RATE_LIMIT_MSG = 'Cò Con đang có nhiều người hỏi cùng lúc, bạn chờ khoảng 1 phút rồi hỏi lại nhé.'
 
+// Bảng có thể CHƯA được áp migration (máy user áp psql tay) → degrade mềm thay vì 500.
+function isMissingTable(err) {
+  if (!err) return false
+  if (err.code === '42P01' || err.code === 'PGRST205') return true
+  return /does not exist|schema cache|could not find the table/i.test(err.message || '')
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 10 * 1024 * 1024 }, // 10MB max
@@ -492,6 +499,117 @@ router.post('/feedback', verifyJWT, async (req, res) => {
   }
 })
 
+// ─── Bookmark câu trả lời hữu ích (#6) ───────────────────────────────────────
+// Chỉ cho ghim message thuộc session của chính mình. Mọi endpoint degrade mềm khi
+// bảng message_bookmarks chưa được áp migration (trả unavailable thay vì 500).
+
+async function ownsMessage(messageId, userId) {
+  const { data } = await supabase
+    .from('messages')
+    .select('id, chat_sessions ( user_id )')
+    .eq('id', messageId)
+    .single()
+  if (!data) return { exists: false }
+  return { exists: true, owned: data.chat_sessions?.user_id === userId }
+}
+
+// POST /chat/bookmarks { messageId } — lưu câu trả lời
+router.post('/bookmarks', verifyJWT, async (req, res) => {
+  const { messageId } = req.body
+  if (!messageId) return res.status(400).json({ error: 'Thiếu messageId.' })
+  try {
+    const { exists, owned } = await ownsMessage(messageId, req.user.userId)
+    if (!exists) return res.status(404).json({ error: 'Không tìm thấy câu trả lời.' })
+    if (!owned)  return res.status(403).json({ error: 'Không có quyền lưu tin nhắn này.' })
+
+    const { error } = await supabase.from('message_bookmarks').upsert(
+      { message_id: messageId, user_id: req.user.userId },
+      { onConflict: 'message_id,user_id' },
+    )
+    if (error) {
+      if (isMissingTable(error)) return res.json({ success: false, unavailable: true })
+      throw error
+    }
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[CHAT] POST /bookmarks error:', err.message)
+    res.status(500).json({ error: 'Không lưu được câu trả lời.' })
+  }
+})
+
+// DELETE /chat/bookmarks/:messageId — bỏ lưu
+router.delete('/bookmarks/:messageId', verifyJWT, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('message_bookmarks')
+      .delete()
+      .eq('message_id', req.params.messageId)
+      .eq('user_id', req.user.userId)
+    if (error) {
+      if (isMissingTable(error)) return res.json({ success: false, unavailable: true })
+      throw error
+    }
+    res.json({ success: true })
+  } catch (err) {
+    console.error('[CHAT] DELETE /bookmarks error:', err.message)
+    res.status(500).json({ error: 'Không bỏ lưu được.' })
+  }
+})
+
+// GET /chat/bookmarks — danh sách câu đã lưu của nông dân (kèm câu hỏi gốc)
+router.get('/bookmarks', verifyJWT, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('message_bookmarks')
+      .select('message_id, created_at, messages ( id, content, source, confidence, session_id, created_at, chat_sessions ( crop_type ) )')
+      .eq('user_id', req.user.userId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+    if (error) {
+      if (isMissingTable(error)) return res.json({ bookmarks: [], unavailable: true })
+      throw error
+    }
+
+    const rows = (data || []).filter(b => b.messages) // message có thể đã bị xoá (CASCADE lo, nhưng phòng hờ)
+
+    // Ghép câu hỏi gốc (user message ngay trước câu trả lời) cho mỗi bookmark — 1 query gom.
+    const sessionIds = [...new Set(rows.map(b => b.messages.session_id))]
+    let questionsBySession = {}
+    if (sessionIds.length) {
+      const { data: qs } = await supabase
+        .from('messages')
+        .select('session_id, content, created_at')
+        .in('session_id', sessionIds)
+        .eq('role', 'user')
+        .order('created_at', { ascending: true })
+      for (const q of qs || []) {
+        (questionsBySession[q.session_id] ||= []).push(q)
+      }
+    }
+    function questionFor(m) {
+      const qs = questionsBySession[m.session_id] || []
+      let found = null
+      for (const q of qs) { if (q.created_at <= m.created_at) found = q.content; else break }
+      return found
+    }
+
+    const bookmarks = rows.map(b => ({
+      messageId:  b.messages.id,
+      sessionId:  b.messages.session_id,
+      content:    b.messages.content,
+      source:     b.messages.source,
+      confidence: b.messages.confidence,
+      cropType:   b.messages.chat_sessions?.crop_type || null,
+      question:   questionFor(b.messages),
+      savedAt:    b.created_at,
+    }))
+    res.json({ bookmarks })
+  } catch (err) {
+    console.error('[CHAT] GET /bookmarks error:', err.message)
+    res.status(500).json({ error: 'Không tải được danh sách đã lưu.' })
+  }
+})
+
 // ─── GET /chat/sessions/:userId — lịch sử phiên chat ─────────────────────────
 router.get('/sessions/:userId', verifyJWT, async (req, res) => {
   const targetId = req.params.userId
@@ -510,19 +628,21 @@ router.get('/sessions/:userId', verifyJWT, async (req, res) => {
 
   if (error) return res.status(500).json({ error: error.message })
 
-  // Lấy câu hỏi đầu tiên của mỗi session làm preview
+  // preview = câu hỏi ĐẦU TIÊN của nông dân; searchText = gom MỌI nội dung (hỏi +
+  // trả lời) để tìm sâu trong lịch sử, không chỉ khớp preview.
   const sessionIds = (data || []).map(s => s.id)
   let previews = {}
+  let searchTexts = {}
   if (sessionIds.length > 0) {
     const { data: msgs } = await supabase
       .from('messages')
-      .select('session_id, content')
+      .select('session_id, role, content')
       .in('session_id', sessionIds)
-      .eq('role', 'user')
       .order('created_at', { ascending: true })
 
     for (const m of msgs || []) {
-      if (!previews[m.session_id]) previews[m.session_id] = m.content
+      if (m.role === 'user' && !previews[m.session_id]) previews[m.session_id] = m.content
+      if (m.content) searchTexts[m.session_id] = (searchTexts[m.session_id] || '') + ' ' + m.content
     }
   }
 
@@ -533,6 +653,8 @@ router.get('/sessions/:userId', verifyJWT, async (req, res) => {
     created_at:   s.created_at,
     messageCount: s.messages?.[0]?.count ?? 0,
     preview:      previews[s.id] || null,
+    // Cắt bớt để không phình payload — đủ cho tìm kiếm client-side.
+    searchText:   (searchTexts[s.id] || '').slice(0, 2000),
   }))
 
   res.json({ sessions })

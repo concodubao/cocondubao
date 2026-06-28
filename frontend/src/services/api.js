@@ -49,6 +49,10 @@ export const chatAPI = {
   reportError:  data       => api.post('/chat/report-error', data),
   escalate:     messageId  => api.post('/chat/escalate', { messageId }),
   feedback:     (messageId, helpful = true) => api.post('/chat/feedback', { messageId, helpful }),
+  // Lưu câu trả lời hữu ích (#6)
+  addBookmark:    messageId => api.post('/chat/bookmarks', { messageId }),
+  removeBookmark: messageId => api.delete(`/chat/bookmarks/${messageId}`),
+  getBookmarks:   ()        => api.get('/chat/bookmarks'),
 }
 
 export const pushAPI = {
