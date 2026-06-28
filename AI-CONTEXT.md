@@ -52,6 +52,9 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 
 ## 4. Trạng thái hiện tại của codebase
 
+### Đã làm gần đây (2026-06-29)
+- ✅ **Realtime engineer queue → polling** (Claude): verify no-op (RLS chặn anon) rồi thay bằng polling ở Queue/Dashboard/WaitEngineer + gỡ helper chết. Lint 0 error, build OK.
+
 ### Đã làm gần đây (2026-06-28)
 - ✅ Migrate `@google/genai` + TẮT thinking (~1.8s), verify API thật — `d736363`, `6b1f0d6`.
 - ✅ Gỡ HẲN langchain (generate + splitter tự viết `splitTextRecursive`) — `3fcda0b`.
@@ -69,7 +72,7 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 - ⬜ **OTP**: đổi provider (Twilio kém ở VN), giữ code hiện tại.
 - ⬜ **A — QA differential** cho triệu chứng mơ hồ: nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ LƯU Ý: prompt (B) chỉ tác động câu đi qua LLM; câu đã có **curated QA (qa_direct, sim≥0.80)** thì serve thẳng QA → muốn đổi hành vi phải SỬA QA đó (việc kỹ sư, nút "Soạn Hỏi–Đáp").
 - ⬜ **Scale** (trần 1 replica): Redis (cache L1/rate-limit/lockout) + leader-election scheduler (advisory lock PG) + billing Gemini + index pgvector. L2 `answer_cache` đã sẵn cross-replica.
-- ⬜ **Realtime engineer queue** nghi no-op (RLS + anon `auth.uid()`=NULL) → verify hoặc dựa polling.
+- ✅ **Realtime engineer queue** — ĐÃ VERIFY no-op + sửa (Claude, 2026-06-29): anon client (`auth.uid()`=NULL) + `engineer_queue` RLS bật không policy → Realtime bị chặn. Thay bằng polling (Queue 20s / Dashboard React Query 30s / WaitEngineer getMessages 12s, đều pause khi tab ẩn). Chi tiết ở IMPROVEMENTS.md.
 - ⬜ **Dọn ảnh chat sâu bệnh cũ** — không tự xoá (chỉ khi user xoá account) → storage phình dần.
 
 ---

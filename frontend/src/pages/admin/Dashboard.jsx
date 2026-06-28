@@ -2,9 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery }    from '@tanstack/react-query'
 import { adminAPI, engineerAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
-import { supabase }    from '../../services/supabase'
 import { toast }       from '../../stores/toastStore'
-import { useEffect }   from 'react'
 import { Users, Send, BookOpen, AlertTriangle, Clock, ChevronRight, ShieldCheck, ScrollText } from 'lucide-react'
 
 function BarChart({ data }) {
@@ -66,23 +64,14 @@ function WaitBadge({ minutes }) {
 }
 
 function QueueSection({ navigate, currentUserId }) {
-  const { data: pendingData,     refetch: refetchPending }     = useQuery({ queryKey: ['queue-pending'],     queryFn: () => engineerAPI.getQueue('pending').then(r => r.data),     refetchInterval: 30_000 })
-  const { data: inProgressData, refetch: refetchInProgress } = useQuery({ queryKey: ['queue-inprogress'], queryFn: () => engineerAPI.getQueue('in_progress').then(r => r.data), refetchInterval: 30_000 })
+  // refetchInterval 30s: tự cập nhật hàng đợi. (Realtime Supabase bị RLS chặn với anon
+  // client — engineer_queue bật RLS không policy, auth.uid()=NULL — nên dùng polling.)
+  const { data: pendingData }    = useQuery({ queryKey: ['queue-pending'],     queryFn: () => engineerAPI.getQueue('pending').then(r => r.data),     refetchInterval: 30_000 })
+  const { data: inProgressData } = useQuery({ queryKey: ['queue-inprogress'], queryFn: () => engineerAPI.getQueue('in_progress').then(r => r.data), refetchInterval: 30_000 })
 
   const pending    = pendingData?.queue     || []
   const inProgress = inProgressData?.queue  || []
   const all        = [...pending, ...inProgress]
-
-  // Realtime: reload khi có thay đổi trong engineer_queue
-  useEffect(() => {
-    const ch = supabase.channel('dashboard-queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'engineer_queue' }, () => {
-        refetchPending()
-        refetchInProgress()
-      })
-      .subscribe()
-    return () => supabase.removeChannel(ch)
-  }, [])
 
   async function handleTake(item) {
     if (item.status === 'in_progress' && item.assigned_to === currentUserId) {

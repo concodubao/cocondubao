@@ -5,14 +5,7 @@ export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
-// Realtime subscription cho engineer (dùng ở màn E-01)
-export function subscribeEngineerQueue(callback) {
-  return supabase
-    .channel('engineer_queue')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'engineer_queue'
-    }, callback)
-    .subscribe()
-}
+// LƯU Ý: KHÔNG dùng Supabase Realtime trên engineer_queue. Client này chỉ có anon key
+// (app đăng nhập bằng JWT tự ký, không qua Supabase Auth) → auth.uid()=NULL; bảng bật
+// RLS không policy nên anon bị chặn SELECT → Realtime không gửi event. Hàng đợi dùng
+// polling thay thế (Queue.jsx, Dashboard.jsx, WaitEngineer.jsx).

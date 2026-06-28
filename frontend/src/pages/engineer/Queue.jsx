@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { engineerAPI } from '../../services/api'
 import { useAuthStore } from '../../stores/authStore'
-import { supabase } from '../../services/supabase'
 import { toast } from '../../stores/toastStore'
 
 const CROP_LABEL = { rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }
@@ -150,11 +149,20 @@ export default function Queue() {
 
   useEffect(() => { loadQueue() }, [tab])
 
+  // Realtime Supabase là no-op ở đây: client dùng anon key (không đăng nhập Supabase
+  // Auth) nên auth.uid()=NULL, mà engineer_queue bật RLS không policy → bị chặn SELECT
+  // → không nhận event. Thay bằng polling: cập nhật mỗi 20s, tạm dừng khi tab ẩn để
+  // đỡ tốn request, và tải lại ngay khi nông dân mở lại app.
   useEffect(() => {
-    const channel = supabase.channel('engineer-queue-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'engineer_queue' }, () => loadQueue())
-      .subscribe()
-    return () => supabase.removeChannel(channel)
+    let timer = null
+    const start = () => { if (!timer) timer = setInterval(loadQueue, 20_000) }
+    const stop  = () => { if (timer) { clearInterval(timer); timer = null } }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') { loadQueue(); start() } else stop()
+    }
+    start()
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { stop(); document.removeEventListener('visibilitychange', onVisible) }
   }, [tab])
 
   async function handleTake(item) {

@@ -1,22 +1,44 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { supabase } from '../../services/supabase'
+import { chatAPI } from '../../services/api'
 import { Bell, Smartphone, MessageCircle, Home } from 'lucide-react'
 
 export default function WaitEngineer() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { sessionId, messageId } = location.state || {}
+  const { sessionId } = location.state || {}
+  // Số message 'engineer' đã có lúc vào màn này; nhiều hơn = kỹ sư vừa trả lời.
+  const baselineRef = useRef(null)
 
+  // Realtime Supabase ở đây là no-op: client dùng anon key (không đăng nhập Supabase
+  // Auth) nên auth.uid()=NULL, mà engineer_queue bật RLS không policy → bị chặn → không
+  // nhận UPDATE. Thay bằng polling getMessages: khi xuất hiện message 'engineer' mới →
+  // tự nhảy về chat. (Nông dân vẫn nhận push song song; đây là lối tự động khi mở app.)
   useEffect(() => {
-    if (!sessionId || !messageId) return
-    const channel = supabase
-      .channel(`engineer-reply-${sessionId}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'engineer_queue', filter: `message_id=eq.${messageId}` },
-        payload => { if (payload.new.status === 'resolved') navigate('/chat', { state: { sessionId, scrollToBottom: true } }) })
-      .subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [sessionId, messageId])
+    if (!sessionId) return
+    let stopped = false
+
+    async function check() {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const res = await chatAPI.getMessages(sessionId)
+        // getMessages trả raw (select('*')) → message kỹ sư có role/source = 'engineer'.
+        const msgs = res.data.messages || []
+        const engineerCount = msgs.filter(m => m.role === 'engineer' || m.source === 'engineer').length
+        if (baselineRef.current === null) { baselineRef.current = engineerCount; return }
+        if (!stopped && engineerCount > baselineRef.current) {
+          stopped = true
+          navigate('/chat', { state: { sessionId, scrollToBottom: true } })
+        }
+      } catch { /* lỗi mạng tạm thời: bỏ qua, lần poll sau thử lại */ }
+    }
+
+    check()
+    const timer = setInterval(check, 12_000)
+    const onVisible = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { stopped = true; clearInterval(timer); document.removeEventListener('visibilitychange', onVisible) }
+  }, [sessionId])
 
   return (
     <div style={styles.page}>
