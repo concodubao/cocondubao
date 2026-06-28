@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI }             from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
 
 // ─── Text splitter tự viết (thay thế langchain RecursiveCharacterTextSplitter) ──
@@ -82,18 +82,20 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
   if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
 
-  const genAI = new GoogleGenerativeAI(key.trim())
-  const model  = genAI.getGenerativeModel({ model: EMBED_MODEL })
+  const ai = new GoogleGenAI({ apiKey: key.trim() })
 
   async function embedOne(text, attempt = 0) {
     try {
-      const result = await model.embedContent({
-        content:              { parts: [{ text }] },
-        taskType,
-        outputDimensionality: EMBED_DIMS,
+      const result = await ai.models.embedContent({
+        model: EMBED_MODEL,
+        contents: text,
+        config: {
+          taskType,
+          outputDimensionality: EMBED_DIMS,
+        }
       })
-      if (!result.embedding?.values?.length) throw new Error('Embedding trả về rỗng')
-      return result.embedding.values
+      if (!result.embeddings?.[0]?.values?.length) throw new Error('Embedding trả về rỗng')
+      return result.embeddings[0].values
     } catch (e) {
       const is429 = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED')
       if (is429 && attempt < 5) {
@@ -118,26 +120,14 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   return results
 }
 
-let _llmModel = null
-function getLLMModel() {
-  if (!_llmModel) {
+let _aiClient = null
+function getAIClient() {
+  if (!_aiClient) {
     const key = process.env.GOOGLE_API_KEY
     if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
-    const genAI = new GoogleGenerativeAI(key.trim())
-    _llmModel = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      systemInstruction: SYSTEM_PROMPT,
-      generationConfig: {
-        temperature: 0.2,
-        // SDK v0.24.1 chưa hỗ trợ thinkingConfig (lỗi 400 trên prod).
-        // gemini-2.5-flash là model "thinking" → token suy nghĩ TÍNH VÀO maxOutputTokens.
-        // Giữ 2048 để chừa đủ chỗ cho cả thinking + câu trả lời (≤200 từ).
-        // Muốn tắt thinking → cần nâng SDK lên version hỗ trợ thinkingConfig.
-        maxOutputTokens: 2048,
-      },
-    })
+    _aiClient = new GoogleGenAI({ apiKey: key.trim() })
   }
-  return _llmModel
+  return _aiClient
 }
 
 const SYSTEM_PROMPT = `Bạn là Cò Con, trợ lý nông nghiệp AI của nông dân xã Trường Khánh, Sóc Trăng.
@@ -258,9 +248,18 @@ export function getSemanticCache(embedding, cropType) {
 // ─── LLM invoke với retry khi gặp 429 ────────────────────────────────────────
 async function invokeLLM(contents, attempt = 0) {
   try {
-    const model = getLLMModel()
-    const result = await model.generateContent({ contents })
-    return { content: result.response.text() }
+    const ai = getAIClient()
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents,
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        temperature: 0.2,
+        maxOutputTokens: 2048,
+        // thinkingConfig: { thinkingBudgetTokens: 1024 } // Uncomment when ready
+      }
+    })
+    return { content: result.text }
   } catch (err) {
     const msg = err.message || ''
     // Retry khi 429 (quota) HOẶC 503 (high demand/overloaded — quá tải tạm thời phía Google)

@@ -12,14 +12,14 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({ rpc: mocks.rpc, from: vi.fn() })),
 }))
 
-// Lõi GoogleGenerativeAI
-vi.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: vi.fn(function () {
+// Lõi GoogleGenAI
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: vi.fn(function () {
     return { 
-      getGenerativeModel: () => ({ 
+      models: { 
         embedContent: mocks.embedContent,
         generateContent: mocks.invoke 
-      }) 
+      } 
     }
   }),
 }))
@@ -27,13 +27,13 @@ vi.mock('@google/generative-ai', () => ({
 const { askRAG, checkFAQ, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache } =
   await import('../src/services/rag.js')
 
-const fakeVector = () => ({ embedding: { values: new Array(1536).fill(0.01) } })
+const fakeVector = () => ({ embeddings: [{ values: new Array(1536).fill(0.01) }] })
 
 beforeEach(() => {
   process.env.GOOGLE_API_KEY = 'test-key'
   mocks.rpc.mockReset()
   mocks.embedContent.mockReset().mockResolvedValue(fakeVector())
-  mocks.invoke.mockReset().mockResolvedValue({ response: { text: () => 'Trả lời mẫu từ Cò Con' } })
+  mocks.invoke.mockReset().mockResolvedValue({ text: 'Trả lời mẫu từ Cò Con' })
   _clearAnswerCache()
 })
 

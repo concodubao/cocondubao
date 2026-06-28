@@ -190,29 +190,21 @@ function visionLooksUncertain(text) {
 // ─── Helper: phân tích ảnh bằng Gemini Vision ───────────────────────────────
 async function analyzeImageWithGemini(imageBuffer, question) {
   try {
-    const { GoogleGenerativeAI } = await import('@google/generative-ai')
-    const genAI  = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
-    // gemini-2.0-flash free tier đã về 0 (limit:0) → đổi sang gemini-2.5-flash
-    // (đa phương thức, còn free tier). LƯU Ý: model này CHUNG bucket quota với
-    // LLM trả lời RAG → bật billing Gemini mới là cách triệt để. maxOutputTokens
-    // cao vì 2.5 là model "thinking" (token suy nghĩ tính vào output, để thấp
-    // sẽ bị cắt cụt câu trả lời).
-    const model  = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
-      generationConfig: { maxOutputTokens: 2048 },
-    })
+    const { GoogleGenAI } = await import('@google/genai')
+    const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY })
 
+    // gemini-2.5-flash (đa phương thức, còn free tier). LƯU Ý: model này CHUNG bucket
+    // quota với LLM trả lời RAG → bật billing Gemini mới là cách triệt để.
     const base64Image = imageBuffer.toString('base64')
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: base64Image,
-        },
-      },
-      `Bạn là chuyên gia nông nghiệp. Hãy phân tích ảnh cây trồng này và trả lời câu hỏi sau bằng tiếng Việt miền Nam, ngắn gọn dễ hiểu:\n\n${question}\n\nNếu ảnh không liên quan đến cây trồng, hãy nói rõ.`,
-    ])
-    return result.response.text().trim()
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+        `Bạn là chuyên gia nông nghiệp. Hãy phân tích ảnh cây trồng này và trả lời câu hỏi sau bằng tiếng Việt miền Nam, ngắn gọn dễ hiểu:\n\n${question}\n\nNếu ảnh không liên quan đến cây trồng, hãy nói rõ.`
+      ],
+      config: { maxOutputTokens: 2048 },
+    })
+    return result.text.trim()
   } catch (err) {
     // Vẫn trả null để fallback mềm sang RAG (nông dân vẫn nhận được câu trả lời
     // dựa trên text). Nếu RAG cũng dính quota, handler ngoài sẽ trả 429 thân thiện.
@@ -354,26 +346,24 @@ router.post('/stt-fallback', verifyJWT, uploadAudio.single('audio'), async (req,
   if (!req.file) return res.status(400).json({ error: 'Không nhận được file audio.' })
 
   try {
-    const { GoogleAIFileManager } = await import('@google/generative-ai/server')
-    const { GoogleGenerativeAI }  = await import('@google/generative-ai')
+    const { GoogleGenAI } = await import('@google/genai')
+    const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY })
 
-    const fileManager = new GoogleAIFileManager(process.env.GOOGLE_API_KEY)
-    const genAI       = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY)
-
-    const uploadResult = await fileManager.uploadFile(req.file.buffer, {
-      mimeType:    req.file.mimetype || 'audio/webm',
-      displayName: 'voice-query',
-    })
+    // Truyền audio trực tiếp dạng inlineData (base64) để STT nhanh hơn,
+    // tránh overhead của File Manager do audio query rất ngắn (vài giây).
+    const base64Audio = req.file.buffer.toString('base64')
 
     // gemini-1.5-flash đã bị Google gỡ (404) → dùng 2.5-flash-lite (nhận audio,
     // không thinking, bucket quota riêng với LLM trả lời).
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' })
-    const result = await model.generateContent([
-      { fileData: { mimeType: uploadResult.file.mimeType, fileUri: uploadResult.file.uri } },
-      'Hãy chuyển nội dung giọng nói trong file audio này thành văn bản tiếng Việt. Chỉ trả về văn bản, không giải thích thêm.',
-    ])
+    const result = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: [
+        { inlineData: { mimeType: req.file.mimetype || 'audio/webm', data: base64Audio } },
+        'Hãy chuyển nội dung giọng nói trong file audio này thành văn bản tiếng Việt. Chỉ trả về văn bản, không giải thích thêm.',
+      ]
+    })
 
-    const transcript = result.response.text().trim()
+    const transcript = result.text.trim()
     res.json({ transcript })
   } catch (err) {
     console.error('[STT] fallback error:', err.message)
