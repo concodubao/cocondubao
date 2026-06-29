@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sentryVitePlugin } from "@sentry/vite-plugin"
 
 export default defineConfig({
   plugins: [
@@ -66,9 +67,16 @@ export default defineConfig({
           }
         ]
       }
+    }),
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG || "cocon-du-bao",
+      project: process.env.SENTRY_PROJECT || "frontend",
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      disable: !process.env.SENTRY_AUTH_TOKEN, // Disable nếu không có token để khỏi lỗi build ở máy dev
     })
   ],
   build: {
+    sourcemap: true, // Sentry cần sourcemap để giải mã lỗi
     rollupOptions: {
       output: {
         // Tách vendor nặng & ít đổi (react/supabase/sentry/query) thành chunk riêng để

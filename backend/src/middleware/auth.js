@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import { supabase } from '../services/supabase.js'
+import * as Sentry from '@sentry/node'
 
 // ─── Denylist tài khoản bị khoá (in-memory) ──────────────────────────────────
 // JWT sống 7–30 ngày nên không thể chỉ tin payload: admin khoá tài khoản phải có
@@ -50,6 +51,10 @@ export function verifyJWT(req, res, next) {
       return res.status(401).json({ error: 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.' })
     }
     req.user = payload
+    
+    // Gắn user info vào Sentry cho request hiện tại
+    Sentry.setUser({ id: payload.userId, role: payload.role })
+    
     next()
   } catch {
     res.status(401).json({ error: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' })
