@@ -247,11 +247,7 @@ export function useSTT() {
     stopVolumeAnalyser()
   }, [])
 
-  function stopAll() {
-    stopListening()
-    setIsListening(false)
-    setIsProcessing(false)
-  }
+
 
   const resetTranscript = useCallback(() => {
     setTranscript('')
