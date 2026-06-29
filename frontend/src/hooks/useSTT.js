@@ -35,7 +35,9 @@ export function useSTT() {
   // Cleanup khi unmount
   useEffect(() => {
     return () => {
-      stopAll()
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (recognitionRef.current) recognitionRef.current.stop()
+      if (mediaRecRef.current?.state === 'recording') mediaRecRef.current.stop()
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
     }
   }, [])
