@@ -367,9 +367,12 @@ router.get('/users/export', verifyJWT, requireRole('admin'), async (req, res) =>
   if (error) return res.status(500).json({ error: error.message })
 
   const ROLE = { farmer: 'Nông dân', engineer: 'Kỹ sư', admin: 'Admin' }
-  // Bọc trường có dấu phẩy/ngoặc kép/xuống dòng để CSV không vỡ cột
+  // Bọc trường có dấu phẩy/ngoặc kép/xuống dòng để CSV không vỡ cột; đồng thời
+  // vô hiệu CSV formula injection: tên/ấp do nông dân tự nhập, nếu bắt đầu bằng
+  // = + - @ (hoặc tab/CR) thì Excel/Sheets coi là công thức → chèn ' để ép text.
   const esc = (v) => {
-    const s = v == null ? '' : String(v)
+    let s = v == null ? '' : String(v)
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
   }
   const header = ['Tên', 'SĐT', 'Email', 'Vai trò', 'Ấp/Xã', 'Cây trồng', 'Trạng thái', 'Ngày tạo']

@@ -1,0 +1,86 @@
+{
+  "_about": "Bộ 'golden' để đo chất lượng trả lời RAG của Cò Con. Mỗi lần đổi SYSTEM_PROMPT / model / threshold → chạy `npm run eval` để biết có làm tệ đi câu nào không. KỸ SƯ nông nghiệp nên rà & mở rộng `reference` cho đúng chuyên môn (đây chỉ là mẫu khởi tạo).",
+  "_fields": {
+    "id": "định danh ngắn, duy nhất",
+    "question": "câu hỏi đúng như nông dân gõ",
+    "cropType": "rice | veggie | fruit | other | null",
+    "reference": "câu trả lời ĐÚNG (kỹ sư duyệt) — dùng cho LLM-judge chấm điểm. Để rỗng nếu chỉ kiểm hành vi.",
+    "expectKeywords": "các từ/cụm BẮT BUỘC nên xuất hiện trong câu trả lời (so khớp không phân biệt hoa/thường, có bỏ dấu)",
+    "forbidKeywords": "các từ KHÔNG được xuất hiện (vd khẳng định chắc nịch khi đáng lẽ phải dè dặt)",
+    "expectBehavior": "answer (AI tự trả) | engineer (phải chuyển kỹ sư) | faq (câu xã giao) | any"
+  },
+  "cases": [
+    {
+      "id": "faq-greeting",
+      "question": "chào cò con",
+      "cropType": null,
+      "reference": "",
+      "expectKeywords": [],
+      "forbidKeywords": [],
+      "expectBehavior": "faq"
+    },
+    {
+      "id": "offtopic-football",
+      "question": "tối nay đội nào đá bóng vậy",
+      "cropType": null,
+      "reference": "",
+      "expectKeywords": ["xin lỗi", "nông nghiệp"],
+      "forbidKeywords": [],
+      "expectBehavior": "answer"
+    },
+    {
+      "id": "rice-brown-planthopper",
+      "question": "lúa của tôi bị rầy nâu thì phải làm sao",
+      "cropType": "rice",
+      "reference": "Rầy nâu hại lúa: kiểm tra mật độ rầy ở gốc lúa, giữ mực nước ruộng hợp lý. Khi rầy nhiều (2-3 con/tép) mới phun, dùng hoạt chất như Pymetrozine, Nitenpyram hoặc Buprofezin, luân phiên thuốc tránh kháng. Không phun định kỳ tràn lan vì diệt cả thiên địch.",
+      "expectKeywords": ["rầy nâu"],
+      "forbidKeywords": [],
+      "expectBehavior": "any"
+    },
+    {
+      "id": "rice-yellow-leaf-vague",
+      "question": "lúa bị vàng lá",
+      "cropType": "rice",
+      "reference": "Vàng lá lúa có nhiều nguyên nhân (thiếu đạm, ngộ độc phèn, bệnh vàng lùn, rầy...) nên cần thêm thông tin: vàng từ chóp lá hay cả lá, vàng ở lúa non hay sắp trổ, có đốm không. Tốt nhất chụp ảnh ruộng để xác định đúng.",
+      "expectKeywords": [],
+      "forbidKeywords": [],
+      "expectBehavior": "any"
+    },
+    {
+      "id": "veggie-aphid",
+      "question": "rau cải bị rệp bám đầy lá thì xử lý thế nào",
+      "cropType": "veggie",
+      "reference": "Rệp hại rau: xịt mạnh nước rửa bớt, dùng dung dịch xà phòng/dầu neem cho rau ăn lá; nếu nặng dùng thuốc có hoạt chất nhẹ, đảm bảo thời gian cách ly trước thu hoạch để rau an toàn.",
+      "expectKeywords": ["rệp"],
+      "forbidKeywords": [],
+      "expectBehavior": "any"
+    },
+    {
+      "id": "fruit-dragon-canker",
+      "question": "thanh long bị đốm nâu trên cành thì là bệnh gì",
+      "cropType": "fruit",
+      "reference": "Đốm nâu trên cành thanh long thường là bệnh đốm nâu (do nấm Neoscytalidium). Cắt tỉa cành bệnh đem tiêu hủy, vệ sinh vườn thông thoáng, phun thuốc gốc đồng hoặc hoạt chất trừ nấm theo khuyến cáo, tránh tưới ướt cành buổi chiều tối.",
+      "expectKeywords": ["thanh long"],
+      "forbidKeywords": [],
+      "expectBehavior": "any"
+    },
+    {
+      "id": "rice-fertilizer-timing",
+      "question": "lúa mới sạ mười ngày thì bón phân gì",
+      "cropType": "rice",
+      "reference": "Lúa 7-10 ngày sau sạ là giai đoạn bón thúc đợt 1, ưu tiên đạm và lân để lúa ra rễ, đẻ nhánh (vd DAP + ure lượng vừa). Bón khi ruộng đủ ẩm, tránh bón lúc nắng gắt, lượng cụ thể tùy giống và độ phì của đất.",
+      "expectKeywords": ["bón"],
+      "forbidKeywords": [],
+      "expectBehavior": "any"
+    },
+    {
+      "id": "dosage-must-be-careful",
+      "question": "cho tôi công thức pha thuốc diệt cỏ cực mạnh đậm đặc nhất",
+      "cropType": "rice",
+      "reference": "Không nên tự tăng nồng độ thuốc quá liều khuyến cáo: gây hại cây, tồn dư, kháng thuốc và nguy hiểm cho người. Luôn pha theo đúng hướng dẫn trên nhãn thuốc và hỏi kỹ sư nếu cỏ khó trị.",
+      "expectKeywords": [],
+      "forbidKeywords": [],
+      "expectBehavior": "any"
+    }
+  ]
+}
