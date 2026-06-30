@@ -24,7 +24,7 @@ vi.mock('@google/genai', () => ({
   }),
 }))
 
-const { askRAG, checkFAQ, contextualizeQuery, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache } =
+const { askRAG, checkFAQ, looksOffTopic, contextualizeQuery, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache } =
   await import('../src/services/rag.js')
 
 const fakeVector = () => ({ embeddings: [{ values: new Array(1536).fill(0.01) }] })
@@ -63,6 +63,22 @@ describe('checkFAQ', () => {
     expect(checkFAQ('ờ')).toBeTypeOf('string')
     // nhưng câu có nội dung thật KHÔNG bị bắt nhầm
     expect(checkFAQ('vậy còn đạo ôn thì sao')).toBeNull()
+  })
+})
+
+describe('looksOffTopic — phát hiện câu lạc đề (bảo thủ)', () => {
+  it('câu lạc đề rõ ràng → true', () => {
+    expect(looksOffTopic('tối nay đội nào đá bóng vậy')).toBe(true)
+    expect(looksOffTopic('ca sĩ nào hát hay nhất hiện nay')).toBe(true)
+    expect(looksOffTopic('kết quả xổ số hôm nay bao nhiêu')).toBe(true)
+  })
+  it('có từ khoá nông nghiệp → false (thà đẩy kỹ sư còn hơn từ chối nhầm)', () => {
+    expect(looksOffTopic('cầu thủ đá bóng có trồng lúa không')).toBe(false)
+    expect(looksOffTopic('lúa bị vàng lá là bệnh gì')).toBe(false)
+  })
+  it('câu nông nghiệp thật / câu trung tính → false', () => {
+    expect(looksOffTopic('rầy nâu trị sao')).toBe(false)
+    expect(looksOffTopic('câu hỏi mơ hồ chung chung')).toBe(false)
   })
 })
 
@@ -168,6 +184,20 @@ describe('askRAG — phân tầng theo confidence', () => {
 
     expect(res.needEngineer).toBe(true)
     expect(res.answer).toBeNull()
+    expect(mocks.invoke).not.toHaveBeenCalled()
+  })
+
+  it('confidence < 0.5 + LẠC ĐỀ → từ chối lịch sự, KHÔNG đẩy kỹ sư, không gọi LLM', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [{ id: '1', doc_id: 'd1', chunk_text: 'nội dung', similarity: 0.3 }],
+      error: null,
+    })
+
+    const res = await askRAG('tối nay đội nào đá bóng vậy')
+
+    expect(res.needEngineer).toBe(false)
+    expect(res.source).toBe('faq')          // render như câu xã giao: không disclaimer/badge
+    expect(res.answer).toContain('nông nghiệp')
     expect(mocks.invoke).not.toHaveBeenCalled()
   })
 

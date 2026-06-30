@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@supabase/supabase-js'
+import { incrementGeminiUsage } from './quotaMonitor.js'
 
 // ─── Text splitter tự viết (thay thế langchain RecursiveCharacterTextSplitter) ──
 // Tách text thành các chunk có kích thước ≤ chunkSize, ưu tiên cắt theo separator
@@ -86,6 +87,7 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
 
   async function embedOne(text, attempt = 0) {
     try {
+      incrementGeminiUsage()
       const result = await ai.models.embedContent({
         model: EMBED_MODEL,
         contents: text,
@@ -146,7 +148,8 @@ Nguyên tắc trả lời:
 - Dùng **chữ đậm** cho tên bệnh, tên thuốc, hoặc ý quan trọng
 - Nếu không chắc chắn, nói thật: "Cò Con không chắc lắm, nên hỏi thêm kỹ sư cho chắc"
 - Không bịa thông tin khi không có trong tài liệu tham khảo
-- KHÔNG tự thêm dòng ghi chú "thông tin tham khảo" ở cuối — hệ thống sẽ tự hiển thị`
+- KHÔNG tự thêm dòng ghi chú "thông tin tham khảo" ở cuối — hệ thống sẽ tự hiển thị
+- NẾU CÂU HỎI LẠC ĐỀ (ví dụ: bóng đá, giải trí, chính trị... hoàn toàn không liên quan đến nông nghiệp), hãy từ chối trả lời một cách lịch sự. Ví dụ: "Dạ xin lỗi bác, Cò Con chỉ là trợ lý nông nghiệp nên không rành chuyện này ạ."`
 
 // ─── Answer cache (in-memory, TTL 1h, max 200 entries) ──────────────────────
 // Giảm số lần gọi Gemini cho câu hỏi lặp lại (nông dân hay hỏi cùng câu)
@@ -254,6 +257,7 @@ export function getSemanticCache(embedding, cropType) {
 async function invokeLLM(contents, attempt = 0) {
   try {
     const ai = getAIClient()
+    incrementGeminiUsage()
     const result = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents,
@@ -349,6 +353,38 @@ export function checkFAQ(question) {
   }
   return null
 }
+
+// ─── Phát hiện câu LẠC ĐỀ (ngoài nông nghiệp) ────────────────────────────────
+// Mục đích: câu hỏi không liên quan nông nghiệp (bóng đá, giải trí, chính trị...)
+// mà điểm tương đồng < 0.5 thì hiện đang bị ĐẨY KỸ SƯ — phí công kỹ sư. Bắt ở đây
+// để TỪ CHỐI LỊCH SỰ ngay (0 quota: chỉ regex, không gọi LLM).
+//   BẢO THỦ: chỉ coi là lạc đề khi (a) khớp chủ đề ngoài nông nghiệp VÀ (b) KHÔNG
+//   có bất kỳ từ khoá nông nghiệp nào. Nghi ngờ → trả false → vẫn đẩy kỹ sư (thà
+//   làm phiền kỹ sư còn hơn từ chối nhầm câu hỏi thật của bà con).
+//   Chỉ dùng ở nhánh confidence < 0.5 (câu vốn sắp bị đẩy kỹ sư), KHÔNG đụng câu
+//   đã có chunk khớp (câu nông nghiệp thật luôn có từ khoá nông nghiệp → AGRI chặn).
+// Tách token theo ranh giới KHÔNG-phải-chữ-cái/số (unicode \p{L}\p{N}) — \b của
+// regex không dùng được vì chữ có dấu tiếng Việt (đ, ĩ, ố...) không phải word-char ASCII.
+const OFFTOPIC_PHRASES = ['bóng đá', 'đá banh', 'đá bóng', 'world cup', 'ngoại hạng', 'champions league', 'cầu thủ', 'đội tuyển', 'tỉ số', 'tỷ số', 'bóng rổ', 'cầu lông', 'ca sĩ', 'diễn viên', 'nghệ sĩ', 'bộ phim', 'phim ảnh', 'bài hát', 'ca nhạc', 'hoa hậu', 'lô đề', 'số đề', 'xổ số', 'cá độ', 'cá cược', 'đánh bài', 'chứng khoán', 'tiền ảo', 'tiền điện tử', 'bầu cử', 'tổng thống', 'biểu tình', 'người yêu', 'bạn gái', 'bạn trai', 'tỏ tình', 'chia tay', 'điện thoại', 'máy tính', 'chơi game', 'liên quân', 'liên minh', 'thần tượng']
+const OFFTOPIC_WORDS = new Set(['idol', 'game', 'gameshow', 'casino', 'bitcoin', 'iphone', 'laptop', 'facebook', 'tiktok', 'crush', 'mv', 'c1'])
+const AGRI_PHRASES = ['hoa màu', 'đạo ôn', 'lem lép', 'vàng lá', 'thán thư', 'trừ sâu', 'diệt cỏ', 'canh tác', 'chăn nuôi', 'thanh long', 'sầu riêng', 'chôm chôm', 'thu hoạch']
+// Lưu ý: cố tình BỎ các token quá mơ hồ trùng từ đời thường (vd 'quả' trong "kết quả")
+// để không chặn nhầm câu lạc đề. Nghĩa hoa quả dựa vào 'trái' + tên trái cụ thể.
+const AGRI_WORDS = new Set(['lúa', 'gạo', 'nếp', 'mạ', 'sạ', 'gieo', 'cấy', 'rau', 'cải', 'dưa', 'bắp', 'ngô', 'khoai', 'sắn', 'đậu', 'cây', 'trồng', 'trái', 'vườn', 'ruộng', 'rẫy', 'nương', 'sâu', 'bệnh', 'rầy', 'nấm', 'cỏ', 'đốm', 'phân', 'bón', 'đạm', 'lân', 'kali', 'npk', 'thuốc', 'giống', 'đất', 'phèn', 'mặn', 'tưới', 'mùa', 'vụ', 'nông', 'tôm', 'cá', 'gà', 'vịt', 'heo', 'lợn', 'bò', 'nuôi', 'ao', 'chuồng', 'xoài', 'cam', 'bưởi', 'nhãn', 'mít'])
+
+export function looksOffTopic(question) {
+  const t = (question || '').toLowerCase()
+  const tokens = new Set(t.split(/[^\p{L}\p{N}]+/u).filter(Boolean))
+  const hasOff  = OFFTOPIC_PHRASES.some(p => t.includes(p)) || [...OFFTOPIC_WORDS].some(w => tokens.has(w))
+  const hasAgri = AGRI_PHRASES.some(p => t.includes(p))     || [...AGRI_WORDS].some(w => tokens.has(w))
+  return hasOff && !hasAgri
+}
+
+// Câu từ chối lịch sự (giống văn phong SYSTEM_PROMPT). Dùng source 'faq' để frontend
+// render như câu xã giao: KHÔNG gắn disclaimer "hỏi kỹ sư", KHÔNG badge tin cậy, và
+// KHÔNG lọt vào thống kê "lỗ hổng tri thức" của admin.
+const OFFTOPIC_DECLINE =
+  'Dạ xin lỗi bác, Cò Con chỉ là trợ lý nông nghiệp nên không rành chuyện này ạ. Bác cần hỏi gì về cây trồng, vật nuôi thì Cò Con giúp liền nhé 😊'
 
 // ─── Ghép ngữ cảnh cho câu NỐI trước khi RETRIEVE ───────────────────────────
 // Retrieval chỉ embed câu hiện tại; câu nối ("còn cách khác", "đạo ôn thì sao")
@@ -456,7 +492,18 @@ export async function askRAG(question, cropType = null, history = []) {
 
     // BƯỚC 3: Nếu không đủ tin cậy → fallback LLM hoặc chuyển kỹ sư
     if (!chunks?.length || confidence < 0.5) {
-      // Không có chunk nào gần → chuyển kỹ sư ngay
+      // Lạc đề rõ ràng (bóng đá, giải trí...) → từ chối lịch sự, KHỎI làm phiền kỹ sư.
+      if (looksOffTopic(question)) {
+        console.log(`[RAG] off-topic (conf=${confidence.toFixed(3)}) → từ chối lịch sự, không đẩy kỹ sư`)
+        return {
+          answer:       OFFTOPIC_DECLINE,
+          confidence:   1.0,
+          needEngineer: false,
+          source:       'faq',
+          chunksFound:  0,
+        }
+      }
+      // Câu nông nghiệp thật nhưng không có chunk gần → chuyển kỹ sư
       return {
         answer:       null,
         confidence:   0,
