@@ -91,7 +91,19 @@ Rà toàn bộ backend + các trang frontend chính. Đã sửa & push (`de2c543
 | I5 | 🟢 Bảo mật | deps | 2 lỗ high vite (dev-server) | `npm audit fix` → 0 vuln; upload/auth rà thủ công đã chắc | ✅ |
 | I6 | 🟢 UX | history | Thiếu lưu câu hữu ích; search chỉ khớp preview | Bookmark (`message_bookmarks`) + tab "Đã lưu" + getSessions trả `searchText` tìm sâu | ✅ |
 
-⚠️ **I6 cần áp migration** `20260629000000_message_bookmarks.sql` bằng psql (backend degrade mềm tới khi áp).
+✅ **I6 migration đã áp** `20260629000000_message_bookmarks.sql` (verify 2026-06-30 qua PostgREST: bảng `message_bookmarks` trả HTTP 200).
+
+## Đợt 2026-06-30 (đạt chuẩn sản phẩm: security review + eval RAG + vận hành)
+
+| ID | Mức | Khu vực | Vấn đề | Hướng sửa | TT |
+|----|-----|---------|--------|-----------|----|
+| J1 | 🟠 Bảo mật | admin export | CSV formula injection: tên/ấp nông dân tự nhập bắt đầu `= + - @` → Excel chạy như công thức | `esc()` prefix `'` để ép text | ✅ |
+| J2 | 🟢 DX/chất lượng | rag | Không có cách đo chất lượng trả lời → đổi prompt/model "mù" | Khung eval `backend/eval/` + `scripts/eval_rag.js` + `npm run eval` (hành vi + từ khoá + LLM-judge, exit≠0 dưới ngưỡng) | ✅ |
+| J3 | 🟢 Hạ tầng | ops | Thiếu runbook backup/monitoring/quota; Railway không healthcheck | `OPERATIONS.md` + `healthcheckPath:/health` trong `railway.json` | ✅ |
+
+**Security review kết luận:** codebase rất chắc. Còn lại (chấp nhận/để ý, chưa cần sửa gấp): `/admin/sentry-test` unreachable (thiếu `verifyJWT`); bucket `images` dùng public URL (path UUID khó đoán nhưng ai có link đều xem); JWT nông dân 30 ngày (denylist + poller 60s đã chặn khoá tức thì). Prompt injection: blast radius hẹp (chat của chính mình, không lộ dữ liệu riêng).
+
+**eval RAG — việc tiếp của kỹ sư:** `dataset.json` mới là mẫu khởi tạo; phải mở rộng `reference` theo chuyên môn + thêm case từ mọi câu bị 👎 (chống tái phát). Chạy `npm run eval` trước mỗi lần đổi SYSTEM_PROMPT/model/threshold.
 
 ### Còn mở (ngoài Sentry/OTP)
 - ⬜ **A** — soạn QA *differential* cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ B (prompt, H14) chỉ tác động câu qua LLM; câu có curated QA (qa_direct) thì serve thẳng QA → sửa hành vi phải sửa QA (việc kỹ sư).
