@@ -92,7 +92,7 @@ const PRIMARY_BTN =
   'disabled:opacity-60 disabled:cursor-not-allowed transition-all'
 
 // ─── Nông dân: SĐT + PIN (Đăng nhập / Đăng ký) ──────────────
-function StepPhonePin() {
+function StepPhonePin({ agreed }) {
   const [mode,     setMode]     = useState('login') // 'login' | 'register'
   const [phone,    setPhone]    = useState('')
   const [pin,      setPin]      = useState('')
@@ -177,7 +177,7 @@ function StepPhonePin() {
 
       {error && <ErrorBox msg={error} />}
 
-      <button onClick={submit} disabled={loading} className={PRIMARY_BTN}>
+      <button onClick={submit} disabled={loading || !agreed} className={PRIMARY_BTN}>
         {loading
           ? <><Spinner /> Đang xử lý...</>
           : <>{mode === 'register' ? 'Đăng ký' : 'Đăng nhập'}<span className="material-symbols-outlined">arrow_forward</span></>}
@@ -191,7 +191,7 @@ function StepPhonePin() {
 }
 
 // ─── Email/Password — login (kỹ sư & admin) ─────────────────
-function StepEmailPassword() {
+function StepEmailPassword({ agreed }) {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
@@ -238,7 +238,7 @@ function StepEmailPassword() {
           className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
       </div>
       {error && <ErrorBox msg={error} />}
-      <button onClick={handleLogin} disabled={loading} className={PRIMARY_BTN}>
+      <button onClick={handleLogin} disabled={loading || !agreed} className={PRIMARY_BTN}>
         {loading ? <><Spinner /> Đang đăng nhập...</> : <><span>Đăng nhập</span><span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
     </div>
@@ -261,6 +261,7 @@ function Spinner() {
 // ─── Main ───────────────────────────────────────────────────
 export default function Login() {
   const [step, setStep] = useState('role') // 'role' | 'phone-pin' | 'email' | 'forgot'
+  const [agreed, setAgreed] = useState(false)
   const { token } = useAuthStore()
   if (token) return <Navigate to="/home" replace />
 
@@ -300,13 +301,24 @@ export default function Login() {
         )}
 
         {step === 'role'      && <StepRole onNext={r => setStep(r === 'farmer' ? 'phone-pin' : 'email')} />}
-        {step === 'phone-pin' && <StepPhonePin />}
-        {step === 'email'     && <StepEmailPassword />}
+        {step === 'phone-pin' && <StepPhonePin agreed={agreed} />}
+        {step === 'email'     && <StepEmailPassword agreed={agreed} />}
 
-        <p className="text-center text-[#7a6358] text-[13px] mt-8">
-          Bằng cách tiếp tục, bạn đồng ý với{' '}
-          <Link to="/policies" className="text-[#4B230A] font-semibold underline">Điều khoản &amp; Chính sách</Link>
-        </p>
+        {step !== 'role' && (
+          <div className="flex items-start gap-2 mt-6 mb-2 px-1">
+            <input 
+              type="checkbox" 
+              id="consent" 
+              checked={agreed} 
+              onChange={e => setAgreed(e.target.checked)}
+              className="mt-1 w-4 h-4 accent-[#4B230A] cursor-pointer"
+            />
+            <label htmlFor="consent" className="text-[#7a6358] text-[13px] cursor-pointer leading-tight">
+              Tôi đồng ý với việc Cò Con thu thập số điện thoại, ảnh, giọng nói và vị trí theo{' '}
+              <Link to="/policies" className="text-[#4B230A] font-semibold underline">Điều khoản & Chính sách bảo mật</Link>
+            </label>
+          </div>
+        )}
       </div>
       </div>
 

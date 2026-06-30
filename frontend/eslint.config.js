@@ -35,4 +35,10 @@ export default defineConfig([
     files: ['public/sw.js', 'public/push-sw.js'],
     languageOptions: { globals: globals.serviceworker },
   },
+  {
+    // File cấu hình (vite/eslint/playwright) + test e2e chạy ở Node, không phải
+    // trình duyệt → cần `process`, `__dirname`... (nếu không sẽ no-undef làm CI đỏ).
+    files: ['*.config.js', 'tests/**/*.{js,jsx}'],
+    languageOptions: { globals: { ...globals.node } },
+  },
 ])
