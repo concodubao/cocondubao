@@ -97,27 +97,3 @@ Both tiers **auto-deploy on `git push`** to `master` — Railway watches `backen
 watches `frontend/`. There is no manual deploy step; production runs the old code until a
 push + redeploy completes. Details in [docs/08-DEPLOYMENT](docs/08-DEPLOYMENT.md).
 
----
-
-## Documentation
-
-Full SDLC documentation suite under [`docs/`](docs/):
-
-| # | Document |
-|---|----------|
-| 01 | [Project Charter & Business Requirements](docs/01-PROJECT-CHARTER.md) |
-| 02 | [Software Requirements Specification (SRS)](docs/02-SRS.md) |
-| 03 | [Software Design Document / Architecture](docs/03-ARCHITECTURE.md) |
-| 04 | [Database Design & Data Dictionary](docs/04-DATABASE.md) |
-| 05 | [REST API Reference](docs/05-API.md) |
-| 06 | [Test Plan, Test Cases & Test Report](docs/06-TEST-PLAN.md) |
-| 07 | [Risk Register & Mitigation Plan](docs/07-RISK-REGISTER.md) |
-| 08 | [Deployment & Installation Guide](docs/08-DEPLOYMENT.md) |
-| 09 | [User Acceptance Test (UAT) Report](docs/09-UAT-REPORT.md) |
-
-User manuals (Vietnamese): [Nông dân](docs/HUONG-DAN-NONG-DAN.md) ·
-[Kỹ sư](docs/HUONG-DAN-KY-SU.md) · [Admin](docs/HUONG-DAN-ADMIN.md) ·
-[Tập huấn](docs/HUONG-DAN-TAP-HUAN.md).
-
-Operations runbook: [`OPERATIONS.md`](OPERATIONS.md) · Design system:
-[`design.md`](design.md) · Contributor & AI conventions: [`CLAUDE.md`](CLAUDE.md).
