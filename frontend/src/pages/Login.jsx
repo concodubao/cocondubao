@@ -44,6 +44,7 @@ function DigitBoxes({ value, onChange, autoFocus = true, mask = false }) {
   const r3 = useRef(null), r4 = useRef(null), r5 = useRef(null)
   const refs = [r0, r1, r2, r3, r4, r5]
   const digits = value.split('')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (autoFocus) refs[0].current?.focus() }, [])
 
   function handleInput(i, char) {

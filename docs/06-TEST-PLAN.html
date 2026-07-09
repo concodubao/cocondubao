@@ -1,0 +1,1100 @@
+<h1>Test Plan, Test Cases &amp; Test Report — Cò Con Dự Báo</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Document</strong></td>
+<td>06 — Test Plan / Test Cases / Test Report</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Baseline (test run @ 2026-06-30)</td>
+</tr>
+<tr>
+<td><strong>Frameworks</strong></td>
+<td>Vitest + Supertest (backend), Vitest + Testing Library (frontend), Playwright (e2e), custom RAG eval</td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td><a href="02-SRS.md">02-SRS</a> (requirement IDs) · <a href="05-API.md">05-API</a> · <a href="07-RISK-REGISTER.md">07-RISK-REGISTER</a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-introduction">Introduction</a></li>
+<li><a href="#2-test-strategy--levels">Test strategy &amp; levels</a></li>
+<li><a href="#3-test-environment--tooling">Test environment &amp; tooling</a></li>
+<li><a href="#4-scope-of-testing">Scope of testing</a></li>
+<li><a href="#5-entry--exit-criteria">Entry &amp; exit criteria</a></li>
+<li><a href="#6-test-cases">Test cases</a></li>
+<li><a href="#7-rag-evaluation-framework">RAG evaluation framework</a></li>
+<li><a href="#8-non-functional-testing">Non-functional testing</a></li>
+<li><a href="#9-test-execution-report-current">Test execution report</a></li>
+<li><a href="#10-defect-management">Defect management</a></li>
+<li><a href="#11-requirement--test-traceability">Traceability matrix</a></li>
+</ol>
+<hr>
+<h2>1. Introduction</h2>
+<h3>1.1 Purpose</h3>
+<p>Define how Cò Con Dự Báo is verified: the test levels, environments, cases, the RAG
+quality-evaluation approach, and the current execution results. Because wrong agronomic
+advice is dangerous, the plan emphasizes <strong>answer correctness/safety</strong> (RAG behavior &amp;
+escalation) and <strong>access control</strong> (auth/IDOR/RLS) above cosmetic concerns.</p>
+<h3>1.2 Objectives</h3>
+<ul>
+<li>Verify functional requirements (<a href="02-SRS.md#4-functional-requirements">SRS §4</a>).</li>
+<li>Verify access-control and data-safety invariants.</li>
+<li>Provide a repeatable measure of RAG answer quality (gate prompt/model changes).</li>
+<li>Catch regressions automatically in CI.</li>
+</ul>
+<h3>1.3 References</h3>
+<p><a href="02-SRS.md">SRS</a>, <a href="05-API.md">API</a>, <a href="03-ARCHITECTURE.md">Architecture</a>, the eval suite
+<code>backend/eval/README.md</code>, and the test sources under <code>backend/test/</code>,
+<code>frontend/src/**/*.test.jsx</code>, <code>frontend/tests/e2e/</code>.</p>
+<hr>
+<h2>2. Test strategy &amp; levels</h2>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Tooling</th>
+<th>Where</th>
+<th>What it covers</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Unit</strong></td>
+<td>Vitest (mocked Supabase/Gemini)</td>
+<td><code>backend/test/*.test.js</code></td>
+<td>Pure logic: RAG tiers, FAQ/off-topic gates, caches, auth middleware, schedulers, validators</td>
+</tr>
+<tr>
+<td><strong>Integration (API)</strong></td>
+<td>Vitest + Supertest</td>
+<td><code>backend/test/*.test.js</code></td>
+<td>Route handlers with mocked DB: status codes, role guards, ownership/IDOR, conflict handling</td>
+</tr>
+<tr>
+<td><strong>DB integration</strong></td>
+<td>Vitest (gated)</td>
+<td><code>backend/test/integration/db_flow.test.js</code></td>
+<td>Real-DB flow — <strong>opt-in only</strong> (<code>RUN_DB_INTEGRATION=1</code> + separate test DB)</td>
+</tr>
+<tr>
+<td><strong>Frontend unit/component</strong></td>
+<td>Vitest + Testing Library</td>
+<td><code>frontend/src/**</code></td>
+<td>Image compression, answer rendering, wait-engineer UI</td>
+</tr>
+<tr>
+<td><strong>End-to-end</strong></td>
+<td>Playwright (Chromium)</td>
+<td><code>frontend/tests/e2e/</code></td>
+<td>Critical paths: login (phone/email), consent, role-based routes</td>
+</tr>
+<tr>
+<td><strong>RAG evaluation</strong></td>
+<td>Custom (<code>scripts/eval_rag.js</code>)</td>
+<td><code>backend/eval/</code></td>
+<td>Answer behavior/keywords/LLM-judge quality (real Gemini)</td>
+</tr>
+<tr>
+<td><strong>Security review</strong></td>
+<td>Manual + <code>npm audit</code></td>
+<td>whole codebase</td>
+<td>IDOR, injection, secrets, deps</td>
+</tr>
+<tr>
+<td><strong>Manual/UAT</strong></td>
+<td>Human</td>
+<td>staging/prod</td>
+<td>Elderly-farmer usability, field conditions</td>
+</tr>
+</tbody></table>
+<p><strong>Test design techniques:</strong> equivalence partitioning &amp; boundary values (PIN length,
+content length, confidence thresholds 0.5/0.7/0.80/0.95), state transition (queue
+<code>pending→in_progress→resolved</code>), decision tables (RAG confidence bands), and negative
+testing (auth failures, ownership violations, quota errors).</p>
+<h3>2.1 Mocking strategy (unit/integration)</h3>
+<ul>
+<li><strong>Supabase</strong> and <strong>Gemini</strong> are mocked via <code>vi.hoisted</code>. <code>GoogleGenerativeAI</code>/
+<code>GoogleGenAI</code> are constructed with <code>new</code>, so mocks are <strong>functions</strong> (not arrows).</li>
+<li>LLM mocks return native-SDK shape <code>{ text: () =&gt; &#39;...&#39; }</code> / <code>result.text</code>.</li>
+<li>The Supabase query builder is mocked as a chainable/thenable that dequeues one enqueued
+result per <code>await</code>.</li>
+<li><code>rag.js</code> exports <code>checkFAQ</code>, <code>looksOffTopic</code>, <code>contextualizeQuery</code>,
+<code>extractCuratedAnswer</code>, <code>getAnswerCache</code>/<code>setAnswerCache</code>/<code>_clearAnswerCache</code>,
+<code>getSemanticCache</code>, <code>embedTexts</code> specifically to enable unit testing.</li>
+</ul>
+<hr>
+<h2>3. Test environment &amp; tooling</h2>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Backend test runner</td>
+<td><code>cd backend &amp;&amp; npm test</code> (<code>vitest run</code>); watch: <code>npm run test:watch</code>; single file: <code>npm test -- rag</code></td>
+</tr>
+<tr>
+<td>Frontend test runner</td>
+<td><code>cd frontend &amp;&amp; npm test</code></td>
+</tr>
+<tr>
+<td>E2e runner</td>
+<td><code>cd frontend &amp;&amp; npm run test:e2e</code> (requires <code>npx playwright install chromium</code>)</td>
+</tr>
+<tr>
+<td>RAG eval</td>
+<td><code>cd backend &amp;&amp; npm run eval</code> (needs real <code>.env</code>: <code>SUPABASE_URL</code>, <code>SUPABASE_SERVICE_KEY</code>, <code>GOOGLE_API_KEY</code>)</td>
+</tr>
+<tr>
+<td>CI</td>
+<td>GitHub Actions on Node 22 — runs backend + frontend test suites and lint</td>
+</tr>
+<tr>
+<td>Lint</td>
+<td><code>cd frontend &amp;&amp; npm run lint</code> (ESLint flat config)</td>
+</tr>
+<tr>
+<td>Node</td>
+<td>22.x</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>Safety:</strong> the DB integration test refuses to run against the production URL and is
+skipped unless <code>RUN_DB_INTEGRATION=1</code> with a dedicated <code>SUPABASE_TEST_URL/KEY</code>, so
+<code>npm test</code> never writes to production.</p>
+</blockquote>
+<hr>
+<h2>4. Scope of testing</h2>
+<p><strong>In scope:</strong> RAG pipeline behavior &amp; caching; auth/RBAC/denylist; per-resource ownership
+(IDOR); engineer queue concurrency; knowledge ingestion safety; notification dispatch
+(quiet hours, crop targeting, scheduling); weather-alert generation; community moderation;
+admin operations; input validation; quota/rate-limit handling.</p>
+<p><strong>Out of scope (automated):</strong> real SMS/OTP delivery, real push delivery to devices,
+third-party provider uptime, visual/pixel regression, load/stress testing (manual only),
+and live-LLM determinism (covered probabilistically by the eval suite, not unit tests).</p>
+<hr>
+<h2>5. Entry &amp; exit criteria</h2>
+<p><strong>Entry:</strong> code compiles; dependencies installed; mocks configured; for eval, a populated
+knowledge base and valid Gemini key.</p>
+<p><strong>Exit (per release):</strong></p>
+<ul>
+<li>All backend + frontend unit/integration tests pass in CI.</li>
+<li>E2e critical paths pass locally before release.</li>
+<li>RAG eval pass-rate ≥ configured threshold (gate for prompt/model/threshold changes).</li>
+<li>No open critical/security defects; <code>npm audit</code> shows no high/critical in prod deps.</li>
+<li>Security review completed for changes touching auth, uploads, or data access.</li>
+</ul>
+<hr>
+<h2>6. Test cases</h2>
+<blockquote>
+<p>Representative cases grouped by module, each traceable to an SRS requirement and a test
+source. &quot;Automated&quot; cases exist in the suites; &quot;Manual&quot; cases are executed by a human.</p>
+</blockquote>
+<h3>6.1 Authentication &amp; access control (→ FR-AUTH, NFR-SEC)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Steps / input</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-AUTH-01</td>
+<td>Missing Authorization header</td>
+<td>call protected route, no header</td>
+<td><code>401</code></td>
+<td>Auto</td>
+<td><code>auth.middleware.test.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-02</td>
+<td>Malformed/expired/wrong-secret token</td>
+<td>tampered JWT</td>
+<td><code>401</code></td>
+<td>Auto</td>
+<td><code>auth.middleware.test.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-03</td>
+<td>Valid token attaches <code>req.user</code></td>
+<td>valid JWT</td>
+<td><code>next()</code> called, <code>req.user</code> set</td>
+<td>Auto</td>
+<td><code>auth.middleware.test.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-04</td>
+<td>Locked account rejected despite valid token</td>
+<td><code>markInactive</code> then call</td>
+<td><code>401</code> &quot;account locked&quot;</td>
+<td>Auto</td>
+<td><code>auth.middleware.test.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-05</td>
+<td>Unlock restores access</td>
+<td><code>markActive</code> then call</td>
+<td>passes</td>
+<td>Auto</td>
+<td><code>auth.middleware.test.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-06</td>
+<td>Role guard denies wrong role</td>
+<td>farmer hits engineer route</td>
+<td><code>403</code></td>
+<td>Auto</td>
+<td><code>auth.middleware.test.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-07</td>
+<td>PIN strength enforced</td>
+<td>set PIN ≠ 6 digits</td>
+<td><code>400</code></td>
+<td>Manual/Auto</td>
+<td><code>routes/auth.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-08</td>
+<td>PIN brute-force lockout</td>
+<td>5 wrong PINs</td>
+<td><code>429</code>, 10-min lock</td>
+<td>Manual</td>
+<td><code>routes/auth.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-09</td>
+<td>OTP does not leak account existence</td>
+<td>request-otp for any number</td>
+<td>no <code>isExistingUser</code>/role in body</td>
+<td>Manual</td>
+<td><code>routes/auth.js</code></td>
+</tr>
+<tr>
+<td>TC-AUTH-10</td>
+<td>Self-delete soft-disables + nulls PII</td>
+<td>delete account</td>
+<td><code>is_active=false</code>, PII null, images removed</td>
+<td>Manual</td>
+<td><code>routes/auth.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.2 RAG answering (→ FR-CHAT)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Input</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-RAG-01</td>
+<td>FAQ short-circuit</td>
+<td>&quot;bạn là ai&quot;</td>
+<td><code>source=faq</code>, no embed/LLM</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-02</td>
+<td>Filler/echo question</td>
+<td>&quot;vậy hả&quot;</td>
+<td>FAQ clarify, not RAG</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-03</td>
+<td>No chunks → escalate</td>
+<td>retrieval empty</td>
+<td><code>needEngineer=true</code>, <code>source=rag</code></td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-04</td>
+<td>Confidence &lt; 0.5 → escalate, no LLM</td>
+<td>low sim</td>
+<td><code>needEngineer=true</code>, LLM not called</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-05</td>
+<td>Off-topic &lt; 0.5 → polite decline</td>
+<td>&quot;kết quả bóng đá&quot;</td>
+<td><code>source=faq</code>, no engineer, no LLM</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-06</td>
+<td>Band 0.5–0.7 → cautious, no cache</td>
+<td>mid sim</td>
+<td><code>source=rag_low_conf</code>, not cached</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-07</td>
+<td>Curated QA ≥ 0.80 → serve verbatim</td>
+<td>high-sim QA chunk</td>
+<td><code>source=qa_direct</code>, LLM not called</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-08</td>
+<td>Confidence ≥ 0.7 → full answer + cache</td>
+<td>high sim</td>
+<td><code>source=rag</code>, cached (L1+L2)</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-09</td>
+<td>Repeat question → cache hit</td>
+<td>ask twice</td>
+<td>2nd from cache, no pgvector/LLM</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-10</td>
+<td>Semantic cache near-duplicate</td>
+<td>cosine ≥ 0.95</td>
+<td>served from cache</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-11</td>
+<td>Off-topic detection is conservative</td>
+<td>off-topic word + agri word</td>
+<td><code>looksOffTopic=false</code> (still escalate)</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-12</td>
+<td>Follow-up contextualization</td>
+<td>&quot;còn cách khác&quot; + history</td>
+<td>topic prepended before embed</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+<tr>
+<td>TC-RAG-13</td>
+<td>pgvector error propagates</td>
+<td>RPC error</td>
+<td>error thrown to caller (→ friendly 500/429)</td>
+<td>Auto</td>
+<td><code>rag.test.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.3 Chat API access &amp; safety (→ FR-CHAT-17, NFR-SEC-03)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-CHAT-01</td>
+<td>IDOR: ask into another&#39;s session</td>
+<td><code>403</code></td>
+<td>Auto</td>
+<td><code>chat.access.test.js</code></td>
+</tr>
+<tr>
+<td>TC-CHAT-02</td>
+<td>Report/feedback/bookmark on others&#39; message</td>
+<td><code>403</code></td>
+<td>Auto</td>
+<td><code>chat.access.test.js</code></td>
+</tr>
+<tr>
+<td>TC-CHAT-03</td>
+<td>History only for own userId</td>
+<td><code>403</code> for others</td>
+<td>Auto</td>
+<td><code>chat.access.test.js</code></td>
+</tr>
+<tr>
+<td>TC-CHAT-04</td>
+<td>Staff read only escalated sessions</td>
+<td><code>403</code> if not escalated</td>
+<td>Auto</td>
+<td><code>chat.access.test.js</code></td>
+</tr>
+<tr>
+<td>TC-CHAT-05</td>
+<td>Bookmarks soft-degrade when table missing</td>
+<td><code>{unavailable:true}</code> not 500</td>
+<td>Auto</td>
+<td><code>chat.access.test.js</code></td>
+</tr>
+<tr>
+<td>TC-CHAT-06</td>
+<td>Quota error → friendly 429</td>
+<td>Gemini 429</td>
+<td><code>429</code> friendly copy</td>
+<td>Auto</td>
+</tr>
+<tr>
+<td>TC-CHAT-07</td>
+<td>testMode (staff) doesn&#39;t persist/notify</td>
+<td>no session/queue/push</td>
+<td>Auto</td>
+<td><code>chat.access.test.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.4 Engineer queue &amp; knowledge (→ FR-ENG)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-ENG-01</td>
+<td>Claim is atomic</td>
+<td>second claimant gets <code>409</code></td>
+<td>Auto</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ENG-02</td>
+<td>Answer by non-assignee blocked</td>
+<td><code>403</code> (admin override allowed)</td>
+<td>Auto</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ENG-03</td>
+<td>Edit resolved overwrites, no duplicate</td>
+<td>single engineer message</td>
+<td>Auto</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ENG-04</td>
+<td>addToKnowledge creates curated QA</td>
+<td>doc inserted + embedded</td>
+<td>Auto</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ENG-05</td>
+<td>Delete unanswered notifies farmer</td>
+<td>system message + push</td>
+<td>Auto</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ENG-06</td>
+<td>Delete resolved blocked</td>
+<td><code>400</code></td>
+<td>Auto</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ENG-07</td>
+<td>Role guard on all queue/KB routes</td>
+<td>non-staff <code>403</code></td>
+<td>Auto</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.5 Admin (→ FR-ADMIN)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-ADM-01</td>
+<td>Admin cannot self-lock / self-demote</td>
+<td><code>400</code></td>
+<td>Auto</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ADM-02</td>
+<td>Lock/unlock updates denylist</td>
+<td>instant effect</td>
+<td>Auto</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ADM-03</td>
+<td>Reset PIN only for farmers</td>
+<td><code>400</code> for staff</td>
+<td>Auto</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ADM-04</td>
+<td>Search input injection stripped</td>
+<td><code>.or()</code> chars removed</td>
+<td>Auto</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ADM-05</td>
+<td>CSV export neutralizes formula injection</td>
+<td>leading <code>=+-@</code> prefixed <code>&#39;</code></td>
+<td>Auto</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ADM-06</td>
+<td>Mutations write audit log</td>
+<td>audit row created (soft-degrade)</td>
+<td>Auto</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>TC-ADM-07</td>
+<td>Role guards on admin routes</td>
+<td>non-admin <code>403</code></td>
+<td>Auto</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.6 Community (→ FR-COM)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-COM-01</td>
+<td>Delete own/admin only</td>
+<td><code>403</code> otherwise</td>
+<td>Auto</td>
+<td><code>community.test.js</code></td>
+</tr>
+<tr>
+<td>TC-COM-02</td>
+<td>Content length limits</td>
+<td><code>400</code> over limit</td>
+<td>Auto</td>
+<td><code>community.test.js</code></td>
+</tr>
+<tr>
+<td>TC-COM-03</td>
+<td>Report idempotent</td>
+<td>duplicate → <code>already:true</code></td>
+<td>Auto</td>
+<td><code>community.test.js</code></td>
+</tr>
+<tr>
+<td>TC-COM-04</td>
+<td>Like toggles</td>
+<td>like/unlike</td>
+<td>Auto</td>
+<td><code>community.test.js</code></td>
+</tr>
+<tr>
+<td>TC-COM-05</td>
+<td>Admin moderation queue grouped</td>
+<td>grouped + dismiss</td>
+<td>Auto</td>
+<td><code>community.test.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.7 Notifications &amp; weather (→ FR-NOTIF)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-NOT-01</td>
+<td>Scheduler sends due, marks sent</td>
+<td>dispatched + <code>sent_at</code> set</td>
+<td>Auto</td>
+<td><code>notifications.scheduler.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-02</td>
+<td>Quiet hours suppress (incl. overnight)</td>
+<td>not delivered in window</td>
+<td>Auto</td>
+<td><code>notifications.scheduler.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-03</td>
+<td>Crop targeting (filter then profile)</td>
+<td>only matching subs</td>
+<td>Auto</td>
+<td><code>notifications.scheduler.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-04</td>
+<td>Overlap guard</td>
+<td>no concurrent runs</td>
+<td>Auto</td>
+<td><code>notifications.scheduler.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-05</td>
+<td>Scheduled list/cancel before send</td>
+<td>cancel only if unsent</td>
+<td>Auto</td>
+<td><code>push.scheduled.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-06</td>
+<td>Settings with no subscription</td>
+<td><code>{noSubscription:true}</code></td>
+<td>Auto</td>
+<td><code>push.scheduled.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-07</td>
+<td>Weather thresholds produce drafts</td>
+<td>rain≥20/heat≥35/wind≥40/cold≤18 → draft</td>
+<td>Auto</td>
+<td><code>weatherAlerts.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-08</td>
+<td>Draft dedup per kind/day</td>
+<td>one draft per kind/day</td>
+<td>Auto</td>
+<td><code>weatherAlerts.test.js</code></td>
+</tr>
+<tr>
+<td>TC-NOT-09</td>
+<td>Stale drafts cleaned</td>
+<td>past-day drafts removed</td>
+<td>Auto</td>
+<td><code>weatherAlerts.test.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.8 Storage cleanup (→ FR/NFR infra)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-STO-01</td>
+<td>Delete pest images &gt; 30 days</td>
+<td>old removed, <code>image_url</code> nulled</td>
+<td>Auto</td>
+<td><code>storageCleanup.test.js</code></td>
+</tr>
+<tr>
+<td>TC-STO-02</td>
+<td>Community images untouched</td>
+<td>not deleted</td>
+<td>Auto</td>
+<td><code>storageCleanup.test.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.9 Frontend &amp; e2e</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+<th>Type</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-FE-01</td>
+<td>Image compression ≤ 1280px, fallback</td>
+<td>compressed or original</td>
+<td>Auto</td>
+<td><code>frontend</code> Vitest</td>
+</tr>
+<tr>
+<td>TC-FE-02</td>
+<td>Answer markdown + disclaimer</td>
+<td>renders + disclaimer for technical</td>
+<td>Auto</td>
+<td><code>frontend</code> Vitest</td>
+</tr>
+<tr>
+<td>TC-FE-03</td>
+<td>Wait-engineer state</td>
+<td>correct UI/polling</td>
+<td>Auto</td>
+<td><code>frontend</code> Vitest</td>
+</tr>
+<tr>
+<td>TC-E2E-01</td>
+<td>Login by phone &amp; email</td>
+<td>reaches role home</td>
+<td>Auto</td>
+<td>Playwright <code>critical-path.spec.js</code></td>
+</tr>
+<tr>
+<td>TC-E2E-02</td>
+<td>Consent required to proceed</td>
+<td>button enabled only after consent (<code>#consent</code>)</td>
+<td>Auto</td>
+<td>Playwright</td>
+</tr>
+<tr>
+<td>TC-E2E-03</td>
+<td>Role-based routing</td>
+<td>farmer→<code>/home</code>, engineer→<code>/engineer/queue</code></td>
+<td>Auto</td>
+<td>Playwright</td>
+</tr>
+</tbody></table>
+<h3>6.10 Manual / UAT (→ NFR-USE)</h3>
+<table>
+<thead>
+<tr>
+<th>TC ID</th>
+<th>Title</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>TC-UAT-01</td>
+<td>Elderly farmer asks by voice unaided</td>
+<td>gets a readable answer</td>
+</tr>
+<tr>
+<td>TC-UAT-02</td>
+<td>Photo diagnosis of a diseased leaf</td>
+<td>sensible answer or escalation</td>
+</tr>
+<tr>
+<td>TC-UAT-03</td>
+<td>Outdoor readability (bright sun, large font)</td>
+<td>legible, usable</td>
+</tr>
+<tr>
+<td>TC-UAT-04</td>
+<td>Engineer answers a real escalation end-to-end</td>
+<td>farmer notified, KB optionally grows</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. RAG evaluation framework</h2>
+<p>Located in <code>backend/eval/</code> (<code>dataset.json</code> + <code>scripts/eval_rag.js</code>, <code>npm run eval</code>).
+Because incorrect dosage/disease advice is dangerous, this turns &quot;try a few questions by
+hand&quot; into a <strong>repeatable measurement</strong> to run before changing <code>SYSTEM_PROMPT</code>, the model,
+or thresholds in <code>rag.js</code>.</p>
+<p><strong>Three scoring signals per case:</strong></p>
+<ol>
+<li><strong>Behavior</strong> — correct tier: <code>faq</code> / <code>engineer</code> (must escalate) / <code>answer</code> (AI answers).</li>
+<li><strong>Keywords</strong> — <code>expectKeywords</code> must appear and <code>forbidKeywords</code> must not (accent- and
+case-insensitive).</li>
+<li><strong>LLM-judge (optional)</strong> — Gemini grades the answer vs a <code>reference</code> on 0–5; ≥ 3 passes.</li>
+</ol>
+<p>A case <strong>passes</strong> when: no error, correct behavior, required keywords present, no forbidden
+keywords, and (if judging) score ≥ 3.</p>
+<p><strong>Usage / gating:</strong></p>
+<pre><code class="language-bash">npm run eval                       # behavior + keywords (cheap)
+npm run eval -- --judge            # add LLM-judge (uses quota)
+npm run eval -- --threshold 0.9    # exit ≠ 0 if pass-rate &lt; 90% (CI/regression gate)
+npm run eval -- --json &gt; result.json
+</code></pre>
+<blockquote>
+<p><strong>Owner action:</strong> <code>dataset.json</code> is a seed. Engineers must expand <code>reference</code> with
+domain expertise and add a case for every 👎-reported answer (regression guard).</p>
+</blockquote>
+<hr>
+<h2>8. Non-functional testing</h2>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>Approach</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Security</strong></td>
+<td>Manual code review (IDOR, injection, secrets) + <code>npm audit</code></td>
+<td>Completed; backend &amp; frontend reviewed; 2 high vite dev-server vulns fixed (<code>npm audit fix</code>); residual accepted items documented</td>
+</tr>
+<tr>
+<td><strong>Performance</strong></td>
+<td>LLM latency observed (~1.8 s after thinking-off); bundle size tracked (~137 KB entry)</td>
+<td>Verified via real API calls / build output (estimates)</td>
+</tr>
+<tr>
+<td><strong>Quota/rate-limit</strong></td>
+<td>Unit tests for 429 handling; <code>quotaMonitor</code> 80% alert</td>
+<td>Covered</td>
+</tr>
+<tr>
+<td><strong>Layout/responsive</strong></td>
+<td>Playwright at 360 px width (overflow checks)</td>
+<td>Covered (H6)</td>
+</tr>
+<tr>
+<td><strong>Reliability</strong></td>
+<td>Soft-degrade paths, vision→text fallback, embed failure-safety</td>
+<td>Covered by unit tests + design</td>
+</tr>
+<tr>
+<td><strong>Load/stress</strong></td>
+<td>Not automated</td>
+<td>Manual/future (Đề xuất sử dụng <strong>K6</strong> hoặc <strong>JMeter</strong> để giả lập tải đồng thời khi mở rộng)</td>
+</tr>
+<tr>
+<td><strong>Accessibility (elderly)</strong></td>
+<td>Manual UAT</td>
+<td>Manual</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>9. Test execution report (current)</h2>
+<blockquote>
+<p>[!NOTE]
+Báo cáo dưới đây là Baseline Test Run (chạy lần đầu lúc nghiệm thu). Kết quả chạy test tự động mới nhất vui lòng xem tại hệ thống CI/CD (Github Actions).</p>
+</blockquote>
+<p><strong>Run date:</strong> 2026-06-30 · <strong>Environment:</strong> local, Node 22, mocked Supabase/Gemini.</p>
+<h3>9.1 Backend (Vitest) — <code>cd backend &amp;&amp; npm test</code></h3>
+<pre><code>Test Files  10 passed | 1 skipped (11)
+     Tests  142 passed | 2 skipped (144)
+  Duration  ~3.8 s
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Test file</th>
+<th>Cases</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>rag.test.js</code></td>
+<td>29</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>admin.endpoints.test.js</code></td>
+<td>24</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>engineer.queue.test.js</code></td>
+<td>22</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>chat.access.test.js</code></td>
+<td>19</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>auth.middleware.test.js</code></td>
+<td>12</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>community.test.js</code></td>
+<td>10</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>notifications.scheduler.test.js</code></td>
+<td>9</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>weatherAlerts.test.js</code></td>
+<td>8</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>push.scheduled.test.js</code></td>
+<td>6</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>storageCleanup.test.js</code></td>
+<td>3</td>
+<td>✅ pass</td>
+</tr>
+<tr>
+<td><code>integration/db_flow.test.js</code></td>
+<td>2</td>
+<td>⏭️ skipped (opt-in, needs real test DB)</td>
+</tr>
+</tbody></table>
+<h3>9.2 Frontend (Vitest) — <code>cd frontend &amp;&amp; npm test</code></h3>
+<pre><code>Test Files  3 passed (3)
+     Tests  12 passed (12)
+  Duration  ~3.8 s
+</code></pre>
+<h3>9.3 End-to-end (Playwright)</h3>
+<p>3 critical-path specs (<code>tests/e2e/critical-path.spec.js</code>) — login (phone/email), consent
+gating, role-based routing. Last known run: <strong>3/3 pass</strong> (<code>npx playwright install chromium</code>
+required; not re-run in this report as it needs a browser + running frontend).</p>
+<h3>9.4 Summary</h3>
+<table>
+<thead>
+<tr>
+<th>Suite</th>
+<th>Passed</th>
+<th>Skipped</th>
+<th>Failed</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Backend unit/integration</td>
+<td>142</td>
+<td>2</td>
+<td>0</td>
+</tr>
+<tr>
+<td>Frontend unit/component</td>
+<td>12</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td>E2e (last known)</td>
+<td>3</td>
+<td>0</td>
+<td>0</td>
+</tr>
+<tr>
+<td><strong>Total</strong></td>
+<td><strong>157</strong></td>
+<td><strong>2</strong></td>
+<td><strong>0</strong></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>The 2 skipped tests are the opt-in DB integration flow, intentionally skipped so the
+suite never writes to production.</p>
+</blockquote>
+<hr>
+<h2>10. Defect management</h2>
+<ul>
+<li><strong>Tracking:</strong> defects and improvements are logged in <code>IMPROVEMENTS.md</code> with an ID,
+severity (🔴/🟠/🟡/🟢), area, problem, fix, and status; runtime errors are captured in
+<strong>Sentry</strong>.</li>
+<li><strong>Severity:</strong> 🔴 critical (data loss / security / core flow broken) → 🟢 enhancement.</li>
+<li><strong>Lifecycle:</strong> ⬜ open → 🔧 in progress → ✅ done; fixes are committed with a descriptive
+message and (for prod) deployed via push.</li>
+<li><strong>Regression prevention:</strong> every fixed bug should gain a test (backend) or eval case
+(RAG); 👎-reported answers should become eval cases.</li>
+</ul>
+<hr>
+<h2>11. Requirement → test traceability</h2>
+<table>
+<thead>
+<tr>
+<th>SRS group</th>
+<th>Primary cases</th>
+<th>Suite</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-AUTH</td>
+<td>TC-AUTH-01…10</td>
+<td><code>auth.middleware.test.js</code>, manual</td>
+</tr>
+<tr>
+<td>FR-CHAT</td>
+<td>TC-RAG-01…13, TC-CHAT-01…07</td>
+<td><code>rag.test.js</code>, <code>chat.access.test.js</code>, eval</td>
+</tr>
+<tr>
+<td>FR-ENG</td>
+<td>TC-ENG-01…07</td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>FR-COM</td>
+<td>TC-COM-01…05</td>
+<td><code>community.test.js</code></td>
+</tr>
+<tr>
+<td>FR-NOTIF</td>
+<td>TC-NOT-01…09</td>
+<td><code>notifications.scheduler.test.js</code>, <code>push.scheduled.test.js</code>, <code>weatherAlerts.test.js</code></td>
+</tr>
+<tr>
+<td>FR-ADMIN</td>
+<td>TC-ADM-01…07</td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>NFR-SEC</td>
+<td>TC-AUTH-*, TC-CHAT-01…05, TC-ADM-04/05</td>
+<td>suites + security review</td>
+</tr>
+<tr>
+<td>NFR-REL</td>
+<td>TC-CHAT-05, TC-NOT-04, TC-ENG-03, TC-STO-*</td>
+<td>suites</td>
+</tr>
+<tr>
+<td>Quality (RAG)</td>
+<td>§7 eval cases</td>
+<td><code>backend/eval</code></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Coverage goal: every Must-priority requirement has at least one automated case or a
+defined manual/UAT procedure. Gaps (load testing, broader UAT) are tracked as future
+work in the <a href="07-RISK-REGISTER.md">Risk Register</a>.</p>
+</blockquote>

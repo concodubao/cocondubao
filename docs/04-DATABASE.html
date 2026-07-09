@@ -1,0 +1,1962 @@
+<h1>Database Design &amp; Data Dictionary — Cò Con Dự Báo</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Document</strong></td>
+<td>04 — Database Design &amp; Data Dictionary</td>
+</tr>
+<tr>
+<td><strong>Engine</strong></td>
+<td>PostgreSQL 17 (Supabase, project ref <code>mcloxncymnhiuubjzgbh</code>)</td>
+</tr>
+<tr>
+<td><strong>Extensions</strong></td>
+<td><code>pgvector</code> (vector similarity)</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Baseline (reflects <code>supabase/migrations/*</code> @ 2026-06-30)</td>
+</tr>
+<tr>
+<td><strong>Source of truth</strong></td>
+<td><code>supabase/migrations/*.sql</code> — this document <strong>describes</strong>, the migrations <strong>define</strong></td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td><a href="03-ARCHITECTURE.md">03-ARCHITECTURE</a> · <a href="05-API.md">05-API</a> · <a href="02-SRS.md">02-SRS</a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-overview--conventions">Overview &amp; conventions</a></li>
+<li><a href="#2-entity-relationship-diagram-erd">Entity-Relationship Diagram (ERD)</a></li>
+<li><a href="#3-domain-groupings">Domain groupings</a></li>
+<li><a href="#4-data-dictionary">Data dictionary</a><ul>
+<li><a href="#41-users">4.1 users</a></li>
+<li><a href="#42-chat_sessions">4.2 chat_sessions</a></li>
+<li><a href="#43-messages">4.3 messages</a></li>
+<li><a href="#44-engineer_queue">4.4 engineer_queue</a></li>
+<li><a href="#45-knowledge_docs">4.5 knowledge_docs</a></li>
+<li><a href="#46-knowledge_chunks">4.6 knowledge_chunks</a></li>
+<li><a href="#47-answer_cache">4.7 answer_cache</a></li>
+<li><a href="#48-ai_error_reports">4.8 ai_error_reports</a></li>
+<li><a href="#49-answer_feedback">4.9 answer_feedback</a></li>
+<li><a href="#410-message_bookmarks">4.10 message_bookmarks</a></li>
+<li><a href="#411-notifications">4.11 notifications</a></li>
+<li><a href="#412-notification_reads">4.12 notification_reads</a></li>
+<li><a href="#413-push_subscriptions">4.13 push_subscriptions</a></li>
+<li><a href="#414-posts">4.14 posts</a></li>
+<li><a href="#415-comments">4.15 comments</a></li>
+<li><a href="#416-post_likes">4.16 post_likes</a></li>
+<li><a href="#417-content_reports">4.17 content_reports</a></li>
+<li><a href="#418-admin_audit_log">4.18 admin_audit_log</a></li>
+</ul>
+</li>
+<li><a href="#5-functions--rpc">Functions &amp; RPC</a></li>
+<li><a href="#6-triggers">Triggers</a></li>
+<li><a href="#7-indexes">Indexes</a></li>
+<li><a href="#8-row-level-security-rls">Row-Level Security (RLS)</a></li>
+<li><a href="#9-storage-buckets">Storage</a></li>
+<li><a href="#10-referential-integrity--deletion-behavior">Referential integrity &amp; deletion behavior</a></li>
+<li><a href="#11-migration-history">Migration history</a></li>
+</ol>
+<hr>
+<h2>1. Overview &amp; conventions</h2>
+<ul>
+<li><strong>18 tables</strong> in schema <code>public</code>, grouped into five domains (§3).</li>
+<li><strong>Primary keys</strong> are <code>uuid</code> defaulted by <code>gen_random_uuid()</code>, except <code>post_likes</code>
+(composite <code>post_id, user_id</code>) and <code>answer_cache</code> (<code>cache_key text</code>).</li>
+<li><strong>Timestamps</strong> are <code>timestamptz</code> (<code>timestamp with time zone</code>), defaulting to <code>now()</code>.</li>
+<li><strong>Crop tags</strong> are Postgres <code>text[]</code> arrays; the valid crop vocabulary is
+<code>{rice, veggie, fruit, other}</code> (enforced in application code, not by DB CHECK).</li>
+<li><strong>Enums vs Checks:</strong> The design uses <code>TEXT</code> columns with <code>CHECK</code> constraints (e.g., <code>status IN (&#39;pending&#39;, &#39;resolved&#39;)</code>) instead of PostgreSQL <code>ENUM</code> types. This makes future migrations much easier without running complex <code>ALTER TYPE</code> statements.</li>
+<li><strong>Embeddings</strong> are <code>vector(1536)</code> (must match the Gemini embedding dimension; changing
+the embedding model requires re-embedding all chunks).</li>
+<li><strong>RLS is enabled on every table.</strong> The backend connects with the Supabase
+<strong>service-role key</strong> (bypasses RLS) and enforces authorization in application code; RLS
+is the backstop that denies anon/direct client access (see §8).</li>
+<li>Several tables are added by later migrations and are queried with <strong>soft-degrade</strong>
+(the API returns an &quot;unavailable&quot; flag instead of 500 when a table is not yet applied):
+<code>answer_cache</code>, <code>message_bookmarks</code>, <code>admin_audit_log</code>.</li>
+</ul>
+<p>Legend for the dictionary: <strong>PK</strong> primary key · <strong>FK</strong> foreign key · <strong>UK</strong> unique ·
+<strong>NN</strong> not null.</p>
+<hr>
+<h2>2. Entity-Relationship Diagram (ERD)</h2>
+<pre><code class="language-mermaid">erDiagram
+    users ||--o{ chat_sessions : owns
+    users ||--o{ knowledge_docs : uploads
+    users ||--o{ notifications : creates
+    users ||--o{ notification_reads : reads
+    users ||--o{ push_subscriptions : registers
+    users ||--o{ posts : authors
+    users ||--o{ comments : writes
+    users ||--o{ post_likes : likes
+    users ||--o{ ai_error_reports : reports
+    users ||--o{ answer_feedback : rates
+    users ||--o{ message_bookmarks : saves
+    users ||--o{ engineer_queue : &quot;assigned to&quot;
+    users ||--o{ content_reports : files
+
+    chat_sessions ||--o{ messages : contains
+    messages ||--o| engineer_queue : escalates
+    messages ||--o{ ai_error_reports : &quot;reported on&quot;
+    messages ||--o{ answer_feedback : &quot;rated on&quot;
+    messages ||--o{ message_bookmarks : &quot;bookmarked&quot;
+
+    knowledge_docs ||--o{ knowledge_chunks : &quot;chunked into&quot;
+
+    notifications ||--o{ notification_reads : &quot;read by&quot;
+
+    posts ||--o{ comments : has
+    posts ||--o{ post_likes : &quot;liked via&quot;
+
+    users {
+        uuid id PK
+        text phone UK
+        text email UK
+        text role &quot;farmer|engineer|admin&quot;
+        text password_hash
+        text name
+        text village
+        text_array crops
+        boolean is_active
+    }
+    chat_sessions {
+        uuid id PK
+        uuid user_id FK
+        text crop_type
+        text status &quot;active|closed&quot;
+    }
+    messages {
+        uuid id PK
+        uuid session_id FK
+        text role &quot;user|assistant|engineer|system&quot;
+        text content
+        text image_url
+        float confidence
+        text source
+    }
+    engineer_queue {
+        uuid id PK
+        uuid message_id FK
+        uuid assigned_to FK
+        text status &quot;pending|in_progress|resolved&quot;
+        text answer
+        bool add_to_knowledge
+    }
+    knowledge_docs {
+        uuid id PK
+        text title
+        text source
+        text_array crop_tags
+        text content
+        text status &quot;draft|embedding|approved|archived&quot;
+        text error_message
+        uuid uploaded_by FK
+    }
+    knowledge_chunks {
+        uuid id PK
+        uuid doc_id FK
+        text chunk_text
+        vector embedding &quot;1536-dim&quot;
+        int chunk_index
+    }
+    answer_cache {
+        text cache_key PK
+        text crop_type
+        text question
+        text answer
+        text source
+        timestamptz expires_at
+    }
+    ai_error_reports {
+        uuid id PK
+        uuid message_id FK
+        uuid user_id FK
+        text error_type
+        uuid reviewed_by FK
+    }
+    answer_feedback {
+        uuid id PK
+        uuid message_id FK
+        uuid user_id FK
+        bool helpful
+    }
+    message_bookmarks {
+        uuid id PK
+        uuid message_id FK
+        uuid user_id FK
+    }
+    notifications {
+        uuid id PK
+        text title
+        text body
+        text type &quot;alert|promotion|weather&quot;
+        text_array crop_tags
+        text region
+        timestamptz scheduled_at
+        timestamptz sent_at
+        uuid created_by FK
+    }
+    notification_reads {
+        uuid id PK
+        uuid notification_id FK
+        uuid user_id FK
+        timestamptz read_at
+    }
+    push_subscriptions {
+        uuid id PK
+        uuid user_id FK
+        text endpoint UK
+        jsonb keys
+        text_array notif_types
+        text_array crops_filter
+        time quiet_start
+        time quiet_end
+        boolean active
+    }
+    posts {
+        uuid id PK
+        uuid user_id FK
+        text content
+        text image_url
+        text_array crop_tags
+    }
+    comments {
+        uuid id PK
+        uuid post_id FK
+        uuid user_id FK
+        text content
+    }
+    post_likes {
+        uuid post_id PK_FK
+        uuid user_id PK_FK
+    }
+    content_reports {
+        uuid id PK
+        text target_type &quot;post|comment&quot;
+        uuid target_id &quot;polymorphic&quot;
+        uuid reporter_id FK
+        text status
+    }
+    admin_audit_log {
+        uuid id PK
+        uuid admin_id
+        text action
+        uuid target_id
+        text detail
+    }
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<blockquote>
+<p><strong>Polymorphic relationship:</strong> <code>content_reports.target_id</code> points to either <code>posts.id</code>
+or <code>comments.id</code> depending on <code>target_type</code>. There is <strong>no DB foreign key</strong> for it;
+application code cleans up orphaned reports when a post/comment is deleted.
+<code>admin_audit_log</code> columns are intentionally loose (denormalized names stored inline) so
+the log survives without joins — no enforced FKs.</p>
+</blockquote>
+<hr>
+<h2>3. Domain groupings</h2>
+<table>
+<thead>
+<tr>
+<th>Domain</th>
+<th>Tables</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Identity &amp; access</strong></td>
+<td><code>users</code></td>
+</tr>
+<tr>
+<td><strong>Conversational AI</strong></td>
+<td><code>chat_sessions</code>, <code>messages</code>, <code>engineer_queue</code>, <code>ai_error_reports</code>, <code>answer_feedback</code>, <code>message_bookmarks</code></td>
+</tr>
+<tr>
+<td><strong>Knowledge base (RAG)</strong></td>
+<td><code>knowledge_docs</code>, <code>knowledge_chunks</code>, <code>answer_cache</code></td>
+</tr>
+<tr>
+<td><strong>Notifications</strong></td>
+<td><code>notifications</code>, <code>notification_reads</code>, <code>push_subscriptions</code></td>
+</tr>
+<tr>
+<td><strong>Community</strong></td>
+<td><code>posts</code>, <code>comments</code>, <code>post_likes</code>, <code>content_reports</code></td>
+</tr>
+<tr>
+<td><strong>Administration</strong></td>
+<td><code>admin_audit_log</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. Data dictionary</h2>
+<h3>4.1 <code>users</code></h3>
+<p>Every account: farmers (phone + PIN), engineers/admins (email + password). RLS policy
+<code>users_self</code> (<code>auth.uid() = id</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td>Account id</td>
+</tr>
+<tr>
+<td><code>phone</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>UK</strong></td>
+<td>E.164 phone (<code>+84...</code>); farmers</td>
+</tr>
+<tr>
+<td><code>email</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>UK</strong></td>
+<td>Lowercased; engineers/admins</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td>text</td>
+<td>NN</td>
+<td><code>&#39;farmer&#39;</code></td>
+<td>CHECK in <code>{farmer, engineer, admin}</code></td>
+<td>RBAC role</td>
+</tr>
+<tr>
+<td><code>password_hash</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>bcrypt hash (PIN for farmers, password for staff)</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Display name; null ⇒ &quot;new user&quot; prompt</td>
+</tr>
+<tr>
+<td><code>village</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Hamlet/commune</td>
+</tr>
+<tr>
+<td><code>crops</code></td>
+<td>text[]</td>
+<td>nullable</td>
+<td><code>&#39;{}&#39;</code></td>
+<td>—</td>
+<td>Subset of <code>{rice,veggie,fruit,other}</code></td>
+</tr>
+<tr>
+<td><code>is_active</code></td>
+<td>boolean</td>
+<td>nullable</td>
+<td><code>true</code></td>
+<td>—</td>
+<td><code>false</code> ⇒ locked / self-deleted (denylist)</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td>Maintained by <code>trg_users_updated_at</code></td>
+</tr>
+</tbody></table>
+<h3>4.2 <code>chat_sessions</code></h3>
+<p>One advisory conversation. RLS policy <code>sessions_owner</code> (<code>user_id = auth.uid()</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td>Owner farmer</td>
+</tr>
+<tr>
+<td><code>crop_type</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Crop context for RAG filtering</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>text</td>
+<td>nullable</td>
+<td><code>&#39;active&#39;</code></td>
+<td>CHECK in <code>{active, closed}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>4.3 <code>messages</code></h3>
+<p>Every turn in a conversation (farmer, AI, engineer, or system). RLS policy
+<code>messages_owner</code> (session belongs to <code>auth.uid()</code>).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>chat_sessions(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>CHECK in <code>{user, assistant, engineer, system}</code></td>
+<td>Author kind</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td>Message text</td>
+</tr>
+<tr>
+<td><code>image_url</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Pest photo public URL (nulled when image purged)</td>
+</tr>
+<tr>
+<td><code>confidence</code></td>
+<td>double precision</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>RAG similarity (assistant messages)</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>CHECK in <code>{rag, llm, engineer}</code></td>
+<td>Origin of an answer</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Note: the application also uses logical <code>source</code> values like <code>faq</code>, <code>qa_direct</code>,
+<code>vision</code>, <code>rag_low_conf</code> in API responses; the DB CHECK only constrains stored values
+to <code>{rag, llm, engineer}</code>, so persisted <code>source</code> is normalized accordingly.</p>
+</blockquote>
+<h3>4.4 <code>engineer_queue</code></h3>
+<p>Questions escalated to human agronomists. RLS enabled, no policy (service-role only).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>messages(id)</code> ON DELETE CASCADE</td>
+<td>The farmer&#39;s question</td>
+</tr>
+<tr>
+<td><code>assigned_to</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code></td>
+<td>Engineer who took it</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>text</td>
+<td>nullable</td>
+<td><code>&#39;pending&#39;</code></td>
+<td>CHECK in <code>{pending, in_progress, resolved}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>answer</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Engineer&#39;s answer text</td>
+</tr>
+<tr>
+<td><code>add_to_knowledge</code></td>
+<td>boolean</td>
+<td>nullable</td>
+<td><code>false</code></td>
+<td>—</td>
+<td>If true ⇒ answer becomes curated QA</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>resolved_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Set on resolve</td>
+</tr>
+</tbody></table>
+<h3>4.5 <code>knowledge_docs</code></h3>
+<p>Source documents/QA for the RAG knowledge base. RLS policy <code>knowledge_farmer_read</code>
+(approved docs are world-readable; staff see all).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td>Document title</td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td><code>engineer_answer</code> / <code>manual_qa</code> / <code>ai_review</code> / <code>ai_error_fix</code> / filename</td>
+</tr>
+<tr>
+<td><code>crop_tags</code></td>
+<td>text[]</td>
+<td>nullable</td>
+<td><code>&#39;{}&#39;</code></td>
+<td>—</td>
+<td>Crop scoping</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Full extracted text</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>text</td>
+<td>nullable</td>
+<td><code>&#39;draft&#39;</code></td>
+<td>CHECK in <code>{draft, embedding, approved, archived}</code></td>
+<td>Lifecycle</td>
+</tr>
+<tr>
+<td><code>uploaded_by</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code></td>
+<td>Author</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>integer</td>
+<td>nullable</td>
+<td><code>1</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>error_message</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Embed failure reason (UI banner)</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>updated_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Only <code>status = &#39;approved&#39;</code> docs are searchable (enforced inside
+<code>match_knowledge_chunks</code>). <code>embedding</code> is a transient state while chunks are computed.</p>
+</blockquote>
+<h3>4.6 <code>knowledge_chunks</code></h3>
+<p>Embedded text chunks for vector search. RLS enabled, no policy (service-role only).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>doc_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>knowledge_docs(id)</code> ON DELETE CASCADE</td>
+<td>Parent doc</td>
+</tr>
+<tr>
+<td><code>chunk_text</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td>~1000-char chunk</td>
+</tr>
+<tr>
+<td><code>embedding</code></td>
+<td>vector(1536)</td>
+<td>nullable</td>
+<td>—</td>
+<td>ivfflat cosine index</td>
+<td>Gemini embedding</td>
+</tr>
+<tr>
+<td><code>chunk_index</code></td>
+<td>integer</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Order within doc</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>4.7 <code>answer_cache</code></h3>
+<p>Durable L2 answer cache (survives redeploys) to cut Gemini calls. Soft-degraded.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>cache_key</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>PK</strong></td>
+<td>`&quot;&lt;crop</td>
+</tr>
+<tr>
+<td><code>crop_type</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>question</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Original question</td>
+</tr>
+<tr>
+<td><code>answer</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td>Cached answer</td>
+</tr>
+<tr>
+<td><code>confidence</code></td>
+<td>real</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td><code>rag</code> / <code>qa_direct</code></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>NN</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>expires_at</code></td>
+<td>timestamptz</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td>TTL (≈ 1 hour)</td>
+</tr>
+</tbody></table>
+<h3>4.8 <code>ai_error_reports</code></h3>
+<p>Farmer &quot;this answer is wrong&quot; reports (👎). RLS: insert own (<code>user_id = auth.uid()</code>);
+engineers/admins read.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>messages(id)</code> ON DELETE CASCADE</td>
+<td>Reported answer</td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code></td>
+<td>Reporter</td>
+</tr>
+<tr>
+<td><code>error_type</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>CHECK in <code>{wrong_info, irrelevant, hard_to_understand}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>note</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Optional detail</td>
+</tr>
+<tr>
+<td><code>reviewed_by</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code></td>
+<td>Admin who handled it</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>4.9 <code>answer_feedback</code></h3>
+<p>Positive feedback (👍). RLS enabled, no policy (service-role only).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>messages(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>helpful</code></td>
+<td>boolean</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td><code>true</code> = 👍</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>NN</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><strong>UK</strong> (<code>message_id</code>, <code>user_id</code>)</td>
+<td>One vote per user per answer (upsertable)</td>
+</tr>
+</tbody></table>
+<h3>4.10 <code>message_bookmarks</code></h3>
+<p>Farmer-saved answers. RLS enabled, no policy. Soft-degraded.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>message_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>messages(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>NN</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><strong>UK</strong> (<code>message_id</code>, <code>user_id</code>)</td>
+<td>One bookmark per user per answer</td>
+</tr>
+</tbody></table>
+<h3>4.11 <code>notifications</code></h3>
+<p>Broadcast notifications and weather-alert drafts. RLS policy <code>notif_read</code> (crop-matched
+or general).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>body</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>type</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>CHECK in <code>{alert, promotion, weather}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>image_url</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Illustration</td>
+</tr>
+<tr>
+<td><code>crop_tags</code></td>
+<td>text[]</td>
+<td>nullable</td>
+<td><code>&#39;{}&#39;</code></td>
+<td>—</td>
+<td>Empty ⇒ general; else crop-targeted</td>
+</tr>
+<tr>
+<td><code>region</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Weather dedup key <code>wx:&lt;kind&gt;:&lt;date&gt;</code> (not shown to farmers)</td>
+</tr>
+<tr>
+<td><code>scheduled_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Set ⇒ scheduled; scheduler sends when due</td>
+</tr>
+<tr>
+<td><code>sent_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Null + scheduled ⇒ pending; null + <code>created_by</code> null + type weather ⇒ draft</td>
+</tr>
+<tr>
+<td><code>created_by</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code></td>
+<td>Null ⇒ system-generated draft</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>The <code>notifications</code> table encodes three lifecycles via <code>created_by</code>/<code>scheduled_at</code>/
+<code>sent_at</code>: <strong>immediate</strong> (<code>sent_at</code> set), <strong>scheduled</strong> (<code>scheduled_at</code> set, <code>sent_at</code>
+null), <strong>weather draft</strong> (<code>type=weather</code>, <code>created_by</code> null, all timestamps null).</p>
+</blockquote>
+<h3>4.12 <code>notification_reads</code></h3>
+<p>Per-user read receipts. RLS enabled.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>notification_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>notifications(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>read_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><strong>UK</strong> (<code>notification_id</code>, <code>user_id</code>)</td>
+<td>One receipt per user per notification</td>
+</tr>
+</tbody></table>
+<h3>4.13 <code>push_subscriptions</code></h3>
+<p>Web Push endpoints + per-device notification preferences. RLS enabled.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>endpoint</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>UK</strong></td>
+<td>Push endpoint URL</td>
+</tr>
+<tr>
+<td><code>keys</code></td>
+<td>jsonb</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td><code>{p256dh, auth}</code></td>
+</tr>
+<tr>
+<td><code>crops_filter</code></td>
+<td>text[]</td>
+<td>nullable</td>
+<td><code>&#39;{}&#39;</code></td>
+<td>—</td>
+<td>Per-device crop filter</td>
+</tr>
+<tr>
+<td><code>notif_types</code></td>
+<td>text[]</td>
+<td>nullable</td>
+<td><code>&#39;{alert,promotion,weather}&#39;</code></td>
+<td>—</td>
+<td>Opted-in types</td>
+</tr>
+<tr>
+<td><code>quiet_start</code></td>
+<td>time</td>
+<td>nullable</td>
+<td><code>&#39;22:00:00&#39;</code></td>
+<td>—</td>
+<td>Quiet-hours start</td>
+</tr>
+<tr>
+<td><code>quiet_end</code></td>
+<td>time</td>
+<td>nullable</td>
+<td><code>&#39;06:00:00&#39;</code></td>
+<td>—</td>
+<td>Quiet-hours end</td>
+</tr>
+<tr>
+<td><code>active</code></td>
+<td>boolean</td>
+<td>nullable</td>
+<td><code>true</code></td>
+<td>—</td>
+<td><code>false</code> ⇒ unsubscribed / expired (410)</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>4.14 <code>posts</code></h3>
+<p>Community feed posts. RLS enabled.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td>Author</td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>CHECK length 1–1000</td>
+<td></td>
+</tr>
+<tr>
+<td><code>image_url</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>crop_tags</code></td>
+<td>text[]</td>
+<td>nullable</td>
+<td><code>&#39;{}&#39;</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>NN</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>4.15 <code>comments</code></h3>
+<p>Comments on posts. RLS enabled.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>post_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>posts(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>content</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>CHECK length 1–500</td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>NN</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>4.16 <code>post_likes</code></h3>
+<p>Like join table (composite PK — naturally idempotent). RLS enabled.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>post_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>PK</strong>, <strong>FK</strong> → <code>posts(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>user_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>PK</strong>, <strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>4.17 <code>content_reports</code></h3>
+<p>Farmer reports of bad posts/comments; admin moderates. RLS enabled, no policy.</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>target_type</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>CHECK in <code>{post, comment}</code></td>
+<td>Polymorphic discriminator</td>
+</tr>
+<tr>
+<td><code>target_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><em>(no FK — polymorphic)</em></td>
+<td>Reported post/comment id</td>
+</tr>
+<tr>
+<td><code>reporter_id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td>—</td>
+<td><strong>FK</strong> → <code>users(id)</code> ON DELETE CASCADE</td>
+<td></td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Optional (≤ 300 chars in app)</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>text</td>
+<td>NN</td>
+<td><code>&#39;pending&#39;</code></td>
+<td>CHECK in <code>{pending, reviewed, dismissed}</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>NN</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td><code>reviewed_by</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Admin</td>
+</tr>
+<tr>
+<td><code>reviewed_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><strong>UK</strong> (<code>target_type</code>, <code>target_id</code>, <code>reporter_id</code>)</td>
+<td>One report per user per item</td>
+</tr>
+</tbody></table>
+<h3>4.18 <code>admin_audit_log</code></h3>
+<p>Immutable-ish log of admin actions. RLS enabled, no policy (service-role only).</p>
+<table>
+<thead>
+<tr>
+<th>Column</th>
+<th>Type</th>
+<th>Null</th>
+<th>Default</th>
+<th>Constraints</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>uuid</td>
+<td>NN</td>
+<td><code>gen_random_uuid()</code></td>
+<td><strong>PK</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>admin_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><em>(no FK)</em></td>
+<td>Acting admin</td>
+</tr>
+<tr>
+<td><code>admin_name</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Denormalized for display</td>
+</tr>
+<tr>
+<td><code>action</code></td>
+<td>text</td>
+<td>NN</td>
+<td>—</td>
+<td>—</td>
+<td><code>lock_user</code>/<code>unlock_user</code>/<code>change_role</code>/<code>reset_pin</code>/<code>create_staff</code></td>
+</tr>
+<tr>
+<td><code>target_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td><em>(no FK)</em></td>
+<td>Affected entity</td>
+</tr>
+<tr>
+<td><code>target_name</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Denormalized</td>
+</tr>
+<tr>
+<td><code>detail</code></td>
+<td>text</td>
+<td>nullable</td>
+<td>—</td>
+<td>—</td>
+<td>Human-readable detail</td>
+</tr>
+<tr>
+<td><code>created_at</code></td>
+<td>timestamptz</td>
+<td>nullable</td>
+<td><code>now()</code></td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Functions &amp; RPC</h2>
+<h3><code>match_knowledge_chunks(query_embedding, match_threshold=0.5, match_count=5, filter_crop=NULL)</code></h3>
+<p>The vector-search RPC powering RAG retrieval. Returns
+<code>TABLE(id uuid, chunk_text text, similarity double precision, doc_id uuid)</code>.</p>
+<pre><code class="language-sql">SELECT kc.id, kc.chunk_text,
+       1 - (kc.embedding &lt;=&gt; query_embedding) AS similarity,
+       kc.doc_id
+FROM knowledge_chunks kc
+JOIN knowledge_docs   kd ON kc.doc_id = kd.id
+WHERE kd.status = &#39;approved&#39;
+  AND (filter_crop IS NULL OR filter_crop = ANY(kd.crop_tags))
+  AND 1 - (kc.embedding &lt;=&gt; query_embedding) &gt; match_threshold
+ORDER BY kc.embedding &lt;=&gt; query_embedding
+LIMIT match_count;
+</code></pre>
+<ul>
+<li>Uses cosine distance (<code>&lt;=&gt;</code>); <code>similarity = 1 - distance</code>.</li>
+<li><strong>Only <code>approved</code> docs</strong> participate; optional crop filter narrows by <code>crop_tags</code>.</li>
+</ul>
+<h3><code>update_updated_at()</code></h3>
+<p>Trigger function: <code>NEW.updated_at = now(); RETURN NEW;</code>.</p>
+<hr>
+<h2>6. Triggers</h2>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>Table</th>
+<th>Timing</th>
+<th>Function</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>trg_users_updated_at</code></td>
+<td><code>users</code></td>
+<td>BEFORE UPDATE FOR EACH ROW</td>
+<td><code>update_updated_at()</code></td>
+<td>Refresh <code>updated_at</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. Indexes</h2>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Table</th>
+<th>Definition</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>knowledge_chunks_embedding_idx</code></td>
+<td><code>knowledge_chunks</code></td>
+<td>ivfflat (<code>vector_cosine_ops</code>) <code>lists=100</code></td>
+<td>Vector ANN search</td>
+</tr>
+<tr>
+<td><code>idx_chunks_doc_id</code></td>
+<td><code>knowledge_chunks</code></td>
+<td>btree (<code>doc_id</code>)</td>
+<td>Chunk-by-doc lookup / re-embed</td>
+</tr>
+<tr>
+<td><code>idx_docs_status_crop</code></td>
+<td><code>knowledge_docs</code></td>
+<td>btree (<code>status</code>, <code>crop_tags</code>)</td>
+<td>Doc listing &amp; filtering</td>
+</tr>
+<tr>
+<td><code>idx_messages_session</code></td>
+<td><code>messages</code></td>
+<td>btree (<code>session_id</code>, <code>created_at</code>)</td>
+<td>Conversation fetch</td>
+</tr>
+<tr>
+<td><code>idx_queue_status</code></td>
+<td><code>engineer_queue</code></td>
+<td>btree (<code>status</code>, <code>created_at</code>)</td>
+<td>Queue listing</td>
+</tr>
+<tr>
+<td><code>idx_sessions_user</code></td>
+<td><code>chat_sessions</code></td>
+<td>btree (<code>user_id</code>, <code>created_at DESC</code>)</td>
+<td>History</td>
+</tr>
+<tr>
+<td><code>idx_users_phone</code></td>
+<td><code>users</code></td>
+<td>btree (<code>phone</code>)</td>
+<td>Login lookup</td>
+</tr>
+<tr>
+<td><code>idx_users_role</code></td>
+<td><code>users</code></td>
+<td>btree (<code>role</code>)</td>
+<td>Role filters / staff fan-out</td>
+</tr>
+<tr>
+<td><code>comments_post_id_created_at_idx</code></td>
+<td><code>comments</code></td>
+<td>btree (<code>post_id</code>, <code>created_at</code>)</td>
+<td>Comment thread</td>
+</tr>
+<tr>
+<td><code>post_likes_user_id_idx</code></td>
+<td><code>post_likes</code></td>
+<td>btree (<code>user_id</code>)</td>
+<td>&quot;liked by me&quot;</td>
+</tr>
+<tr>
+<td><code>posts_created_at_idx</code></td>
+<td><code>posts</code></td>
+<td>btree (<code>created_at DESC</code>)</td>
+<td>Feed</td>
+</tr>
+<tr>
+<td><code>idx_notifications_pending_schedule</code></td>
+<td><code>notifications</code></td>
+<td>btree (<code>scheduled_at</code>) WHERE <code>sent_at IS NULL</code></td>
+<td>Scheduler scan</td>
+</tr>
+<tr>
+<td><code>idx_content_reports_pending</code></td>
+<td><code>content_reports</code></td>
+<td>btree (<code>created_at</code>) WHERE <code>status=&#39;pending&#39;</code></td>
+<td>Moderation queue</td>
+</tr>
+<tr>
+<td><code>idx_answer_feedback_message</code></td>
+<td><code>answer_feedback</code></td>
+<td>btree (<code>message_id</code>)</td>
+<td>👍 counts</td>
+</tr>
+<tr>
+<td><code>idx_message_bookmarks_user</code></td>
+<td><code>message_bookmarks</code></td>
+<td>btree (<code>user_id</code>, <code>created_at DESC</code>)</td>
+<td>Saved list</td>
+</tr>
+<tr>
+<td><code>answer_cache_expires_idx</code></td>
+<td><code>answer_cache</code></td>
+<td>btree (<code>expires_at</code>)</td>
+<td>TTL sweeping</td>
+</tr>
+<tr>
+<td><code>idx_admin_audit_created</code></td>
+<td><code>admin_audit_log</code></td>
+<td>btree (<code>created_at DESC</code>)</td>
+<td>Audit listing</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>8. Row-Level Security (RLS)</h2>
+<p><strong>Every table has RLS enabled.</strong> The backend uses the service-role key (which bypasses
+RLS), so application code is the primary authorization layer; RLS is a defense-in-depth
+backstop that blocks anon/<code>authenticated</code> clients from reading data directly. Policies
+that <em>do</em> exist (for any future direct-client access):</p>
+<table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Policy</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>users</code></td>
+<td><code>users_self</code></td>
+<td>A user can only access their own row (<code>auth.uid() = id</code>)</td>
+</tr>
+<tr>
+<td><code>chat_sessions</code></td>
+<td><code>sessions_owner</code></td>
+<td>Owner only (<code>user_id = auth.uid()</code>)</td>
+</tr>
+<tr>
+<td><code>messages</code></td>
+<td><code>messages_owner</code> (SELECT)</td>
+<td>Only messages in the user&#39;s own sessions</td>
+</tr>
+<tr>
+<td><code>knowledge_docs</code></td>
+<td><code>knowledge_farmer_read</code> (SELECT)</td>
+<td>Approved docs world-readable; staff see all</td>
+</tr>
+<tr>
+<td><code>notifications</code></td>
+<td><code>notif_read</code> (SELECT)</td>
+<td>General (<code>crop_tags={}</code>) or crop-matched to user</td>
+</tr>
+<tr>
+<td><code>ai_error_reports</code></td>
+<td><code>ai_error_insert</code> / <code>ai_error_read_eng</code></td>
+<td>Insert own; engineers/admins read</td>
+</tr>
+</tbody></table>
+<p>Tables with <strong>RLS on but no policy</strong> (deny-all to clients; service-role only):
+<code>engineer_queue</code>, <code>knowledge_chunks</code>, <code>post_likes</code>, <code>posts</code>, <code>comments</code>,
+<code>push_subscriptions</code>, <code>notification_reads</code>, <code>answer_feedback</code>, <code>message_bookmarks</code>,
+<code>content_reports</code>, <code>answer_cache</code>, <code>admin_audit_log</code>.</p>
+<blockquote>
+<p><strong>Consequence:</strong> Supabase Realtime cannot subscribe to <code>engineer_queue</code> from an anon
+client (RLS blocks it), which is why the engineer queue uses <strong>polling</strong> rather than
+Realtime (see ADR-10 in <a href="03-ARCHITECTURE.md">03-ARCHITECTURE</a>).</p>
+</blockquote>
+<hr>
+<h2>9. Storage (buckets)</h2>
+<table>
+<thead>
+<tr>
+<th>Bucket</th>
+<th>Folder convention</th>
+<th>Used by</th>
+<th>Lifecycle</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>images</code></td>
+<td><code>pest-images/&lt;userId&gt;/&lt;ts&gt;.jpg</code></td>
+<td>Chat pest photos</td>
+<td>Auto-deleted after 30 days (<code>storageCleanup.js</code>); <code>messages.image_url</code> nulled</td>
+</tr>
+<tr>
+<td><code>images</code></td>
+<td><code>community/&lt;userId&gt;/&lt;ts&gt;.jpg</code></td>
+<td>Community post images</td>
+<td>Kept; removed when post/account deleted</td>
+</tr>
+<tr>
+<td><code>images</code></td>
+<td><code>notifications/&lt;userId&gt;/&lt;ts&gt;.jpg</code></td>
+<td>Admin notification illustrations</td>
+<td>Kept</td>
+</tr>
+</tbody></table>
+<p>Public-read bucket; object paths use UUIDs/timestamps (hard to guess). All images are
+re-encoded by <code>sharp</code> on upload (resize + strip metadata).</p>
+<hr>
+<h2>10. Referential integrity &amp; deletion behavior</h2>
+<ul>
+<li><strong>CASCADE deletes</strong> flow from <code>users</code> → sessions → messages → (queue, error reports,
+feedback, bookmarks), and <code>posts</code> → (comments, post_likes). Deleting a <code>knowledge_docs</code>
+cascades to its <code>knowledge_chunks</code>.</li>
+<li><strong>Soft delete for accounts:</strong> <code>DELETE /auth/account</code> does <strong>not</strong> hard-delete the user
+row (which would break chat/report history FKs). It sets <code>is_active=false</code>, nulls PII
+(<code>name</code>, <code>village</code>, <code>crops</code>), deactivates push subscriptions, and removes the user&#39;s
+uploaded images.</li>
+<li><strong>Restrictive FKs (no cascade):</strong> <code>engineer_queue.assigned_to</code>,
+<code>knowledge_docs.uploaded_by</code>, <code>notifications.created_by</code>, <code>ai_error_reports.reviewed_by</code>
+reference <code>users(id)</code> without cascade (these are staff references that should persist).</li>
+<li><strong>Polymorphic cleanup:</strong> deleting a post/comment triggers an application-level delete of
+matching <code>content_reports</code> rows (no DB cascade for the polymorphic target).</li>
+</ul>
+<hr>
+<h2>11. Migration history</h2>
+<p>Applied manually via <code>psql</code> 17 against production (no Docker → no <code>supabase db push</code>),
+then committed. Files in <code>supabase/migrations/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Timestamp</th>
+<th>File</th>
+<th>Adds</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>20260603182216</td>
+<td><code>remote_schema.sql</code></td>
+<td>Base schema: 13 tables, RPC, trigger, indexes, RLS</td>
+</tr>
+<tr>
+<td>20260603195915</td>
+<td><code>add_notifications_scheduled_at.sql</code></td>
+<td><code>notifications.scheduled_at</code> + partial index</td>
+</tr>
+<tr>
+<td>20260606000000</td>
+<td><code>enable_rls_push_notification_reads.sql</code></td>
+<td>RLS on push/notification_reads</td>
+</tr>
+<tr>
+<td>20260612090000</td>
+<td><code>knowledge_docs_embedding_error.sql</code></td>
+<td><code>error_message</code> column + <code>embedding</code> status</td>
+</tr>
+<tr>
+<td>20260615000000</td>
+<td><code>admin_audit_log.sql</code></td>
+<td><code>admin_audit_log</code> table</td>
+</tr>
+<tr>
+<td>20260621000000</td>
+<td><code>answer_feedback.sql</code></td>
+<td><code>answer_feedback</code> table (👍)</td>
+</tr>
+<tr>
+<td>20260621000001</td>
+<td><code>content_reports.sql</code></td>
+<td><code>content_reports</code> table (moderation)</td>
+</tr>
+<tr>
+<td>20260628000000</td>
+<td><code>answer_cache.sql</code></td>
+<td><code>answer_cache</code> table (L2 cache)</td>
+</tr>
+<tr>
+<td>20260629000000</td>
+<td><code>message_bookmarks.sql</code></td>
+<td><code>message_bookmarks</code> table</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>When adding a migration: create the file in <code>supabase/migrations/</code>, apply by hand with
+<code>psql</code>, then commit. Vector columns are <code>vector(1536)</code>. Write API code to degrade
+softly so a deploy that precedes the manual migration does not 500.</p>
+</blockquote>
+<p><strong>Seed Data (Tạo Admin đầu tiên):</strong>
+Để khởi tạo hệ thống sau khi tạo database mới, bạn cần tạo ít nhất 1 tài khoản <code>admin</code>. Hãy chạy file <code>seed.sql</code> (nếu có) hoặc tự INSERT thủ công vào bảng <code>users</code> với <code>role = &#39;admin&#39;</code>.</p>

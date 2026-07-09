@@ -53,7 +53,7 @@ export default function WaitEngineer() {
     start()
     document.addEventListener('visibilitychange', onVisible)
     return () => { stop(); document.removeEventListener('visibilitychange', onVisible) }
-  }, [sessionId])
+  }, [sessionId, navigate])
 
   return (
     <div style={styles.page}>

@@ -23,7 +23,7 @@ function ToastItem({ id, type = 'info', msg, duration = 3500 }) {
       setTimeout(() => remove(id), 270)
     }, duration)
     return () => clearTimeout(t)
-  }, [id, duration])
+  }, [id, duration, remove])
 
   const cfg = CONFIG[type] || CONFIG.info
 

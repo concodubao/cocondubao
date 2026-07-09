@@ -6,11 +6,11 @@ import axios from 'axios'
 
 // ─── Detect môi trường ────────────────────────────────────────────────────────
 // iPadOS 13+ báo UA là "Macintosh" → bổ sung check maxTouchPoints để bắt iPad.
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+// const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+//   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 // Safari thật (loại trừ Chrome/Edge/Firefox/Opera trên iOS lẫn desktop)
-const isSafari = /^((?!chrome|android|crios|fxios|edg|opr).)*safari/i.test(navigator.userAgent)
-const hasWebSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+// const isSafari = /^((?!chrome|android|crios|fxios|edg|opr).)*safari/i.test(navigator.userAgent)
+// const hasWebSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
 // Web Speech API trên Chrome Desktop đôi khi bị lỗi silent (không nhận diện được 
 // dù có tiếng) do xung đột microphone hoặc lỗi kết nối ngầm tới Google Server.
@@ -246,6 +246,7 @@ export function useSTT() {
     setError(null)
     if (USE_WEB_SPEECH) startWebSpeech()
     else startMediaRecorder()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const stopListening = useCallback(() => {

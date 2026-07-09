@@ -69,6 +69,7 @@ function MicButton({ isListening, isProcessing, onStart, onStop }) {
 function CountdownBar({ isListening, maxSeconds = 30 }) {
   const [seconds, setSeconds] = useState(maxSeconds)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!isListening) { setSeconds(maxSeconds); return }
     const interval = setInterval(() => setSeconds(s => s <= 1 ? 0 : s - 1), 1000)
     return () => clearInterval(interval)

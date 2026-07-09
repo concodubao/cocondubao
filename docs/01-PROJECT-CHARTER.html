@@ -1,0 +1,419 @@
+<h1>Project Charter &amp; Business Requirements — Cò Con Dự Báo</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Document</strong></td>
+<td>01 — Project Charter / Business Requirements Document (BRD)</td>
+</tr>
+<tr>
+<td><strong>Product</strong></td>
+<td>Cò Con Dự Báo (&quot;Little Stork Forecast&quot;)</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Baseline / Pilot (as of 2026-06-30)</td>
+</tr>
+<tr>
+<td><strong>Sponsor</strong></td>
+<td>Trường Khánh agricultural cooperative (commune-level)</td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td><a href="02-SRS.md">02-SRS</a> · <a href="03-ARCHITECTURE.md">03-ARCHITECTURE</a> · <a href="07-RISK-REGISTER.md">07-RISK-REGISTER</a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-executive-summary">Executive summary</a></li>
+<li><a href="#2-problem-statement--business-case">Problem statement &amp; business case</a></li>
+<li><a href="#3-vision--mission">Vision &amp; mission</a></li>
+<li><a href="#4-goals-objectives--success-metrics">Goals, objectives &amp; success metrics</a></li>
+<li><a href="#5-scope">Scope</a></li>
+<li><a href="#6-deliverables">Deliverables</a></li>
+<li><a href="#7-stakeholders--roles">Stakeholders &amp; roles</a></li>
+<li><a href="#8-target-users-personas">Target users (personas)</a></li>
+<li><a href="#9-assumptions--constraints">Assumptions &amp; constraints</a></li>
+<li><a href="#10-high-level-milestones">High-level milestones</a></li>
+<li><a href="#11-budget--resources">Budget &amp; resources</a></li>
+<li><a href="#12-high-level-risks">High-level risks</a></li>
+<li><a href="#13-governance--ways-of-working">Governance &amp; ways of working</a></li>
+</ol>
+<hr>
+<h2>1. Executive summary</h2>
+<p><strong>Cò Con Dự Báo</strong> is a Progressive Web App that gives farmers in Trường Khánh commune
+(Sóc Trăng province, Vietnam) instant, trustworthy agricultural advice. A farmer asks a
+question by <strong>text, voice, or photo</strong>; an AI assistant answers using a curated agronomy
+knowledge base (RAG), and <strong>hard questions are routed to human agronomists</strong>. The product
+also provides a community feed, weather information and alerts, and broadcast
+notifications, plus administrative tooling for the cooperative.</p>
+<p>The project&#39;s guiding principle is <strong>&quot;address risks and limitations first, then expand
+features&quot;</strong> — reflected in a backlog that prioritized correctness, security, cost
+control, and operability before new capabilities.</p>
+<hr>
+<h2>2. Problem statement &amp; business case</h2>
+<h3>2.1 Problem</h3>
+<p>Smallholder farmers in the Mekong Delta face crop diseases, pests, fertilization
+decisions, and weather risks daily, but expert agronomic advice is scarce, slow, and
+often inaccessible to <strong>elderly, low-literacy users</strong> with only a basic smartphone. Wrong
+or delayed advice translates directly into crop loss and financial harm. Generic search
+or chatbots are unreliable for local crops and may give confidently wrong answers.</p>
+<h3>2.2 Why now / why this approach</h3>
+<ul>
+<li>LLMs can now converse in natural Southern-Vietnamese, but <strong>need grounding</strong> to be
+trustworthy → a RAG pipeline over a <strong>curated, expert-reviewed</strong> knowledge base.</li>
+<li>A <strong>human-in-the-loop</strong> escalation keeps answers safe where the AI is uncertain, and
+feeds expert answers back into the knowledge base (a virtuous loop).</li>
+<li>A <strong>PWA</strong> avoids app-store friction and runs on cheap Android phones.</li>
+</ul>
+<h3>2.3 Expected benefits</h3>
+<ul>
+<li>Faster, more consistent answers to common agronomy questions, 24/7.</li>
+<li>Reduced agronomist workload on repetitive questions (handled by curated QA / cache).</li>
+<li>A growing, locally-relevant knowledge base owned by the cooperative.</li>
+<li>A communication channel (notifications, weather alerts) to the farming community.</li>
+</ul>
+<hr>
+<h2>3. Vision &amp; mission</h2>
+<ul>
+<li><strong>Vision:</strong> every farmer in the commune has an expert agronomist &quot;in their pocket.&quot;</li>
+<li><strong>Mission:</strong> deliver reliable, plain-language, locally-grounded agricultural advice
+through an accessible PWA, backed by human experts, at near-zero running cost.</li>
+</ul>
+<hr>
+<h2>4. Goals, objectives &amp; success metrics</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Objective</th>
+<th>Success metric (KPI)</th>
+<th>Target (pilot)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>O1</td>
+<td>Answer common questions without human effort</td>
+<td>Share of questions resolved by AI (FAQ/cache/<code>qa_direct</code>/RAG ≥ 0.7)</td>
+<td>Majority of repeat/common questions*</td>
+</tr>
+<tr>
+<td>O2</td>
+<td>Keep answers trustworthy</td>
+<td>Low-confidence questions escalated, not guessed</td>
+<td>100% of confidence &lt; 0.5 (agronomy) escalated</td>
+</tr>
+<tr>
+<td>O3</td>
+<td>Respond quickly to escalations (SLA)</td>
+<td>Avg engineer response time (<code>avgResponseHours</code>)</td>
+<td>≤ 24 h (SLA monitored by Admin/HTX; overdue flagged for follow-up)</td>
+</tr>
+<tr>
+<td>O4</td>
+<td>Operate within free-tier cost</td>
+<td>Monthly infra cost</td>
+<td>~0 (Railway/Vercel/Supabase/Gemini/Open-Meteo free tier)</td>
+</tr>
+<tr>
+<td>O5</td>
+<td>Be usable by elderly farmers</td>
+<td>Successful unaided task completion (ask + read answer)</td>
+<td>Qualitative pilot feedback</td>
+</tr>
+<tr>
+<td>O6</td>
+<td>Continuously improve the KB</td>
+<td>Curated QAs added from engineer answers + 👍/👎 review</td>
+<td>Steady growth; 👎 cases converted</td>
+</tr>
+<tr>
+<td>O7</td>
+<td>Operate reliably</td>
+<td>Uptime via <code>/health</code> monitor; errors triaged in Sentry</td>
+<td>High availability; no unhandled error backlog</td>
+</tr>
+</tbody></table>
+<p>* The system instruments <code>ragRate</code> (share of recent answers with confidence ≥ 0.7) and
+queue/feedback counts in the admin dashboard; exact pilot targets are set with the
+cooperative. Figures here are objectives, not measured results.</p>
+<hr>
+<h2>5. Scope</h2>
+<h3>5.1 In scope (v1.0)</h3>
+<ul>
+<li>Multi-role accounts (farmer / engineer / admin) with phone+PIN and email+password auth.</li>
+<li>AI Q&amp;A by text, photo (vision), and voice (STT), with RAG grounding and caching.</li>
+<li>Human escalation queue and engineer answering workflow.</li>
+<li>Knowledge-base ingestion (PDF/DOCX/TXT) and curated Q&amp;A authoring + embedding.</li>
+<li>AI quality review, knowledge-gap surfacing, and feedback (👍/👎) loops.</li>
+<li>Community feed (posts/comments/likes) with reporting and admin moderation.</li>
+<li>Notifications: broadcast, scheduled, and system-generated weather-alert drafts.</li>
+<li>Weather information (Open-Meteo).</li>
+<li>Admin tooling: user management, role/lock control, PIN reset, audit log, CSV export,
+analytics dashboard.</li>
+<li>Observability (Sentry), quota monitoring, and an operations runbook.</li>
+</ul>
+<h3>5.2 Out of scope (v1.0)</h3>
+<ul>
+<li>Payments / e-commerce / input marketplace.</li>
+<li>IoT / field-sensor integration.</li>
+<li>Native iOS/Android apps (PWA only).</li>
+<li>Multi-commune / multi-tenant deployment and horizontal scaling.</li>
+<li>Full offline operation beyond PWA shell caching.</li>
+<li>Replacing the OTP/SMS provider (deferred; Twilio kept but flagged).</li>
+</ul>
+<h3>5.3 Scope boundary notes</h3>
+<p>The architecture is intentionally <strong>pilot-scoped to a single backend replica</strong>; scaling
+out is explicitly deferred with a documented migration path (see
+<a href="03-ARCHITECTURE.md#13-scalability--the-single-replica-constraint">Architecture §13</a>).</p>
+<hr>
+<h2>6. Deliverables</h2>
+<table>
+<thead>
+<tr>
+<th>Deliverable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Frontend PWA</td>
+<td>React PWA on Vercel (<code>cocondubao.vercel.app</code>)</td>
+</tr>
+<tr>
+<td>Backend API</td>
+<td>Express REST API on Railway</td>
+</tr>
+<tr>
+<td>Database</td>
+<td>Supabase Postgres + pgvector schema &amp; migrations</td>
+</tr>
+<tr>
+<td>Knowledge base</td>
+<td>Curated agronomy documents + Q&amp;A, embedded</td>
+</tr>
+<tr>
+<td>Documentation set</td>
+<td>This SDLC suite (<code>docs/01</code>–<code>07</code>) + user manuals (<code>docs/HUONG-DAN-*</code>)</td>
+</tr>
+<tr>
+<td>Operations runbook</td>
+<td><code>OPERATIONS.md</code> (backup, monitoring, quota)</td>
+</tr>
+<tr>
+<td>Quality assets</td>
+<td>Test suites (vitest/Playwright) + RAG eval framework (<code>backend/eval/</code>)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. Stakeholders &amp; roles</h2>
+<table>
+<thead>
+<tr>
+<th>Stakeholder</th>
+<th>Interest / role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Farmers</strong></td>
+<td>Primary end users; ask questions, read answers, receive alerts</td>
+</tr>
+<tr>
+<td><strong>Agronomists (engineers)</strong></td>
+<td>Answer escalations, curate the knowledge base, review AI quality</td>
+</tr>
+<tr>
+<td><strong>Cooperative admin/staff</strong></td>
+<td>Manage users, broadcast information, moderate community, review analytics</td>
+</tr>
+<tr>
+<td><strong>Project owner / developer</strong></td>
+<td>Build, deploy, operate, and maintain the system</td>
+</tr>
+<tr>
+<td><strong>Commune authority (sponsor)</strong></td>
+<td>Endorses and promotes adoption</td>
+</tr>
+<tr>
+<td><strong>External providers</strong></td>
+<td>Google (Gemini), Supabase, Vercel, Railway, Open-Meteo, Twilio</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>RACI is lightweight for a pilot: the developer is Responsible for build/run; engineers
+are Responsible for knowledge quality; admin is Accountable for community &amp; user
+governance; the cooperative is Consulted/Informed on direction.</p>
+</blockquote>
+<hr>
+<h2>8. Target users (personas)</h2>
+<ul>
+<li><strong>Bác Bảy (farmer, ~60):</strong> grows rice; basic Android phone; reads slowly; prefers
+speaking and taking photos; needs big text and very plain language outdoors.</li>
+<li><strong>Kỹ sư Hân (agronomist):</strong> answers the queue between field visits; wants an efficient
+workflow and to avoid re-answering the same question (curated QA).</li>
+<li><strong>Anh Tâm (cooperative admin):</strong> manages members, sends seasonal/weather notices,
+keeps the community civil, watches basic analytics.</li>
+</ul>
+<p>Full requirements derived from these personas are in <a href="02-SRS.md#23-user-classes">02-SRS §2.3</a>.</p>
+<hr>
+<h2>9. Assumptions &amp; constraints</h2>
+<h3>9.1 Assumptions</h3>
+<ul>
+<li>Farmers have a smartphone with a modern browser and intermittent internet.</li>
+<li>The cooperative provides agronomist time to staff the queue and curate knowledge.</li>
+<li>Pilot user base is on the order of tens of users (single commune).</li>
+</ul>
+<h3>9.2 Constraints</h3>
+<ul>
+<li><strong>Cost:</strong> must run on free tiers → scarce Gemini quota is the dominant technical
+constraint (primary source of 429 errors).</li>
+<li><strong>Single replica:</strong> in-process cache/rate-limit/schedulers; scaling needs Redis + locks.</li>
+<li><strong>Operations:</strong> no Docker locally → manual <code>psql</code> migrations; auto-deploy on <code>git push</code>.</li>
+<li><strong>Language/locale:</strong> all content in Vietnamese; AI tuned to Southern-Vietnamese phrasing.</li>
+</ul>
+<hr>
+<h2>10. High-level milestones</h2>
+<blockquote>
+<p>The project was built iteratively in review-driven &quot;đợt&quot; (waves), risk-first. Dates
+reflect delivered work in the repository history (see <a href="../CHANGELOG.md">CHANGELOG</a>).</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Focus</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>M1 — Core platform</td>
+<td>Auth, chat/RAG, engineer queue, knowledge base, community, notifications, weather</td>
+<td>✅ Delivered</td>
+</tr>
+<tr>
+<td>M2 — Risk hardening (waves 1–3)</td>
+<td>Push/SW fixes, account lockout denylist, crop-filter, IDOR, OTP enumeration, storage cleanup, rate-limit keys, semantic cache</td>
+<td>✅ Delivered (G1–G22, H1–H15)</td>
+</tr>
+<tr>
+<td>M3 — Productization (2026-06-28→30)</td>
+<td>LLM stack migration (<code>@google/genai</code>, thinking off), bundle/image perf, frontend tests, Sentry, security review, RAG eval, ops runbook</td>
+<td>✅ Delivered (I1–I6, J1–J3)</td>
+</tr>
+<tr>
+<td>M4 — Documentation baseline</td>
+<td>Full SDLC document suite (this set)</td>
+<td>✅ In progress</td>
+</tr>
+<tr>
+<td>M5 — Scale &amp; growth (future)</td>
+<td>Redis + distributed locks, Gemini billing, pgvector tuning, differential QA, OTP provider swap</td>
+<td>⬜ Backlog</td>
+</tr>
+</tbody></table>
+<p>See <a href="07-RISK-REGISTER.md">07-RISK-REGISTER</a> and <a href="../IMPROVEMENTS.md">IMPROVEMENTS.md</a> for
+the detailed, ID-tracked backlog.</p>
+<hr>
+<h2>11. Budget &amp; resources</h2>
+<ul>
+<li><strong>Financial:</strong> target <strong>~0 recurring cost</strong> using free tiers (Railway, Vercel,
+Supabase, Gemini, Open-Meteo). The single explicit paid upgrade on the roadmap is
+<strong>enabling Gemini billing</strong>, which is the definitive fix for quota 429s.</li>
+<li><strong>Human:</strong> primarily a solo developer for build/run; agronomist volunteer/staff time
+for the queue and knowledge curation; admin time from the cooperative.</li>
+<li><strong>Technical:</strong> Node.js/React skill set; Postgres/pgvector; prompt &amp; RAG engineering.</li>
+</ul>
+<hr>
+<h2>12. High-level risks</h2>
+<p>Summarized here; tracked in full in <a href="07-RISK-REGISTER.md">07-RISK-REGISTER</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Impact</th>
+<th>Mitigation summary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Gemini free-tier quota exhaustion (429)</td>
+<td>Answers fail at peak</td>
+<td>Tiered cache + curated QA + retries; enable billing (roadmap)</td>
+</tr>
+<tr>
+<td>Incorrect AI advice</td>
+<td>Crop/financial harm</td>
+<td>Confidence gating, escalation, curated KB, disclaimers, eval framework</td>
+</tr>
+<tr>
+<td>Single replica limits</td>
+<td>No horizontal scaling</td>
+<td>Documented Redis/lock migration path</td>
+</tr>
+<tr>
+<td>SMS (OTP) deliverability in VN</td>
+<td>Onboarding friction</td>
+<td>Phone+PIN primary; OTP optional; provider swap planned</td>
+</tr>
+<tr>
+<td>Operator key-person dependence</td>
+<td>Maintenance risk</td>
+<td>Documentation suite, runbook, Sentry, tests</td>
+</tr>
+<tr>
+<td>PWA stale cache after deploy</td>
+<td>Users see old code</td>
+<td>Auto-reload on SW update; documented behavior</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>13. Governance &amp; ways of working</h2>
+<ul>
+<li><strong>Source of truth:</strong> <code>AI-CONTEXT.md</code> (current state + LLM stack + gotchas) and
+<code>IMPROVEMENTS.md</code> (backlog) are the shared memory; <code>CLAUDE.md</code> documents architecture &amp;
+conventions for contributors (human and AI).</li>
+<li><strong>Change management:</strong> work proceeds in risk-first waves; each change is committed with
+a descriptive message; deploys are automatic on push to <code>master</code>.</li>
+<li><strong>Quality gates:</strong> vitest (backend) + vitest/Testing Library + Playwright (frontend);
+ESLint; a RAG eval suite (<code>npm run eval</code>) intended to gate prompt/model/threshold
+changes; periodic security review.</li>
+<li><strong>Decision records:</strong> significant technical decisions captured as ADRs in
+<a href="03-ARCHITECTURE.md#14-architecture-decision-records-adr">03-ARCHITECTURE §14</a>.</li>
+</ul>
+<hr>
+<h2>14. Glossary (Thuật ngữ)</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Definition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>HTX</strong></td>
+<td>Hợp tác xã (Agricultural Cooperative) - The governing body managing the deployment.</td>
+</tr>
+<tr>
+<td><strong>Cò Con</strong></td>
+<td>Project nickname (&quot;Little Stork&quot;) representing a friendly, localized assistant.</td>
+</tr>
+<tr>
+<td><strong>SLA</strong></td>
+<td>Service Level Agreement - Formal commitments (e.g., &lt;= 24h response time) monitored by HTX.</td>
+</tr>
+<tr>
+<td><strong>Engineer</strong></td>
+<td>Kỹ sư nông nghiệp (Agronomist) - Human experts who answer escalated questions.</td>
+</tr>
+</tbody></table>
+<hr>
+<p><em>This charter establishes the why, what, and boundaries of the project. Requirements are
+detailed in the <a href="02-SRS.md">SRS</a>; the technical design is in the
+<a href="03-ARCHITECTURE.md">Architecture</a>.</em></p>

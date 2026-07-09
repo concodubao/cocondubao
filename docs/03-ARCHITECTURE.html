@@ -1,0 +1,1068 @@
+<h1>Software Design Document (SDD) — Cò Con Dự Báo</h1>
+<blockquote>
+<p>System Architecture &amp; Technical Design</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Document</strong></td>
+<td>03 — Software Design Document / System Architecture</td>
+</tr>
+<tr>
+<td><strong>Product</strong></td>
+<td>Cò Con Dự Báo — Agricultural advisory PWA</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Baseline (reflects <code>master</code> @ 2026-06-30)</td>
+</tr>
+<tr>
+<td><strong>Audience</strong></td>
+<td>Engineers, technical reviewers, new contributors</td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td><a href="02-SRS.md">02-SRS</a> · <a href="04-DATABASE.md">04-DATABASE</a> · <a href="05-API.md">05-API</a> · <a href="07-RISK-REGISTER.md">07-RISK-REGISTER</a> · <a href="../OPERATIONS.md">OPERATIONS</a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-abstract">Abstract</a></li>
+<li><a href="#2-architectural-goals--constraints">Architectural goals &amp; constraints</a></li>
+<li><a href="#3-system-context-c4-level-1">System context (C4 L1)</a></li>
+<li><a href="#4-container-view-c4-level-2">Container view (C4 L2)</a></li>
+<li><a href="#5-deployment-topology">Deployment topology</a></li>
+<li><a href="#6-technology-stack">Technology stack</a></li>
+<li><a href="#7-backend-architecture">Backend architecture</a></li>
+<li><a href="#8-the-rag-subsystem-core">The RAG subsystem</a></li>
+<li><a href="#9-engineer-escalation-flow">Engineer escalation flow</a></li>
+<li><a href="#10-notification-subsystem">Notification subsystem</a></li>
+<li><a href="#11-frontend-architecture">Frontend architecture</a></li>
+<li><a href="#12-cross-cutting-concerns">Cross-cutting concerns</a></li>
+<li><a href="#13-scalability--the-single-replica-constraint">Scalability &amp; the single-replica constraint</a></li>
+<li><a href="#14-architecture-decision-records-adr">Architecture Decision Records (ADR)</a></li>
+<li><a href="#15-diagram-index">Diagram index</a></li>
+</ol>
+<hr>
+<h2>1. Abstract</h2>
+<p><strong>Cò Con Dự Báo</strong> (&quot;Little Stork Forecast&quot;) is a Progressive Web App (PWA) that gives
+farmers in Trường Khánh commune (Sóc Trăng province, Vietnam) on-demand agricultural
+advice. A farmer asks a question by text, voice, or photo; the system answers using a
+<strong>Retrieval-Augmented Generation (RAG)</strong> pipeline backed by a curated agronomy
+knowledge base, and <strong>escalates hard questions to human agronomists</strong> (&quot;engineers&quot;).</p>
+<p>The system is a two-package monorepo:</p>
+<ul>
+<li><strong><code>frontend/</code></strong> — React 19 + Vite + Tailwind v4 PWA, deployed on <strong>Vercel</strong>.</li>
+<li><strong><code>backend/</code></strong> — Express (ESM) REST API, deployed on <strong>Railway</strong> (single replica).</li>
+<li><strong><code>supabase/</code></strong> — Postgres 17 + <code>pgvector</code> + Storage, the system of record.</li>
+</ul>
+<p>External AI capability is provided by <strong>Google Gemini</strong> (<code>@google/genai</code>): one model
+family for embeddings, one for text/vision generation.</p>
+<p>The design optimizes for three forces that dominate every decision: (1) <strong>end users are
+elderly, low-literacy farmers on cheap phones in bright sunlight</strong> → mobile-first,
+high-contrast, voice/photo input, plain Vietnamese; (2) <strong>Gemini free-tier quota is
+extremely scarce</strong> → a layered caching/short-circuit strategy that minimizes LLM calls;
+(3) <strong>a single backend replica</strong> → all stateful concerns (cache, rate-limit, schedulers,
+lockouts) are in-process and explicitly documented as such.</p>
+<hr>
+<h2>2. Architectural goals &amp; constraints</h2>
+<h3>2.1 Quality goals (prioritized)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Goal</th>
+<th>Why it dominates</th>
+<th>Where it shows up</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><strong>Cost / quota efficiency</strong></td>
+<td>Gemini free tier ≈ tens of generate requests/day per model</td>
+<td>FAQ short-circuit, 3-tier cache, <code>qa_direct</code> direct-serve, off-topic gate</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Usability for low-literacy users</strong></td>
+<td>Primary persona is elderly farmers</td>
+<td>Voice (STT/TTS), image diagnosis, plain language, large fonts</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Answer trustworthiness</strong></td>
+<td>Wrong agronomy advice = real crop/financial damage</td>
+<td>Confidence bands, human escalation, curated QA, disclaimers</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Security &amp; privacy</strong></td>
+<td>PII of villagers (phone, name, hamlet)</td>
+<td>JWT + RBAC + RLS, IDOR checks, account denylist</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>Operability</strong></td>
+<td>Volunteer/solo maintenance</td>
+<td>Sentry, <code>/health</code>, runbook, soft-degrade on missing tables</td>
+</tr>
+</tbody></table>
+<h3>2.2 Hard constraints</h3>
+<ul>
+<li><strong>No Docker on the maintainer&#39;s machine</strong> → migrations are applied manually with
+<code>psql</code> 17 against production; code must <strong>degrade softly</strong> when a table is missing.</li>
+<li><strong>Single Railway replica</strong> → in-process scheduler/cache/rate-limit are correct <em>only</em>
+at one replica. Scaling out requires Redis + distributed locks (see §13).</li>
+<li><strong>Auto-deploy on <code>git push</code></strong> (Railway watches <code>backend/</code>, Vercel watches
+<code>frontend/</code>). No manual deploy step; a fix only reaches production after push.</li>
+<li><strong>Free-tier everything</strong> (Railway, Vercel, Supabase, Gemini, Open-Meteo) — the
+architecture must keep request volume low and tolerate provider 429/503.</li>
+</ul>
+<hr>
+<h2>3. System context (C4 Level 1)</h2>
+<pre><code class="language-mermaid">graph TB
+    farmer([👨‍🌾 Farmer&lt;br/&gt;elderly, mobile, voice/photo])
+    engineer([👨‍🔬 Agronomist / Engineer])
+    admin([🛠️ Admin / Cooperative staff])
+
+    subgraph system [Cò Con Dự Báo]
+        pwa[PWA Frontend&lt;br/&gt;React PWA on Vercel]
+        api[REST API&lt;br/&gt;Express on Railway]
+    end
+
+    gemini[[Google Gemini&lt;br/&gt;embeddings + generation + vision]]
+    supabase[[Supabase&lt;br/&gt;Postgres + pgvector + Storage]]
+    openmeteo[[Open-Meteo&lt;br/&gt;weather forecast]]
+    twilio[[Twilio via Supabase Auth&lt;br/&gt;SMS OTP]]
+    webpushsvc[[Browser Push Services&lt;br/&gt;FCM / APNs / Mozilla]]
+
+    farmer --&gt;|asks questions, reads answers| pwa
+    engineer --&gt;|answers queue, curates KB| pwa
+    admin --&gt;|manages users, broadcasts, moderation| pwa
+    pwa --&gt;|HTTPS JSON, JWT| api
+
+    api --&gt;|embed / generate / vision| gemini
+    api --&gt;|SQL + RPC + Storage| supabase
+    api --&gt;|daily forecast| openmeteo
+    api --&gt;|send OTP| twilio
+    api --&gt;|Web Push| webpushsvc
+    webpushsvc -.-&gt;|notification| farmer
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<p><strong>Actors</strong></p>
+<ul>
+<li><strong>Farmer</strong> — asks questions, uploads pest photos, reads answers, uses the community
+feed and weather, receives push notifications.</li>
+<li><strong>Engineer (agronomist)</strong> — answers escalated questions, uploads/approves knowledge
+documents, authors curated Q&amp;A, reviews AI answer quality.</li>
+<li><strong>Admin</strong> — manages user accounts (lock/unlock, roles, PIN reset), broadcasts
+notifications, approves weather-alert drafts, moderates the community, views analytics.</li>
+</ul>
+<p><strong>External systems</strong></p>
+<ul>
+<li><strong>Gemini</strong> — embeddings (<code>gemini-embedding-001</code>, 1536-dim) and generation/vision
+(<code>gemini-2.5-flash</code>, <code>gemini-2.5-flash-lite</code> for STT).</li>
+<li><strong>Supabase</strong> — Postgres 17 (system of record) with <code>pgvector</code>, plus an <code>images</code>
+Storage bucket.</li>
+<li><strong>Open-Meteo</strong> — free daily forecast for the weather widget and weather-alert drafts.</li>
+<li><strong>Twilio</strong> (via Supabase Auth) — SMS OTP for farmer phone verification (kept but
+flagged for replacement; Twilio deliverability is poor in Vietnam).</li>
+<li><strong>Browser push services</strong> — deliver Web Push notifications.</li>
+</ul>
+<hr>
+<h2>4. Container view (C4 Level 2)</h2>
+<pre><code class="language-mermaid">graph TB
+    subgraph client [Client — Browser / PWA]
+        ui[React 19 SPA&lt;br/&gt;Tailwind v4]
+        sw[Service Worker&lt;br/&gt;Workbox + Web Push]
+        store[Zustand + React Query&lt;br/&gt;localStorage cocon-auth]
+    end
+
+    subgraph railway [Railway — Express API single replica]
+        helmet[helmet + CORS]
+        rl[Rate limiters&lt;br/&gt;chat 15/min · auth 30/min · otp 5/min]
+        jwtmw[verifyJWT + requireRole&lt;br/&gt;+ in-memory denylist]
+        routes[Routers: auth · chat · engineer/knowledge · admin · community · push/notifications]
+        ragsvc[RAG service&lt;br/&gt;services/rag.js]
+        notif[Notification + web-push services]
+        sched[In-process schedulers x4]
+    end
+
+    subgraph supabase [Supabase]
+        pg[(Postgres 17&lt;br/&gt;+ pgvector)]
+        rpc{{RPC match_knowledge_chunks}}
+        storage[(Storage bucket images)]
+    end
+
+    gemini[[Gemini @google/genai]]
+    meteo[[Open-Meteo]]
+
+    ui --&gt; store
+    ui --&gt;|axios + JWT| helmet
+    sw -. push .- ui
+    helmet --&gt; rl --&gt; jwtmw --&gt; routes
+    routes --&gt; ragsvc
+    routes --&gt; notif
+    ragsvc --&gt;|embed / generate| gemini
+    ragsvc --&gt;|vector search| rpc
+    rpc --&gt; pg
+    routes --&gt;|SQL service key| pg
+    routes --&gt;|upload / public URL| storage
+    sched --&gt; pg
+    sched --&gt;|forecast| meteo
+    notif --&gt;|Web Push| sw
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<h3>4.1 Module map (backend)</h3>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>backend/src/index.js</code></td>
+<td>App wiring: helmet, CORS, rate limiters, route mounts, <code>/health</code>, scheduler bootstrap, Sentry error handler</td>
+</tr>
+<tr>
+<td><code>backend/src/instrument.js</code></td>
+<td>Sentry init — imported <strong>first</strong> (ESM hoist)</td>
+</tr>
+<tr>
+<td><code>backend/src/middleware/auth.js</code></td>
+<td><code>verifyJWT</code>, <code>requireRole</code>, in-memory account denylist + 60s sync poller</td>
+</tr>
+<tr>
+<td><code>backend/src/routes/auth.js</code></td>
+<td>Registration/login (phone+PIN, email+password), OTP, profile, account deletion</td>
+</tr>
+<tr>
+<td><code>backend/src/routes/chat.js</code></td>
+<td>Ask (text/image), STT fallback, escalate, error report, feedback, bookmarks, history</td>
+</tr>
+<tr>
+<td><code>backend/src/routes/engineer.js</code></td>
+<td>Engineer queue + knowledge base (upload/approve/embed/QA) — mounted at <code>/engineer</code> <strong>and</strong> <code>/knowledge</code></td>
+</tr>
+<tr>
+<td><code>backend/src/routes/admin.js</code></td>
+<td>Users, stats, AI-error review, knowledge gaps, audit log, CSV export</td>
+</tr>
+<tr>
+<td><code>backend/src/routes/community.js</code></td>
+<td>Posts, comments, likes, content reports, admin moderation</td>
+</tr>
+<tr>
+<td><code>backend/src/routes/push.js</code></td>
+<td>Push subscribe/unsubscribe, broadcast send, scheduled &amp; weather drafts, notification read/settings — mounted at <code>/push</code> <strong>and</strong> <code>/notifications</code></td>
+</tr>
+<tr>
+<td><code>backend/src/services/rag.js</code></td>
+<td>The RAG pipeline (<code>askRAG</code>), embedding, splitter, caches, FAQ/off-topic gates, <code>embedAndStoreDoc</code></td>
+</tr>
+<tr>
+<td><code>backend/src/services/notifications.js</code></td>
+<td><code>dispatchNotification</code>, quiet-hours, scheduled-notification scheduler</td>
+</tr>
+<tr>
+<td><code>backend/src/services/webpush.js</code></td>
+<td><code>notifyEngineer</code>, <code>notifyFarmer</code></td>
+</tr>
+<tr>
+<td><code>backend/src/services/weatherAlerts.js</code></td>
+<td>Weather forecast evaluation → draft alerts for admin approval</td>
+</tr>
+<tr>
+<td><code>backend/src/services/storageCleanup.js</code></td>
+<td>Delete pest images &gt; 30 days</td>
+</tr>
+<tr>
+<td><code>backend/src/services/quotaMonitor.js</code></td>
+<td>In-process Gemini RPM/RPD counter + 80% Sentry alert</td>
+</tr>
+<tr>
+<td><code>backend/src/services/supabase.js</code></td>
+<td>Supabase service-role client singleton</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Deployment topology</h2>
+<pre><code class="language-mermaid">graph LR
+    dev[Developer] --&gt;|git push master| gh[(GitHub repo)]
+    gh --&gt;|watch frontend/| vercel[Vercel&lt;br/&gt;cocondubao.vercel.app&lt;br/&gt;PWA static + CDN]
+    gh --&gt;|watch backend/| railway[Railway&lt;br/&gt;laudable-happiness&lt;br/&gt;Node ESM · 1 replica]
+
+    browser[Farmer browser/PWA] --&gt;|HTTPS| vercel
+    browser --&gt;|HTTPS /api/v1| railway
+
+    railway --&gt;|Session pooler| supadb[(Supabase Postgres&lt;br/&gt;ref mcloxncymnhiuubjzgbh)]
+    railway --&gt; sentry[[Sentry]]
+    vercel --&gt; sentry
+    railway --&gt;|healthcheck /health| railway
+
+    maintainer[Maintainer] -.-&gt;|psql 17 manual migrations| supadb
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<p><strong>Key facts</strong></p>
+<ul>
+<li>Both tiers <strong>auto-deploy on <code>git push</code></strong> to <code>master</code>. There is no separate deploy
+command; production runs old code until a push + redeploy completes.</li>
+<li>The PWA&#39;s service worker caches aggressively → a new deploy does not reach an open
+session until a real reload. &quot;Still broken after deploy&quot; usually means stale SW cache.</li>
+<li><strong>Migrations are applied manually</strong> by the maintainer with <code>psql</code> 17 over the Supabase
+Session pooler (no Docker → no <code>supabase db push</code>). Code is written to degrade softly
+when a not-yet-applied table is queried.</li>
+<li>Railway has <code>healthcheckPath: /health</code> configured (<code>railway.json</code>).</li>
+<li>Backend turns on production behavior (Sentry, etc.) only when <code>NODE_ENV=production</code> is
+set in Railway.</li>
+</ul>
+<h3>5.1 In-process schedulers (started in <code>index.js</code> on boot)</h3>
+<table>
+<thead>
+<tr>
+<th>Scheduler</th>
+<th>Interval</th>
+<th>Source</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>startNotificationScheduler</code></td>
+<td>60 s</td>
+<td><code>services/notifications.js</code></td>
+<td>Send scheduled notifications whose <code>scheduled_at &lt;= now()</code></td>
+</tr>
+<tr>
+<td><code>startUserStatusSync</code></td>
+<td>60 s</td>
+<td><code>middleware/auth.js</code></td>
+<td>Refresh in-memory denylist of locked accounts from DB</td>
+</tr>
+<tr>
+<td><code>startWeatherAlertScheduler</code></td>
+<td>6 h</td>
+<td><code>services/weatherAlerts.js</code></td>
+<td>Create weather-alert drafts for admin approval</td>
+</tr>
+<tr>
+<td><code>startStorageCleanupScheduler</code></td>
+<td>24 h</td>
+<td><code>services/storageCleanup.js</code></td>
+<td>Delete pest images older than 30 days</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>⚠️ All four are <strong>in-process <code>setInterval</code> timers</strong>, correct only at a single replica.
+The scheduled-notification loop guards against overlap with a <code>_processing</code> flag; a
+multi-replica deployment would double-send without a distributed lock (see §13).</p>
+</blockquote>
+<hr>
+<h2>6. Technology stack</h2>
+<h3>6.1 Backend (<code>backend/package.json</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Runtime</td>
+<td>Node.js (ESM, <code>&quot;type&quot;:&quot;module&quot;</code>)</td>
+<td></td>
+</tr>
+<tr>
+<td>Web framework</td>
+<td>Express 4</td>
+<td><code>trust proxy = 1</code> (Railway is behind a reverse proxy)</td>
+</tr>
+<tr>
+<td>AI SDK</td>
+<td><code>@google/genai</code> ^2.10</td>
+<td>Unified Google SDK; <strong>required</strong> for <code>thinkingConfig</code> (old <code>@google/generative-ai</code> 400s on prod)</td>
+</tr>
+<tr>
+<td>DB / auth backend</td>
+<td><code>@supabase/supabase-js</code> ^2</td>
+<td>Service-role key for backend access</td>
+</tr>
+<tr>
+<td>Auth tokens</td>
+<td><code>jsonwebtoken</code></td>
+<td>Self-signed JWT (7d email / 30d phone). <strong>Not</strong> Supabase Auth for sessions</td>
+</tr>
+<tr>
+<td>Password hashing</td>
+<td><code>bcrypt</code></td>
+<td>cost 10 (create) / 12 (set/change)</td>
+</tr>
+<tr>
+<td>Security headers</td>
+<td><code>helmet</code></td>
+<td></td>
+</tr>
+<tr>
+<td>Rate limiting</td>
+<td><code>express-rate-limit</code> ^8</td>
+<td><code>ipKeyGenerator</code> for IPv6-safe IP fallback</td>
+</tr>
+<tr>
+<td>File upload</td>
+<td><code>multer</code> (memory storage)</td>
+<td>image / audio / document</td>
+</tr>
+<tr>
+<td>Image processing</td>
+<td><code>sharp</code></td>
+<td>server-side re-encode + resize (also strips metadata)</td>
+</tr>
+<tr>
+<td>DOCX/PDF extract</td>
+<td><code>mammoth</code> + <code>pdftotext</code></td>
+<td>KB ingestion</td>
+</tr>
+<tr>
+<td>Web Push</td>
+<td><code>web-push</code></td>
+<td>VAPID</td>
+</tr>
+<tr>
+<td>Error tracking</td>
+<td><code>@sentry/node</code> + profiling</td>
+<td>gated on <code>NODE_ENV=production</code></td>
+</tr>
+<tr>
+<td>Tests</td>
+<td><code>vitest</code> + <code>supertest</code></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>6.2 Frontend (<code>frontend/package.json</code>)</h3>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>UI</td>
+<td>React 19 (React Compiler enabled)</td>
+</tr>
+<tr>
+<td>Build</td>
+<td>Vite 8 (Rolldown)</td>
+</tr>
+<tr>
+<td>Styling</td>
+<td>Tailwind CSS v4 (<code>@theme</code> design tokens)</td>
+</tr>
+<tr>
+<td>PWA</td>
+<td><code>vite-plugin-pwa</code> + Workbox</td>
+</tr>
+<tr>
+<td>Server state</td>
+<td><code>@tanstack/react-query</code> (staleTime 5 min)</td>
+</tr>
+<tr>
+<td>Client state</td>
+<td><code>zustand</code> (persist key <code>cocon-auth</code>)</td>
+</tr>
+<tr>
+<td>Routing</td>
+<td><code>react-router-dom</code> 7</td>
+</tr>
+<tr>
+<td>HTTP</td>
+<td><code>axios</code> (JWT interceptor, 45s/60s chat timeouts)</td>
+</tr>
+<tr>
+<td>Icons</td>
+<td><code>lucide-react</code> + Material Symbols</td>
+</tr>
+<tr>
+<td>Error tracking</td>
+<td><code>@sentry/react</code> (gated on <code>import.meta.env.PROD</code>)</td>
+</tr>
+<tr>
+<td>Tests</td>
+<td><code>vitest</code> + Testing Library; <code>@playwright/test</code> for e2e</td>
+</tr>
+</tbody></table>
+<h3>6.3 Gemini models</h3>
+<table>
+<thead>
+<tr>
+<th>Use</th>
+<th>Model</th>
+<th>Config</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>RAG answer generation</td>
+<td><code>gemini-2.5-flash</code></td>
+<td><code>maxOutputTokens: 512</code>, <code>temperature: 0.2</code>, <code>thinkingBudget: 0</code> (thinking off → ~1.8 s vs ~6 s)</td>
+</tr>
+<tr>
+<td>Vision (pest photo)</td>
+<td><code>gemini-2.5-flash</code></td>
+<td><code>maxOutputTokens: 2048</code> — <strong>shares the quota bucket</strong> with RAG answers</td>
+</tr>
+<tr>
+<td>Speech-to-text fallback</td>
+<td><code>gemini-2.5-flash-lite</code></td>
+<td>separate quota bucket</td>
+</tr>
+<tr>
+<td>Embeddings</td>
+<td><code>gemini-embedding-001</code></td>
+<td>1536-dim, sequential @ 700 ms/req; changing it requires full re-embed</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. Backend architecture</h2>
+<h3>7.1 Request lifecycle</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant C as Client (axios + JWT)
+    participant H as helmet/CORS
+    participant RL as Rate limiter
+    participant A as verifyJWT + requireRole
+    participant R as Route handler
+    participant DB as Supabase (service key)
+    participant S as Sentry
+
+    C-&gt;&gt;H: HTTPS request /api/v1/...
+    H-&gt;&gt;RL: security headers OK
+    RL-&gt;&gt;RL: key = user:&lt;id&gt; (JWT) or IP
+    alt over limit
+        RL--&gt;&gt;C: 429 friendly message
+    else within limit
+        RL-&gt;&gt;A: pass
+        A-&gt;&gt;A: verify JWT, check denylist, check role
+        alt invalid / locked / wrong role
+            A--&gt;&gt;C: 401 / 403
+        else authorized
+            A-&gt;&gt;R: req.user attached
+            R-&gt;&gt;DB: queries (with IDOR / ownership checks)
+            DB--&gt;&gt;R: rows
+            R--&gt;&gt;C: JSON
+        end
+    end
+    Note over S: Unhandled errors → Sentry.setupExpressErrorHandler
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<h3>7.2 Routing &amp; dual-mount strategy</h3>
+<p>Routes are mounted under <code>/api/v1/*</code>. Two routers are mounted twice to give cleaner
+URLs without duplicating code:</p>
+<ul>
+<li><code>push.js</code> → <code>/api/v1/push</code> <strong>and</strong> <code>/api/v1/notifications</code></li>
+<li><code>engineer.js</code> → <code>/api/v1/engineer</code> <strong>and</strong> <code>/api/v1/knowledge</code></li>
+</ul>
+<p>Per-router middleware: <code>authLimiter</code> wraps <code>/auth</code>; <code>chatLimiter</code> wraps <code>/chat</code>. All
+protected handlers call <code>verifyJWT</code> (and <code>requireRole(...)</code> where needed) individually.</p>
+<h3>7.3 Authentication &amp; authorization (defense in depth)</h3>
+<p>Three independent layers protect data:</p>
+<ol>
+<li><strong>JWT</strong> (<code>verifyJWT</code>) — self-signed, carries <code>{ userId, phone, role, name }</code>. Bearer
+token in <code>Authorization</code>. Expiry 7 days (email accounts) / 30 days (phone accounts).</li>
+<li><strong>In-memory denylist</strong> — because tokens are long-lived, an admin lock must take effect
+before expiry. <code>markInactive</code>/<code>markActive</code> update a <code>Set&lt;userId&gt;</code> instantly; a 60 s
+poller (<code>refreshInactiveUsers</code>) re-syncs from <code>users.is_active</code> after restarts. A
+request from a locked user is rejected 401 even with a valid token.</li>
+<li><strong>Role guard</strong> (<code>requireRole</code>) — coarse RBAC at the route boundary.</li>
+<li><strong>Row-Level Security (RLS)</strong> — every table has RLS enabled. The backend uses the
+<strong>service-role key (bypasses RLS)</strong> and enforces ownership in code (IDOR checks);
+RLS is the backstop that denies any direct/anon client access. See <a href="04-DATABASE.md">04-DATABASE</a>.</li>
+</ol>
+<p><strong>Per-resource ownership (IDOR) checks</strong> are explicit in handlers, e.g. <code>isOwnSession</code>
+(chat), <code>ownsMessage</code> (bookmarks/feedback), session-ownership on history, and &quot;engineer
+may only read a chat that was actually escalated&quot;.</p>
+<h3>7.4 Rate limiting (multi-tier)</h3>
+<table>
+<thead>
+<tr>
+<th>Limiter</th>
+<th>Window</th>
+<th>Limit</th>
+<th>Key</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>chatLimiter</code></td>
+<td>60 s</td>
+<td>15</td>
+<td><code>user:&lt;id&gt;</code> else IP (<code>ipKeyGenerator</code>)</td>
+<td>A whole commune behind one 4G NAT must not block each other</td>
+</tr>
+<tr>
+<td><code>authLimiter</code></td>
+<td>60 s</td>
+<td>30</td>
+<td>IP</td>
+<td>Several people logging in at once on shared NAT</td>
+</tr>
+<tr>
+<td><code>otpLimiter</code></td>
+<td>60 s</td>
+<td>5</td>
+<td>IP</td>
+<td>OTP send/verify abuse</td>
+</tr>
+<tr>
+<td>PIN lockout</td>
+<td>10 min</td>
+<td>5 fails</td>
+<td>phone</td>
+<td>Brute-force protection on 6-digit PIN (in-memory)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>The custom chat key generator must use <code>ipKeyGenerator(req.ip)</code> for the IP fallback —
+returning raw <code>req.ip</code> triggers <code>ERR_ERL_KEY_GEN_IPV6</code> on express-rate-limit v8.</p>
+</blockquote>
+<hr>
+<h2>8. The RAG subsystem (core)</h2>
+<p><code>services/rag.js</code> is the heart of the product. <code>askRAG(question, cropType, history)</code>
+is a <strong>tiered pipeline</strong> designed to answer correctly while calling Gemini as rarely as
+possible. Each tier that resolves the question short-circuits the rest.</p>
+<h3>8.1 <code>askRAG</code> pipeline</h3>
+<pre><code class="language-mermaid">flowchart TD
+    start([askRAG question, cropType, history]) --&gt; faq{FAQ regex match?}
+    faq -- yes --&gt; faqOut[source: faq · 0 quota]
+    faq -- no --&gt; l1{L1 in-memory cache hit?}
+    l1 -- yes --&gt; l1Out[source: *_cached]
+    l1 -- no --&gt; l2{L2 DB cache hit?}
+    l2 -- yes --&gt; l2Out[reload L1 · source: *_dbcached]
+    l2 -- no --&gt; ctx[contextualizeQuery&lt;br/&gt;stitch follow-up topic]
+    ctx --&gt; embed[Embed query → 1536-dim&lt;br/&gt;Gemini embedding · +1 quota]
+    embed --&gt; sem{Semantic cache&lt;br/&gt;cosine ≥ 0.95?}
+    sem -- yes --&gt; semOut[source: *_semcached]
+    sem -- no --&gt; search[match_knowledge_chunks&lt;br/&gt;top-5 · threshold 0.5]
+    search --&gt; conf{top similarity?}
+
+    conf -- &quot;&lt; 0.5&quot; --&gt; offtopic{looksOffTopic?}
+    offtopic -- yes --&gt; decline[Polite decline&lt;br/&gt;source: faq · no engineer · 0 quota]
+    offtopic -- no --&gt; escalate[needEngineer = true&lt;br/&gt;source: rag]
+
+    conf -- &quot;&gt;= 0.5&quot; --&gt; curated{Top chunk is curated QA&lt;br/&gt;and sim ≥ 0.80?}
+    curated -- yes --&gt; direct[extractCuratedAnswer&lt;br/&gt;source: qa_direct · 0 LLM quota · cache]
+    curated -- no --&gt; band{confidence band}
+    band -- &quot;0.5–0.7&quot; --&gt; lowllm[LLM · limited context · cautious&lt;br/&gt;source: rag_low_conf · no cache]
+    band -- &quot;&gt;= 0.7&quot; --&gt; fullllm[LLM · full context&lt;br/&gt;source: rag · cache L1+L2]
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<h3>8.2 Tiers explained (cheapest → most expensive)</h3>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Tier</th>
+<th>Cost</th>
+<th>What it catches</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0A</td>
+<td><strong>FAQ</strong> (<code>checkFAQ</code>)</td>
+<td>0 quota</td>
+<td>Greetings, &quot;who are you&quot;, thanks, filler (&quot;vậy hả&quot;, &quot;ờ&quot;) — regex</td>
+</tr>
+<tr>
+<td>0B</td>
+<td><strong>L1 answer cache</strong> (in-memory, TTL 1h, max 200)</td>
+<td>0 quota</td>
+<td>Exact repeat questions within a process lifetime</td>
+</tr>
+<tr>
+<td>0C</td>
+<td><strong>L2 DB cache</strong> (<code>answer_cache</code> table)</td>
+<td>0 LLM</td>
+<td>Repeat questions surviving redeploys (Railway redeploys often)</td>
+</tr>
+<tr>
+<td>1</td>
+<td><strong>Embed + semantic cache</strong></td>
+<td>+1 embed</td>
+<td>Same intent phrased differently (cosine ≥ 0.95)</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>Vector search</strong> (<code>match_knowledge_chunks</code>)</td>
+<td>DB only</td>
+<td>Retrieves top-5 chunks @ threshold 0.5</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Off-topic gate</strong> (<code>looksOffTopic</code>)</td>
+<td>0 quota</td>
+<td>Non-agriculture questions below 0.5 → polite decline (no engineer)</td>
+</tr>
+<tr>
+<td>3.5</td>
+<td><strong><code>qa_direct</code></strong> (<code>extractCuratedAnswer</code>)</td>
+<td>0 LLM</td>
+<td>Curated &quot;Câu trả lời:&quot; chunk @ sim ≥ 0.80 → serve verbatim</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>LLM generation</strong></td>
+<td>+1 generate</td>
+<td>Only when confidence ≥ 0.5 and no curated match</td>
+</tr>
+</tbody></table>
+<h3>8.3 Confidence bands (post-retrieval)</h3>
+<p><code>confidence = top chunk cosine similarity</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Band</th>
+<th>Behavior</th>
+<th><code>source</code></th>
+<th>Cached?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&lt; 0.5</code> (off-topic)</td>
+<td>Polite decline, no engineer</td>
+<td><code>faq</code></td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>&lt; 0.5</code> (agronomy)</td>
+<td><strong>Escalate to engineer</strong>, no LLM</td>
+<td><code>rag</code> (<code>needEngineer</code>)</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>0.5 – 0.7</code></td>
+<td>LLM with limited context + caution note</td>
+<td><code>rag_low_conf</code></td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>≥ 0.7</code></td>
+<td>LLM with full context</td>
+<td><code>rag</code></td>
+<td><strong>yes</strong> (L1+L2)</td>
+</tr>
+<tr>
+<td>any, curated hit ≥ 0.80</td>
+<td>Serve curated answer verbatim</td>
+<td><code>qa_direct</code></td>
+<td>yes</td>
+</tr>
+</tbody></table>
+<h3>8.4 Query contextualization &amp; history</h3>
+<p><code>contextualizeQuery</code> detects follow-up/elliptical questions (&quot;còn cách khác&quot;, &quot;đạo ôn
+thì sao&quot;, ≤2 words) and prepends the last substantive farmer topic before embedding, so
+retrieval doesn&#39;t drift off-topic. <code>buildMessages</code> enforces strict <code>user/model</code>
+alternation required by the Gemini SDK (merging same-role turns, inserting a filler
+model turn if needed).</p>
+<h3>8.5 Resilience</h3>
+<p><code>invokeLLM</code> and <code>embedTexts</code> retry on <strong>429 (quota)</strong> and <strong>503 (overloaded)</strong>, parsing
+<code>retry in Ns</code> from Gemini&#39;s message and adding exponential backoff + jitter. Vision
+failures <strong>fall back softly to text-only RAG</strong>. The off-topic decline and FAQ tiers cost
+zero quota by design. <code>quotaMonitor</code> counts RPM/RPD and emits a Sentry warning at 80%.</p>
+<h3>8.6 Knowledge ingestion (<code>embedAndStoreDoc</code>)</h3>
+<p>Engineers upload PDF/DOCX/TXT or author Q&amp;A. On approval the document is chunked
+(<code>splitTextRecursive</code>, ~1000 chars, 100 overlap), embedded sequentially, and stored in
+<code>knowledge_chunks</code>. <strong>Old chunks are replaced only after a successful embed</strong> (delete +
+insert window of a few ms) so a mid-way 429 never wipes a live document. Only docs with
+<code>status = &#39;approved&#39;</code> are visible to <code>match_knowledge_chunks</code>.</p>
+<hr>
+<h2>9. Engineer escalation flow</h2>
+<pre><code class="language-mermaid">sequenceDiagram
+    actor F as Farmer
+    participant API as chat.js
+    participant RAG as rag.js
+    participant Q as engineer_queue
+    participant P as web-push
+    actor E as Engineer
+    participant KB as knowledge_docs
+
+    F-&gt;&gt;API: POST /chat/ask (text/image)
+    API-&gt;&gt;RAG: askRAG(...)
+    RAG--&gt;&gt;API: needEngineer = true (confidence &lt; 0.5)
+    API-&gt;&gt;Q: insert {message_id, status: pending}
+    API-&gt;&gt;P: notifyEngineer(...)
+    P--&gt;&gt;E: 🔔 &quot;New farmer question&quot;
+    API--&gt;&gt;F: &quot;Forwarded to an engineer (≤ 24h)&quot;
+
+    E-&gt;&gt;Q: PATCH /queue/:id/take (atomic pending→in_progress)
+    E-&gt;&gt;API: PATCH /queue/:id/answer {answer, addToKnowledge}
+    API-&gt;&gt;API: insert engineer message into chat
+    API-&gt;&gt;Q: status → resolved
+    opt addToKnowledge = true
+        API-&gt;&gt;KB: insert curated QA, status embedding
+        API-&gt;&gt;RAG: embedAndStoreDoc (background)
+    end
+    API-&gt;&gt;P: notifyFarmer(&quot;Engineer replied&quot;)
+    P--&gt;&gt;F: 🔔 answer ready
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<p><strong>Notes</strong></p>
+<ul>
+<li><code>take</code> is <strong>atomic</strong> (<code>UPDATE ... WHERE status=&#39;pending&#39;</code>) to avoid two engineers
+grabbing the same item; 0 rows updated → 409 Conflict.</li>
+<li>Editing a resolved answer <strong>overwrites</strong> the prior engineer message (matched by
+content) instead of appending a duplicate.</li>
+<li>A farmer can also <strong>self-escalate</strong> (<code>POST /chat/escalate</code>) after an AI answer, or
+<strong>report an error</strong> (👎) / mark <strong>helpful</strong> (👍). High-👍 answers become candidate
+curated QA. Deleting an unanswered queue item notifies the farmer so they don&#39;t wait
+in vain.</li>
+</ul>
+<hr>
+<h2>10. Notification subsystem</h2>
+<p>Three notification paths share <code>dispatchNotification</code> + <code>web-push</code>:</p>
+<ol>
+<li><strong>Admin broadcast</strong> (<code>POST /push/send</code>) — immediate or scheduled (<code>scheduled_at</code>).</li>
+<li><strong>Scheduled delivery</strong> — the 60 s scheduler sends due, unsent notifications.</li>
+<li><strong>Weather-alert drafts</strong> — <code>weatherAlerts.js</code> evaluates tomorrow&#39;s Open-Meteo forecast
+(rain ≥ 20 mm, heat ≥ 35 °C, wind ≥ 40 km/h, cold ≤ 18 °C) and inserts <strong>drafts</strong>
+(<code>type=&#39;weather&#39;, created_by=NULL</code>). Admin approves before any farmer is notified —
+the system never auto-sends weather alerts.</li>
+</ol>
+<p><code>dispatchNotification</code> filters subscribers by (a) opted-in <code>notif_types</code>, (b)
+<strong>quiet hours</strong> (supports overnight windows like 22:00–06:00), and (c) crop targeting
+(per-device <code>crops_filter</code>, falling back to profile <code>users.crops</code>). Expired
+subscriptions (HTTP 410) are marked inactive automatically.</p>
+<hr>
+<h2>11. Frontend architecture</h2>
+<ul>
+<li><strong><code>services/api.js</code></strong> — all HTTP grouped into objects (<code>authAPI</code>, <code>chatAPI</code>, <code>pushAPI</code>,
+<code>engineerAPI</code>, <code>communityAPI</code>, <code>adminAPI</code>). An axios interceptor attaches the JWT from
+<code>localStorage[&#39;cocon-auth&#39;]</code> and redirects to <code>/login</code> on 401. Chat uses long timeouts
+(45 s text / 60 s image) because the LLM may retry.</li>
+<li><strong>State</strong> — Zustand stores (<code>authStore</code> persisted as <code>cocon-auth</code>, plus <code>displayStore</code>,
+<code>templateStore</code>, <code>toastStore</code>) + React Query (5-minute staleTime) for server state.</li>
+<li><strong>Routing</strong> (<code>App.jsx</code>) — <code>ProtectedRoute</code> guards token + <code>allowedRoles</code>. Farmer pages
+import eagerly; engineer/admin pages are <code>lazy()</code>. Public routes: <code>/</code>, <code>/login</code>,
+<code>/policies</code>, <code>/weather</code>. Staff pages live inside a <code>DesktopLayout</code> (sidebar); farmer
+pages are mobile-first standalone.</li>
+<li><strong>Answer rendering</strong> — <code>components/AnswerContent.jsx</code> renders markdown and appends a
+one-line &quot;consult an engineer&quot; disclaimer for technical answers (<code>source</code> not
+faq/engineer). The system prompt deliberately omits the disclaimer so the frontend
+controls it.</li>
+<li><strong>Hooks</strong> — <code>useWeather</code> (Open-Meteo, 429 fallback), <code>useSTT</code>/<code>useTTS</code> (voice),
+<code>usePush</code> (Web Push subscribe). iOS Safari STT falls back to the backend
+<code>/chat/stt-fallback</code> endpoint.</li>
+<li><strong>PWA</strong> — Workbox service worker; on SW update the app auto-reloads. Client-side image
+compression (<code>utils/compressImage.js</code>) before upload. Vendor chunk splitting keeps the
+entry bundle small (~137 KB).</li>
+</ul>
+<h3>11.1 Design system</h3>
+<p>The brand and tokens are documented separately in <a href="../design.md">design.md</a>: primary
+brown <code>#4B230A</code>, warm cream surface <code>#fdf8f5</code>, large type, high contrast, wide touch
+targets — all driven by the elderly-farmer persona. Read-content zoom uses a
+<code>--read-scale</code> CSS variable (never whole-page zoom).</p>
+<hr>
+<h2>12. Cross-cutting concerns</h2>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Approach</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Observability</strong></td>
+<td>Sentry on both tiers (sampling 0.1, no Replay), gated on production; user context <code>{id, role}</code> attached in <code>verifyJWT</code>; <code>/health</code> endpoint for uptime checks</td>
+</tr>
+<tr>
+<td><strong>Quota monitoring</strong></td>
+<td><code>quotaMonitor</code> counts every Gemini call (RPM/RPD), warns to Sentry at 80%</td>
+</tr>
+<tr>
+<td><strong>Error handling</strong></td>
+<td>Uniform 500 messages to clients (no DB internals leaked); friendly 429 copy on quota; soft-degrade (<code>isMissingTable</code>) when a migration isn&#39;t applied yet</td>
+</tr>
+<tr>
+<td><strong>Input safety</strong></td>
+<td><code>sharp</code> re-encodes all images (strips EXIF/metadata); PostgREST <code>.or()</code> filter injection stripped; CSV formula injection neutralized on export; crop whitelist; length caps; no <code>dangerouslySetInnerHTML</code></td>
+</tr>
+<tr>
+<td><strong>Secrets</strong></td>
+<td>All via env vars (<code>GOOGLE_API_KEY</code>, <code>JWT_SECRET</code>, VAPID keys, Supabase keys); none committed</td>
+</tr>
+<tr>
+<td><strong>Privacy</strong></td>
+<td>Account deletion soft-disables + nulls PII and removes uploaded images, preserving FK history</td>
+</tr>
+<tr>
+<td><strong>Disaster Recovery</strong></td>
+<td>Point-in-Time Recovery via Supabase dashboard; manual DB restore in case of accidental table drops.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>13. Scalability &amp; the single-replica constraint</h2>
+<p>The current design is correct and cost-optimal <strong>at one replica</strong>. The following are
+in-process and would need externalizing to scale horizontally:</p>
+<table>
+<thead>
+<tr>
+<th>In-process today</th>
+<th>Problem at N replicas</th>
+<th>Target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>L1 answer cache + semantic cache</td>
+<td>per-replica, lower hit rate</td>
+<td>Redis (L2 <code>answer_cache</code> already cross-replica)</td>
+</tr>
+<tr>
+<td>Chat/auth rate limiters</td>
+<td>per-replica counters</td>
+<td>Redis store for <code>express-rate-limit</code></td>
+</tr>
+<tr>
+<td>PIN lockout + account denylist</td>
+<td>per-replica state</td>
+<td>Redis / shared store</td>
+</tr>
+<tr>
+<td>4× <code>setInterval</code> schedulers</td>
+<td>duplicate sends/work</td>
+<td>Leader election via Postgres advisory lock or a queue</td>
+</tr>
+<tr>
+<td>pgvector <code>ivfflat (lists=100)</code></td>
+<td>fine at pilot scale</td>
+<td>tune lists / upgrade index as KB grows</td>
+</tr>
+</tbody></table>
+<p>The definitive fix for Gemini 429s is enabling <strong>billing</strong> on the Gemini account (a
+business decision), not model swaps. See <a href="07-RISK-REGISTER.md">07-RISK-REGISTER</a> and
+<a href="../IMPROVEMENTS.md">IMPROVEMENTS.md</a> for the prioritized backlog.</p>
+<hr>
+<h2>14. Architecture Decision Records (ADR)</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Decision</th>
+<th>Status</th>
+<th>Rationale / consequence</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>ADR-01</td>
+<td>Self-signed JWT, <strong>not</strong> Supabase Auth, for sessions</td>
+<td>Accepted</td>
+<td>Full control over phone+PIN flow; requires manual denylist for instant lockout</td>
+</tr>
+<tr>
+<td>ADR-02</td>
+<td>Backend uses Supabase <strong>service-role key</strong>; RLS as backstop</td>
+<td>Accepted</td>
+<td>Simpler server logic; ownership enforced in code; RLS denies anon/direct access</td>
+</tr>
+<tr>
+<td>ADR-03</td>
+<td>Tiered cache + curated <code>qa_direct</code> to minimize LLM calls</td>
+<td>Accepted</td>
+<td>Survives scarce free-tier quota; adds cache-invalidation considerations</td>
+</tr>
+<tr>
+<td>ADR-04</td>
+<td>In-process schedulers/cache/limits (single replica)</td>
+<td>Accepted (constrained)</td>
+<td>Zero infra cost now; explicit migration path to Redis/locks before scaling</td>
+</tr>
+<tr>
+<td>ADR-05</td>
+<td>Migrate to <code>@google/genai</code>, disable thinking</td>
+<td>Accepted</td>
+<td><code>thinkingConfig</code> only works on the unified SDK; ~1.8 s vs ~6 s; old SDK 400s on prod</td>
+</tr>
+<tr>
+<td>ADR-06</td>
+<td>Manual <code>psql</code> migrations + soft-degrade on missing tables</td>
+<td>Accepted</td>
+<td>No Docker locally; run <code>psql</code> on <code>supabase/migrations/*.sql</code></td>
+</tr>
+<tr>
+<td>ADR-07</td>
+<td>Weather alerts are drafts requiring admin approval</td>
+<td>Accepted</td>
+<td>Avoids false/spam alerts to elderly users; adds an admin step</td>
+</tr>
+<tr>
+<td>ADR-08</td>
+<td>Removed LangChain (incl. splitter) in favor of native SDK + hand-written splitter</td>
+<td>Accepted</td>
+<td>Fewer deps, faster cold start; must maintain <code>splitTextRecursive</code></td>
+</tr>
+<tr>
+<td>ADR-09</td>
+<td>Keep OTP/Twilio code but flag for replacement</td>
+<td>Accepted</td>
+<td>Twilio SMS deliverability poor in VN; provider swap deferred</td>
+</tr>
+<tr>
+<td>ADR-10</td>
+<td>Replaced Supabase Realtime (engineer queue) with polling</td>
+<td>Accepted</td>
+<td>Anon Realtime blocked by RLS; polling pauses on hidden tab</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>15. Diagram index</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Diagram</th>
+<th>Section</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>System context (C4 L1)</td>
+<td><a href="#3-system-context-c4-level-1">§3</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Container view (C4 L2)</td>
+<td><a href="#4-container-view-c4-level-2">§4</a></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Deployment topology</td>
+<td><a href="#5-deployment-topology">§5</a></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Request lifecycle (sequence)</td>
+<td><a href="#71-request-lifecycle">§7.1</a></td>
+</tr>
+<tr>
+<td>5</td>
+<td>RAG pipeline (flowchart)</td>
+<td><a href="#81-askrag-pipeline">§8.1</a></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Engineer escalation (sequence)</td>
+<td><a href="#9-engineer-escalation-flow">§9</a></td>
+</tr>
+</tbody></table>
+<p>An <strong>ERD</strong> and a <strong>use-case diagram</strong> live in <a href="04-DATABASE.md">04-DATABASE</a> and
+<a href="02-SRS.md">02-SRS</a> respectively, to keep each diagram next to its detailed text.</p>
+<hr>
+<p><em>Maintained alongside the code. When architecture changes, update this file and note the
+date/author per the repository convention in <code>AI-CONTEXT.md</code>.</em></p>

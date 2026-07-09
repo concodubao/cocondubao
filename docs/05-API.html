@@ -1,0 +1,1131 @@
+<h1>REST API Reference — Cò Con Dự Báo</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Document</strong></td>
+<td>05 — REST API Reference</td>
+</tr>
+<tr>
+<td><strong>Base URL (prod)</strong></td>
+<td><code>https://laudable-happiness-production-cdfb.up.railway.app</code></td>
+</tr>
+<tr>
+<td><strong>Base path</strong></td>
+<td><code>/api/v1</code></td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Baseline (reflects <code>backend/src/routes/*</code> @ 2026-06-30)</td>
+</tr>
+<tr>
+<td><strong>Auth</strong></td>
+<td>Bearer JWT (self-signed) unless marked <em>public</em></td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td><a href="03-ARCHITECTURE.md">03-ARCHITECTURE</a> · <a href="04-DATABASE.md">04-DATABASE</a> · <a href="02-SRS.md">02-SRS</a></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-conventions">Conventions</a></li>
+<li><a href="#2-authentication--authorization">Authentication &amp; authorization</a></li>
+<li><a href="#3-rate-limiting">Rate limiting</a></li>
+<li><a href="#4-common-error-responses">Common errors</a></li>
+<li><a href="#5-endpoint-index">Endpoint index</a></li>
+<li><a href="#6-auth-api-apiv1auth">Auth API</a></li>
+<li><a href="#7-chat-api-apiv1chat">Chat API</a></li>
+<li><a href="#8-engineer--knowledge-api">Engineer &amp; Knowledge API</a></li>
+<li><a href="#9-admin-api-apiv1admin">Admin API</a></li>
+<li><a href="#10-community-api-apiv1community">Community API</a></li>
+<li><a href="#11-push--notifications-api">Push &amp; Notifications API</a></li>
+<li><a href="#12-health">Health</a></li>
+</ol>
+<hr>
+<h2>1. Conventions</h2>
+<ul>
+<li>All paths below are relative to the base path <code>/api/v1</code> unless noted.</li>
+<li>Request/response bodies are JSON (<code>Content-Type: application/json</code>), except file
+uploads which are <code>multipart/form-data</code>.</li>
+<li>Authenticated requests send <code>Authorization: Bearer &lt;jwt&gt;</code>.</li>
+<li>IDs are UUIDs. Timestamps are ISO-8601 (<code>timestamptz</code>).</li>
+<li>Role guards: <strong>F</strong> = farmer, <strong>E</strong> = engineer, <strong>A</strong> = admin, <strong>public</strong> = no auth,
+<strong>auth</strong> = any authenticated role.</li>
+<li>&quot;Soft-degrade&quot; endpoints return a flag (e.g. <code>unavailable: true</code>) instead of <code>500</code>
+when a backing table has not been migrated yet.</li>
+<li><strong>Pagination:</strong> Endpoints returning lists (e.g. <code>/engineer/history</code>, <code>/admin/users</code>) accept <code>limit</code> and <code>offset</code> query parameters, and return a <code>total</code> field alongside the array to support frontend pagination.</li>
+</ul>
+<hr>
+<h2>2. Authentication &amp; authorization</h2>
+<ul>
+<li><strong>Token:</strong> self-signed JWT carrying <code>{ userId, phone, role, name }</code>. Issued by the
+login/registration endpoints. Expiry: <strong>7 days</strong> (email accounts), <strong>30 days</strong> (phone
+accounts).</li>
+<li><strong><code>verifyJWT</code></strong> rejects missing/expired tokens (<code>401</code>) and <strong>locked accounts</strong> (<code>401</code>,
+even if the token is still valid — via the in-memory denylist).</li>
+<li><strong><code>requireRole(...)</code></strong> returns <code>403</code> when the role is not permitted.</li>
+<li>The backend talks to Postgres with the <strong>service-role key</strong>; per-resource ownership
+(IDOR) is enforced in handlers (e.g. only the owning farmer can read a chat session).</li>
+</ul>
+<hr>
+<h2>3. Rate limiting</h2>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Window</th>
+<th>Limit</th>
+<th>Key</th>
+<th>Applies to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Chat</td>
+<td>60 s</td>
+<td>15</td>
+<td><code>user:&lt;id&gt;</code> else IP</td>
+<td>all <code>/chat/*</code></td>
+</tr>
+<tr>
+<td>Auth</td>
+<td>60 s</td>
+<td>30</td>
+<td>IP</td>
+<td>all <code>/auth/*</code></td>
+</tr>
+<tr>
+<td>OTP</td>
+<td>60 s</td>
+<td>5</td>
+<td>IP</td>
+<td><code>/auth/request-otp</code>, <code>/auth/verify-otp</code></td>
+</tr>
+<tr>
+<td>PIN lockout</td>
+<td>10 min</td>
+<td>5 fails</td>
+<td>phone</td>
+<td><code>/auth/login-phone</code></td>
+</tr>
+</tbody></table>
+<p>Exceeding a limit returns <code>429</code> with a friendly Vietnamese message.</p>
+<hr>
+<h2>4. Common error responses</h2>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+<th>Example body</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>400</code></td>
+<td>Validation error</td>
+<td><code>{ &quot;error&quot;: &quot;Vui lòng nhập câu hỏi.&quot; }</code></td>
+</tr>
+<tr>
+<td><code>401</code></td>
+<td>Not authenticated / token expired / account locked</td>
+<td><code>{ &quot;error&quot;: &quot;Phiên đăng nhập đã hết hạn...&quot; }</code></td>
+</tr>
+<tr>
+<td><code>403</code></td>
+<td>Authenticated but not authorized (role / ownership)</td>
+<td><code>{ &quot;error&quot;: &quot;Không có quyền...&quot; }</code></td>
+</tr>
+<tr>
+<td><code>404</code></td>
+<td>Resource not found</td>
+<td><code>{ &quot;error&quot;: &quot;Không tìm thấy...&quot; }</code></td>
+</tr>
+<tr>
+<td><code>409</code></td>
+<td>Conflict (e.g. queue item already taken)</td>
+<td><code>{ &quot;error&quot;: &quot;Câu hỏi này đã được kỹ sư khác nhận.&quot; }</code></td>
+</tr>
+<tr>
+<td><code>422</code></td>
+<td>Unprocessable (e.g. file has no text)</td>
+<td><code>{ &quot;error&quot;: &quot;Không đọc được nội dung file...&quot; }</code></td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td>Rate limited / Gemini quota</td>
+<td><code>{ &quot;error&quot;: &quot;Cò Con đang có nhiều người hỏi...&quot; }</code></td>
+</tr>
+<tr>
+<td><code>500</code></td>
+<td>Server error (generic, no internals leaked)</td>
+<td><code>{ &quot;error&quot;: &quot;Có lỗi xảy ra...&quot; }</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. Endpoint index</h2>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Role</th>
+<th>Summary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/auth/request-otp</code></td>
+<td>public</td>
+<td>Send SMS OTP</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/verify-otp</code></td>
+<td>public</td>
+<td>Verify OTP → token</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/register-phone</code></td>
+<td>public</td>
+<td>Farmer signup (phone + PIN)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/login-phone</code></td>
+<td>public</td>
+<td>Farmer login</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/login-email</code></td>
+<td>public</td>
+<td>Staff login</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/register-email</code></td>
+<td>A</td>
+<td>Create staff account (admin-only)</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/auth/set-password</code></td>
+<td>auth</td>
+<td>Set first password/PIN</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/auth/change-password</code></td>
+<td>auth</td>
+<td>Change password/PIN</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/auth/me</code></td>
+<td>auth</td>
+<td>Current profile</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/auth/profile</code></td>
+<td>auth</td>
+<td>Update profile</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/auth/account</code></td>
+<td>auth</td>
+<td>Self-delete (soft)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/chat/ask</code></td>
+<td>auth</td>
+<td>Ask (text) via RAG</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/chat/ask-with-image</code></td>
+<td>auth</td>
+<td>Ask with pest photo</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/chat/stt-fallback</code></td>
+<td>auth</td>
+<td>Speech-to-text (audio)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/chat/escalate</code></td>
+<td>auth</td>
+<td>Request engineer review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/chat/report-error</code></td>
+<td>auth</td>
+<td>Report a bad answer (👎)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/chat/feedback</code></td>
+<td>auth</td>
+<td>Mark answer helpful (👍)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/chat/bookmarks</code></td>
+<td>auth</td>
+<td>Save an answer</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/chat/bookmarks/:messageId</code></td>
+<td>auth</td>
+<td>Unsave</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/chat/bookmarks</code></td>
+<td>auth</td>
+<td>List saved answers</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/chat/sessions/:userId</code></td>
+<td>auth</td>
+<td>List own sessions</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/chat/messages/:sessionId</code></td>
+<td>auth/E/A</td>
+<td>Messages in a session</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/engineer/queue</code></td>
+<td>E/A</td>
+<td>Pending questions</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/engineer/queue/:id</code></td>
+<td>E/A</td>
+<td>One queue item</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/engineer/queue/:id/take</code></td>
+<td>E/A</td>
+<td>Claim (atomic)</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/engineer/queue/:id/answer</code></td>
+<td>E/A</td>
+<td>Answer/resolve</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/engineer/queue/:id</code></td>
+<td>E/A</td>
+<td>Delete unanswered item</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/engineer/history</code></td>
+<td>E/A</td>
+<td>Own resolved history</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/engineer/stats</code></td>
+<td>E/A</td>
+<td>Personal stats</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/knowledge/upload</code></td>
+<td>E/A</td>
+<td>Upload KB document</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/knowledge/qa</code></td>
+<td>E/A</td>
+<td>Author curated Q&amp;A</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/knowledge/docs</code></td>
+<td>E/A</td>
+<td>List documents</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/knowledge/docs/:id</code></td>
+<td>E/A</td>
+<td>Document detail</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/knowledge/:id/approve</code></td>
+<td>E/A</td>
+<td>Approve + embed</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/knowledge/:id/archive</code></td>
+<td>E/A</td>
+<td>Archive</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/knowledge/:id</code></td>
+<td>E/A</td>
+<td>Delete draft</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/engineer/test-embed</code></td>
+<td>A</td>
+<td>Embedding API diagnostics</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/engineers</code></td>
+<td>A</td>
+<td>Create staff</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/stats</code></td>
+<td>A</td>
+<td>Dashboard metrics</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/knowledge-gaps</code></td>
+<td>A</td>
+<td>Low-confidence questions</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/ai-review</code></td>
+<td>A/E</td>
+<td>AI answer quality review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/knowledge-qa</code></td>
+<td>A/E</td>
+<td>Curate a corrected QA</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/users</code></td>
+<td>A</td>
+<td>List users</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/users/export</code></td>
+<td>A</td>
+<td>CSV export</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/users/:id/activity</code></td>
+<td>A</td>
+<td>User activity</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/audit</code></td>
+<td>A</td>
+<td>Admin audit log</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/admin/users/:id</code></td>
+<td>A</td>
+<td>Lock/unlock/role</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/admin/users/:id/reset-pin</code></td>
+<td>A</td>
+<td>Reset farmer PIN</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/admin/ai-errors</code></td>
+<td>A</td>
+<td>List 👎 reports</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/admin/ai-errors/:id/to-knowledge</code></td>
+<td>A</td>
+<td>Fix → KB</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/admin/ai-errors/:id</code></td>
+<td>A</td>
+<td>Mark reviewed</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/community/feed</code></td>
+<td>auth</td>
+<td>Post feed</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/community/posts/:id</code></td>
+<td>auth</td>
+<td>One post</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/community/posts</code></td>
+<td>auth</td>
+<td>Create post</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/community/posts/:id</code></td>
+<td>auth</td>
+<td>Delete post</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/community/posts/:id/like</code></td>
+<td>auth</td>
+<td>Toggle like</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/community/posts/:id/comments</code></td>
+<td>auth</td>
+<td>List comments</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/community/posts/:id/comments</code></td>
+<td>auth</td>
+<td>Add comment</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/community/comments/:id</code></td>
+<td>auth</td>
+<td>Delete comment</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/community/posts/:id/report</code></td>
+<td>auth</td>
+<td>Report post</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/community/comments/:id/report</code></td>
+<td>auth</td>
+<td>Report comment</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/community/reports</code></td>
+<td>A</td>
+<td>Moderation queue</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/community/reports/dismiss</code></td>
+<td>A</td>
+<td>Dismiss report</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/push/subscribe</code></td>
+<td>auth</td>
+<td>Register push</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/push/unsubscribe</code></td>
+<td>auth</td>
+<td>Unregister push</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/push/upload-image</code></td>
+<td>A</td>
+<td>Notification image</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/push/send</code></td>
+<td>A</td>
+<td>Broadcast/schedule</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/push/scheduled</code></td>
+<td>A</td>
+<td>Scheduled (unsent)</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/push/scheduled/:id</code></td>
+<td>A</td>
+<td>Cancel scheduled</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/push/drafts</code></td>
+<td>A</td>
+<td>Weather-alert drafts</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/push/drafts/:id/approve</code></td>
+<td>A</td>
+<td>Approve &amp; send draft</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/push/drafts/:id</code></td>
+<td>A</td>
+<td>Discard draft</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/notifications/settings</code></td>
+<td>auth</td>
+<td>Get notif settings</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/notifications/settings</code></td>
+<td>auth</td>
+<td>Save notif settings</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/notifications/item/:id</code></td>
+<td>auth</td>
+<td>One notification</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/notifications/:userId</code></td>
+<td>auth</td>
+<td>List notifications</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/notifications/:id/read</code></td>
+<td>auth</td>
+<td>Mark read</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/health</code></td>
+<td>public</td>
+<td>Liveness probe</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>Dual mounts:</strong> the knowledge/engineer router is served at both <code>/engineer/*</code> and
+<code>/knowledge/*</code>; the push/notifications router is served at both <code>/push/*</code> and
+<code>/notifications/*</code>. Either prefix works.</p>
+</blockquote>
+<hr>
+<h2>6. Auth API (<code>/api/v1/auth</code>)</h2>
+<h3>POST <code>/auth/request-otp</code> · public · OTP-limited</h3>
+<p>Send an SMS OTP (Twilio via Supabase Auth). Does <strong>not</strong> reveal whether the number is
+registered (prevents account enumeration).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;0901234567&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;phone&quot;: &quot;+84901234567&quot; }</code></li>
+<li><strong>Errors:</strong> <code>400</code> invalid phone · <code>429</code> provider rate limit</li>
+</ul>
+<h3>POST <code>/auth/verify-otp</code> · public · OTP-limited</h3>
+<p>Verify the OTP; creates a farmer account on first verification.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;otp&quot;: &quot;123456&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;token&quot;: &quot;&lt;jwt&gt;&quot;, &quot;user&quot;: { id, phone, role, name, village, crops, hasPassword }, &quot;isNewUser&quot;: true }</code></li>
+<li><strong>Errors:</strong> <code>400</code> wrong/expired OTP · <code>403</code> account locked</li>
+</ul>
+<h3>POST <code>/auth/register-phone</code> · public</h3>
+<p>Farmer signup with phone + 6-digit PIN. Token valid <strong>30 days</strong>.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;password&quot;: &quot;123456&quot; }</code> (PIN = exactly 6 digits)</li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;token&quot;: &quot;&lt;jwt&gt;&quot;, &quot;user&quot;: {...}, &quot;isNewUser&quot;: bool }</code></li>
+<li><strong>Errors:</strong> <code>400</code> invalid phone / PIN not 6 digits / already registered</li>
+</ul>
+<h3>POST <code>/auth/login-phone</code> · public · PIN lockout</h3>
+<p>Farmer login. 5 wrong PINs → 10-minute lock for that phone.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;password&quot;: &quot;123456&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;token&quot;: &quot;&lt;jwt&gt;&quot;, &quot;user&quot;: {...}, &quot;isNewUser&quot;: bool }</code></li>
+<li><strong>Errors:</strong> <code>401</code> not registered / wrong PIN / no PIN set · <code>403</code> locked · <code>429</code> too many failures</li>
+</ul>
+<h3>POST <code>/auth/login-email</code> · public</h3>
+<p>Staff (engineer/admin) login with email + password. Token valid <strong>7 days</strong>.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;email&quot;: &quot;...&quot;, &quot;password&quot;: &quot;...&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;token&quot;: &quot;&lt;jwt&gt;&quot;, &quot;user&quot;: { id, email, phone, role, name, hasPassword }, &quot;isNewUser&quot;: bool }</code></li>
+<li><strong>Errors:</strong> <code>401</code> wrong credentials · <code>403</code> pending approval / locked</li>
+</ul>
+<h3>POST <code>/auth/register-email</code> · admin</h3>
+<p>Create an engineer/admin account (admin-only path). New engineers start inactive
+(<code>pending</code>) until approved; new admins are active.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;email&quot;: &quot;...&quot;, &quot;password&quot;: &quot;...(≥8)&quot;, &quot;role&quot;: &quot;engineer&quot;|&quot;admin&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;pending&quot;: bool }</code></li>
+<li><strong>Errors:</strong> <code>400</code> missing fields / weak password / email taken / bad role</li>
+</ul>
+<h3>PATCH <code>/auth/set-password</code> · auth</h3>
+<p>Set a password/PIN for the first time (account has none). Farmer ⇒ 6-digit PIN; staff ⇒
+≥ 8 chars.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;password&quot;: &quot;...&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>Errors:</strong> <code>400</code> already has password / invalid</li>
+</ul>
+<h3>PATCH <code>/auth/change-password</code> · auth</h3>
+<p>Change password/PIN (all roles). New value must differ and satisfy role strength.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;currentPassword&quot;: &quot;...&quot;, &quot;newPassword&quot;: &quot;...&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>Errors:</strong> <code>400</code> invalid · <code>401</code> wrong current</li>
+</ul>
+<h3>GET <code>/auth/me</code> · auth</h3>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;user&quot;: { id, phone, email, role, name, village, crops, is_active, created_at, hasPassword } }</code></li>
+</ul>
+<h3>PATCH <code>/auth/profile</code> · auth</h3>
+<p>Update name/village/crops (crops filtered to the valid whitelist).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;name&quot;: &quot;...&quot;, &quot;village&quot;: &quot;...&quot;, &quot;crops&quot;: [&quot;rice&quot;,&quot;fruit&quot;] }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;user&quot;: {...} }</code></li>
+</ul>
+<h3>DELETE <code>/auth/account</code> · auth</h3>
+<p>Soft-delete: disables account, nulls PII, deactivates push, removes uploaded images.
+History is preserved (FKs intact).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<hr>
+<h2>7. Chat API (<code>/api/v1/chat</code>)</h2>
+<p>All endpoints require auth and are chat-rate-limited.</p>
+<h3>POST <code>/chat/ask</code> · auth</h3>
+<p>Ask a text question through the RAG pipeline. Persists the conversation and may escalate
+to an engineer.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;text&quot;: &quot;lúa bị vàng lá trị sao&quot;, &quot;cropType&quot;: &quot;rice&quot;, &quot;sessionId&quot;: &quot;&lt;uuid|null&gt;&quot;, &quot;testMode&quot;: false }</code><ul>
+<li><code>text</code> ≤ 1000 chars. <code>testMode</code> (engineer/admin only) runs RAG <strong>without</strong> persisting
+or notifying — for the Test-AI screen.</li>
+</ul>
+</li>
+<li><strong>200:</strong> <code>{ &quot;answer&quot;: &quot;...|null&quot;, &quot;confidence&quot;: 0.83, &quot;source&quot;: &quot;rag&quot;, &quot;sessionId&quot;: &quot;&lt;uuid&gt;&quot;, &quot;engineerQueued&quot;: false, &quot;needEngineer&quot;: false, &quot;messageId&quot;: &quot;&lt;uuid&gt;&quot; }</code><ul>
+<li>When <code>needEngineer</code> is true, <code>answer</code> is null and the farmer-facing text is a
+&quot;forwarded to engineer&quot; message.</li>
+</ul>
+</li>
+<li><strong>Errors:</strong> <code>400</code> empty/too long · <code>403</code> not owner of <code>sessionId</code> · <code>429</code> Gemini quota</li>
+</ul>
+<h3>POST <code>/chat/ask-with-image</code> · auth · multipart</h3>
+<p>Ask with a pest photo. Image is compressed (<code>sharp</code>), uploaded, then analyzed by Gemini
+Vision; uncertain vision results escalate to an engineer; vision failure falls back to
+text RAG.</p>
+<ul>
+<li><strong>Form fields:</strong> <code>image</code> (file ≤ 10 MB, chỉ nhận <code>image/jpeg, image/png, image/webp</code>), <code>text</code>, <code>cropType</code>, <code>sessionId</code></li>
+<li><strong>200:</strong> <code>{ &quot;answer&quot;, &quot;confidence&quot;, &quot;source&quot;: &quot;vision&quot;|&quot;vision_low_conf&quot;|&quot;rag&quot;, &quot;sessionId&quot;, &quot;imageUrl&quot;, &quot;engineerQueued&quot;, &quot;needEngineer&quot;, &quot;messageId&quot; }</code></li>
+<li><strong>Errors:</strong> <code>400</code> non-image · <code>403</code> not owner · <code>429</code> quota</li>
+</ul>
+<h3>POST <code>/chat/stt-fallback</code> · auth · multipart</h3>
+<p>Server-side speech-to-text (iOS Safari fallback). Uses <code>gemini-2.5-flash-lite</code>.</p>
+<ul>
+<li><strong>Form fields:</strong> <code>audio</code> (file ≤ 15 MB)</li>
+<li><strong>200:</strong> <code>{ &quot;transcript&quot;: &quot;...&quot; }</code> · <strong>Errors:</strong> <code>400</code> no file · <code>500</code> recognition failed</li>
+</ul>
+<h3>POST <code>/chat/escalate</code> · auth</h3>
+<p>Ask an engineer to review an already-answered question.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;messageId&quot;: &quot;&lt;answer message uuid&gt;&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;already&quot;: bool? }</code></li>
+<li><strong>Errors:</strong> <code>400</code> missing · <code>403</code> not owner · <code>404</code> not found</li>
+</ul>
+<h3>POST <code>/chat/report-error</code> · auth</h3>
+<p>Report a wrong/irrelevant/confusing AI answer (👎). Idempotent per user+message.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;messageId&quot;: &quot;...&quot;, &quot;errorType&quot;: &quot;wrong_info&quot;|&quot;irrelevant&quot;|&quot;hard_to_understand&quot;, &quot;note&quot;: &quot;...&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;already&quot;: bool? }</code></li>
+<li><strong>Errors:</strong> <code>400</code> invalid type · <code>403</code> not owner · <code>404</code> not found</li>
+</ul>
+<h3>POST <code>/chat/feedback</code> · auth</h3>
+<p>Mark an answer helpful (👍). Upsert (one vote per user+message).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;messageId&quot;: &quot;...&quot;, &quot;helpful&quot;: true }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<h3>POST <code>/chat/bookmarks</code> · auth · soft-degrade</h3>
+<p>Save an answer.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;messageId&quot;: &quot;...&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> or <code>{ &quot;success&quot;: false, &quot;unavailable&quot;: true }</code> (table not migrated)</li>
+<li><strong>Errors:</strong> <code>403</code> not owner · <code>404</code> not found</li>
+</ul>
+<h3>DELETE <code>/chat/bookmarks/:messageId</code> · auth · soft-degrade</h3>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> or <code>{ &quot;success&quot;: false, &quot;unavailable&quot;: true }</code></li>
+</ul>
+<h3>GET <code>/chat/bookmarks</code> · auth · soft-degrade</h3>
+<p>List saved answers (with original question), newest first (≤ 50).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;bookmarks&quot;: [ { messageId, sessionId, content, source, confidence, cropType, question, savedAt } ] }</code></li>
+</ul>
+<h3>GET <code>/chat/sessions/:userId</code> · auth</h3>
+<p>List own chat sessions (≤ 30). Only your own id is allowed.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;sessions&quot;: [ { id, crop_type, status, created_at, messageCount, preview, searchText } ] }</code></li>
+<li><strong>Errors:</strong> <code>403</code> other user&#39;s id</li>
+</ul>
+<h3>GET <code>/chat/messages/:sessionId</code> · auth / E / A</h3>
+<p>Messages in a session. Owner can read; <strong>staff can only read a session that was actually
+escalated</strong> to the queue.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;messages&quot;: [ {...} ] }</code> · <strong>Errors:</strong> <code>403</code> not owner / not escalated · <code>404</code> not found</li>
+</ul>
+<hr>
+<h2>8. Engineer &amp; Knowledge API</h2>
+<p>Mounted at <code>/api/v1/engineer/*</code> and <code>/api/v1/knowledge/*</code>. All require engineer or admin
+(except <code>test-embed</code> which is admin-only).</p>
+<h3>Queue</h3>
+<h4>GET <code>/engineer/queue</code> · E/A</h4>
+<ul>
+<li><strong>Query:</strong> <code>status</code> (default <code>pending</code>), <code>limit</code> (20), <code>offset</code> (0)</li>
+<li><strong>200:</strong> <code>{ &quot;queue&quot;: [ { id, status, created_at, resolved_at, assigned_to, answer, add_to_knowledge, assignee, messages{ content, image_url, confidence, chat_sessions{ crop_type, users{ name, village, phone } } }, waitMinutes } ], &quot;total&quot;: n }</code></li>
+</ul>
+<h4>GET <code>/engineer/queue/:id</code> · E/A</h4>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;item&quot;: {..., waitMinutes } }</code> · <strong>Errors:</strong> <code>404</code></li>
+</ul>
+<h4>PATCH <code>/engineer/queue/:id/take</code> · E/A</h4>
+<p>Atomically claim a pending item (<code>pending → in_progress</code>).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;item&quot;: {...} }</code></li>
+<li><strong>Errors:</strong> <code>404</code> not found · <code>409</code> already taken by another engineer</li>
+</ul>
+<h4>PATCH <code>/engineer/queue/:id/answer</code> · E/A</h4>
+<p>Answer (or edit) a question. Optionally add the QA to the knowledge base (background
+embed). Engineers may only answer items assigned to them; admins may override.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;answer&quot;: &quot;...&quot;, &quot;addToKnowledge&quot;: false }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;addedToKnowledge&quot;: bool, &quot;updated&quot;: bool }</code></li>
+<li><strong>Errors:</strong> <code>400</code> empty answer · <code>403</code> assigned to another engineer · <code>404</code></li>
+</ul>
+<h4>DELETE <code>/engineer/queue/:id</code> · E/A</h4>
+<p>Delete an unanswered (<code>pending</code>/<code>in_progress</code>) item and notify the farmer.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>Errors:</strong> <code>400</code> already resolved · <code>403</code> · <code>404</code></li>
+</ul>
+<h4>GET <code>/engineer/history</code> · E/A</h4>
+<p>Own resolved questions, paginated, optional crop filter (DB-side inner join).</p>
+<ul>
+<li><strong>Query:</strong> <code>crop</code> (or <code>all</code>), <code>limit</code> (20), <code>offset</code> (0)</li>
+<li><strong>200:</strong> <code>{ &quot;history&quot;: [...], &quot;total&quot;: n }</code></li>
+</ul>
+<h4>GET <code>/engineer/stats</code> · E/A</h4>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;totalResolved&quot;, &quot;resolvedWeek&quot;, &quot;avgResponseHours&quot;, &quot;addedToKnowledge&quot; }</code></li>
+</ul>
+<h3>Knowledge base</h3>
+<h4>POST <code>/knowledge/upload</code> · E/A · multipart</h4>
+<p>Upload a PDF/DOCX/TXT (≤ 20 MB); text is extracted and stored as a <code>draft</code>.</p>
+<ul>
+<li><strong>Form fields:</strong> <code>file</code>, <code>title</code>, <code>cropTags</code> (JSON array string), <code>source</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;doc&quot;: { id, title, status, charCount, estimatedChunks } }</code></li>
+<li><strong>Errors:</strong> <code>400</code> no file / no title · <code>422</code> unreadable / empty text</li>
+</ul>
+<h4>POST <code>/knowledge/qa</code> · E/A</h4>
+<p>Author a curated Q&A; stored as <code>&quot;Câu hỏi: ... Câu trả lời: ...&quot;</code> and embedded in the
+background (enables <code>qa_direct</code> serving).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;question&quot;: &quot;...&quot;, &quot;answer&quot;: &quot;...&quot;, &quot;cropTags&quot;: [&quot;rice&quot;] }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;docId&quot;: &quot;&lt;uuid&gt;&quot; }</code> · <strong>Errors:</strong> <code>400</code> missing fields</li>
+</ul>
+<h4>GET <code>/knowledge/docs</code> · E/A</h4>
+<ul>
+<li><strong>Query:</strong> <code>status</code>, <code>crop</code> · <strong>200:</strong> <code>{ &quot;docs&quot;: [ {..., chunkCount } ] }</code></li>
+</ul>
+<h4>GET <code>/knowledge/docs/:id</code> · E/A</h4>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;doc&quot;: { id, title, source, crop_tags, status, content, created_at, updated_at } }</code> · <strong>404</strong></li>
+</ul>
+<h4>PATCH <code>/knowledge/:id/approve</code> · E/A</h4>
+<p>Set <code>embedding</code> and embed in the background (chunks → vectors → <code>approved</code>).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;accepted&quot;: true, &quot;docId&quot;: &quot;...&quot;, &quot;message&quot;: &quot;Đang embed...&quot; }</code> · <strong>422</strong> no content</li>
+</ul>
+<h4>PATCH <code>/knowledge/:id/archive</code> · E/A</h4>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<h4>DELETE <code>/knowledge/:id</code> · E/A</h4>
+<p>Delete a <code>draft</code>/<code>embedding</code> doc (and its chunks). Approved docs must be archived instead.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>400</strong> not a draft · <strong>404</strong></li>
+</ul>
+<h4>GET <code>/engineer/test-embed</code> · A</h4>
+<p>Diagnostics: lists Gemini embedding models and runs a probe embed.</p>
+<ul>
+<li><strong>200:</strong> <code>{ listStatus, totalModels, embeddingModels, embedTest, listError }</code></li>
+</ul>
+<hr>
+<h2>9. Admin API (<code>/api/v1/admin</code>)</h2>
+<p>All admin-only unless noted. Mutations are recorded in <code>admin_audit_log</code>.</p>
+<h3>POST <code>/admin/engineers</code> · A</h3>
+<p>Create an engineer/admin (active immediately).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;email&quot;, &quot;password&quot; (≥8), &quot;name&quot;, &quot;role&quot;: &quot;engineer&quot;|&quot;admin&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;user&quot;: { id, email, name, role, is_active, created_at } }</code></li>
+<li><strong>Errors:</strong> <code>400</code> missing / weak / email taken</li>
+</ul>
+<h3>GET <code>/admin/stats</code> · A</h3>
+<p>Dashboard metrics.</p>
+<ul>
+<li><strong>200:</strong> <code>{ totalUsers, totalSessions, totalMessages, pendingQueue, totalNotifs, errorReports, overdueQueue, avgResponseHours, topCrops[], ragRate, sessionsByDay[] }</code></li>
+</ul>
+<h3>GET <code>/admin/knowledge-gaps</code> · A</h3>
+<p>Recent AI answers with confidence &lt; 0.5 (silent gaps to fill), with their questions.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;gaps&quot;: [ { question, confidence, created_at } ] }</code></li>
+</ul>
+<h3>GET <code>/admin/ai-review</code> · A/E</h3>
+<p>AI answer quality review.</p>
+<ul>
+<li><strong>Query:</strong> <code>filter</code> = <code>all</code>|<code>low</code>|<code>mid</code>|<code>helpful</code> (default <code>all</code>), <code>limit</code> (40)</li>
+<li><strong>200:</strong> <code>{ &quot;items&quot;: [ { question, answer, confidence, source, helpfulCount, created_at } ] }</code></li>
+</ul>
+<h3>POST <code>/admin/knowledge-qa</code> · A/E</h3>
+<p>Curate a corrected Q&amp;A from the review screen (background embed).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;question&quot;, &quot;answer&quot; }</code> · <strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<h3>GET <code>/admin/users</code> · A</h3>
+<ul>
+<li><strong>Query:</strong> <code>role</code>, <code>search</code> (name/phone; injection-stripped), <code>limit</code> (50), <code>offset</code> (0)</li>
+<li><strong>200:</strong> <code>{ &quot;users&quot;: [ { id, phone, email, role, name, village, crops, is_active, created_at } ] }</code></li>
+</ul>
+<h3>GET <code>/admin/users/export</code> · A</h3>
+<p>CSV export (UTF-8 BOM; formula-injection neutralized).</p>
+<ul>
+<li><strong>Query:</strong> <code>role</code> · <strong>200:</strong> <code>text/csv</code> attachment <code>cocon-users.csv</code></li>
+</ul>
+<h3>GET <code>/admin/users/:id/activity</code> · A</h3>
+<p>Drill-down for phone support: profile, recent sessions, recent questions.</p>
+<ul>
+<li><strong>200:</strong> <code>{ user, totalSessions, sessions[], questions[] }</code> · <strong>404</strong></li>
+</ul>
+<h3>GET <code>/admin/audit</code> · A · soft-degrade</h3>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;logs&quot;: [ { admin_name, action, target_name, detail, created_at } ], &quot;ready&quot;: bool }</code></li>
+</ul>
+<h3>PATCH <code>/admin/users/:id</code> · A</h3>
+<p>Lock/unlock or change role. <strong>Admins cannot lock or demote themselves.</strong> Updates the
+denylist instantly.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;is_active&quot;: bool, &quot;role&quot;: &quot;farmer&quot;|&quot;engineer&quot;|&quot;admin&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;user&quot;: {...} }</code> · <strong>400</strong> self-target</li>
+</ul>
+<h3>PATCH <code>/admin/users/:id/reset-pin</code> · A</h3>
+<p>Generate a new random 6-digit PIN for a <strong>farmer</strong> (returned so the admin can relay it).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;pin&quot;: &quot;482913&quot;, &quot;user&quot;: {...} }</code> · <strong>400</strong> not a farmer · <strong>404</strong></li>
+</ul>
+<h3>GET <code>/admin/ai-errors</code> · A</h3>
+<p>List 👎 reports (with the original question).</p>
+<ul>
+<li><strong>Query:</strong> <code>reviewed</code> (<code>true</code>/<code>false</code>), <code>limit</code> (30), <code>offset</code> (0)</li>
+<li><strong>200:</strong> <code>{ &quot;errors&quot;: [ { id, error_type, note, created_at, reviewed_by, messages{...}, users{ name, phone }, question } ] }</code></li>
+</ul>
+<h3>POST <code>/admin/ai-errors/:id/to-knowledge</code> · A</h3>
+<p>Rewrite a reported answer into a curated QA, mark the report reviewed, background embed.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;question&quot;, &quot;answer&quot; }</code> · <strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<h3>PATCH <code>/admin/ai-errors/:id</code> · A</h3>
+<p>Mark a report reviewed.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<blockquote>
+<p><code>/admin/sentry-test</code> exists for error-tracking verification but is effectively
+unreachable (it lacks <code>verifyJWT</code>, so <code>requireRole</code> returns <code>401</code>).</p>
+</blockquote>
+<hr>
+<h2>10. Community API (<code>/api/v1/community</code>)</h2>
+<p>All require auth; report/moderation rules noted.</p>
+<h3>GET <code>/community/feed</code> · auth</h3>
+<ul>
+<li><strong>Query:</strong> <code>limit</code> (20), <code>offset</code> (0), <code>crop</code></li>
+<li><strong>200:</strong> <code>{ &quot;posts&quot;: [ { id, content, image_url, crop_tags, created_at, users{ id, name, village, role }, likeCount, commentCount, likedByMe } ] }</code></li>
+</ul>
+<h3>GET <code>/community/posts/:id</code> · auth</h3>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;post&quot;: {... likeCount, commentCount, likedByMe } }</code> · <strong>404</strong></li>
+</ul>
+<h3>POST <code>/community/posts</code> · auth · multipart</h3>
+<ul>
+<li><strong>Form fields:</strong> <code>content</code> (1–1000), <code>cropTags</code> (JSON array string), <code>image</code> (optional ≤ 10 MB)</li>
+<li><strong>200:</strong> <code>{ &quot;post&quot;: {... likeCount:0, commentCount:0, likedByMe:false } }</code> · <strong>400</strong> empty/too long</li>
+</ul>
+<h3>DELETE <code>/community/posts/:id</code> · auth</h3>
+<p>Author or admin. Removes the image and related reports.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>403</strong> not author/admin · <strong>404</strong></li>
+</ul>
+<h3>POST <code>/community/posts/:id/like</code> · auth</h3>
+<p>Toggle like.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;liked&quot;: true|false }</code></li>
+</ul>
+<h3>GET <code>/community/posts/:id/comments</code> · auth</h3>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;comments&quot;: [ { id, content, created_at, users{ id, name, role } } ] }</code></li>
+</ul>
+<h3>POST <code>/community/posts/:id/comments</code> · auth</h3>
+<p>Add a comment (1–500). Notifies the post author.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;content&quot;: &quot;...&quot; }</code> · <strong>200:</strong> <code>{ &quot;comment&quot;: {...} }</code> · <strong>400</strong> empty/too long</li>
+</ul>
+<h3>DELETE <code>/community/comments/:id</code> · auth</h3>
+<p>Author or admin.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>403</strong> · <strong>404</strong></li>
+</ul>
+<h3>POST <code>/community/posts/:id/report</code> · auth</h3>
+<h3>POST <code>/community/comments/:id/report</code> · auth</h3>
+<p>Report bad content (idempotent per reporter+item).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;reason&quot;: &quot;...&quot; }</code> · <strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;already&quot;: bool }</code> · <strong>404</strong></li>
+</ul>
+<h3>GET <code>/community/reports</code> · A</h3>
+<p>Moderation queue (grouped by content, with preview &amp; report count).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;reports&quot;: [ { target_type, target_id, count, reasons[], content, author, postId, deleted } ] }</code></li>
+</ul>
+<h3>PATCH <code>/community/reports/dismiss</code> · A</h3>
+<p>Dismiss reports for an item (keep content).</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;targetType&quot;: &quot;post&quot;|&quot;comment&quot;, &quot;targetId&quot;: &quot;...&quot; }</code> · <strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<hr>
+<h2>11. Push &amp; Notifications API</h2>
+<p>Mounted at <code>/api/v1/push/*</code> and <code>/api/v1/notifications/*</code>.</p>
+<h3>POST <code>/push/subscribe</code> · auth</h3>
+<p>Register a Web Push subscription (upsert by endpoint). Sends a one-time welcome push the
+first time a user enables notifications.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;subscription&quot;: { &quot;endpoint&quot;: &quot;...&quot;, &quot;keys&quot;: { &quot;p256dh&quot;: &quot;...&quot;, &quot;auth&quot;: &quot;...&quot; } } }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>400</strong> missing fields</li>
+</ul>
+<h3>DELETE <code>/push/unsubscribe</code> · auth</h3>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;endpoint&quot;: &quot;...&quot; }</code> · <strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<h3>POST <code>/push/upload-image</code> · A · multipart</h3>
+<p>Upload a notification illustration → public URL.</p>
+<ul>
+<li><strong>Form fields:</strong> <code>image</code> (≤ 10 MB) · <strong>200:</strong> <code>{ &quot;url&quot;: &quot;https://...&quot; }</code></li>
+</ul>
+<h3>POST <code>/push/send</code> · A</h3>
+<p>Broadcast immediately or schedule. Targets by <code>type</code> opt-in, quiet hours, and crop.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;title&quot;, &quot;body&quot;, &quot;type&quot;: &quot;alert&quot;|&quot;promotion&quot;|&quot;weather&quot;, &quot;imageUrl&quot;, &quot;cropTags&quot;: [], &quot;scheduleAt&quot;: &quot;&lt;ISO|null&gt;&quot; }</code></li>
+<li><strong>200 (immediate):</strong> <code>{ &quot;success&quot;: true, &quot;notificationId&quot;, &quot;sent&quot;, &quot;failed&quot;, &quot;total&quot;, &quot;message&quot; }</code></li>
+<li><strong>200 (scheduled):</strong> <code>{ &quot;success&quot;: true, &quot;notificationId&quot;, &quot;scheduled&quot;: true, &quot;scheduledAt&quot;, &quot;message&quot; }</code></li>
+<li><strong>400</strong> empty title/body / bad schedule time</li>
+</ul>
+<h3>GET <code>/push/scheduled</code> · A</h3>
+<p>Scheduled-but-unsent notifications.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;scheduled&quot;: [ { id, title, body, type, region, crop_tags, scheduled_at, created_at } ] }</code></li>
+</ul>
+<h3>DELETE <code>/push/scheduled/:id</code> · A</h3>
+<p>Cancel a scheduled notification (only if unsent).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>400</strong> already sent · <strong>404</strong></li>
+</ul>
+<h3>GET <code>/push/drafts</code> · A</h3>
+<p>System-generated weather-alert drafts awaiting approval.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;drafts&quot;: [ { id, title, body, type, crop_tags, created_at } ] }</code></li>
+</ul>
+<h3>POST <code>/push/drafts/:id/approve</code> · A</h3>
+<p>Approve and send a weather draft now.</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;sent&quot;, &quot;total&quot; }</code> · <strong>400</strong> already sent · <strong>404</strong></li>
+</ul>
+<h3>DELETE <code>/push/drafts/:id</code> · A</h3>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code> · <strong>400</strong> already sent · <strong>404</strong></li>
+</ul>
+<h3>GET <code>/notifications/settings</code> · auth</h3>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;notifTypes&quot;: [&quot;alert&quot;,&quot;promotion&quot;,&quot;weather&quot;], &quot;quietStart&quot;: &quot;22:00&quot;, &quot;quietEnd&quot;: &quot;06:00&quot;, &quot;cropsFilter&quot;: [] }</code></li>
+</ul>
+<h3>PATCH <code>/notifications/settings</code> · auth</h3>
+<p>Per-device settings. If the device has no active subscription, returns a flag instead of
+silently succeeding.</p>
+<ul>
+<li><strong>Body:</strong> <code>{ &quot;notifTypes&quot;: [...], &quot;cropsFilter&quot;: [...], &quot;quietStart&quot;: &quot;22:00&quot;, &quot;quietEnd&quot;: &quot;06:00&quot; }</code></li>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;updatedDevices&quot;: n }</code> or <code>{ &quot;success&quot;: false, &quot;noSubscription&quot;: true, &quot;error&quot;: &quot;...&quot; }</code></li>
+</ul>
+<h3>GET <code>/notifications/item/:id</code> · auth</h3>
+<p>One sent notification (deep-link / push tap).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;notification&quot;: {..., read_at, is_read } }</code> · <strong>404</strong></li>
+</ul>
+<h3>GET <code>/notifications/:userId</code> · auth</h3>
+<p>List notifications for a user (crop-filtered for farmers who chose crops; farmers can only
+read their own id).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;notifications&quot;: [ {..., read_at, is_read } ] }</code> · <strong>403</strong> other farmer&#39;s id</li>
+</ul>
+<h3>PATCH <code>/notifications/:id/read</code> · auth</h3>
+<p>Mark a notification read (upsert receipt).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;success&quot;: true }</code></li>
+</ul>
+<blockquote>
+<p>⚠️ Route ordering: the static paths <code>/notifications/settings</code> and
+<code>/notifications/item/:id</code> are declared <strong>before</strong> <code>/notifications/:userId</code> so they are
+not shadowed by the <code>:userId</code> parameter.</p>
+</blockquote>
+<hr>
+<h2>12. Health</h2>
+<h3>GET <code>/health</code> · public</h3>
+<p>Liveness/uptime probe (used by Railway healthcheck and external monitors).</p>
+<ul>
+<li><strong>200:</strong> <code>{ &quot;status&quot;: &quot;ok&quot;, &quot;timestamp&quot;: &quot;&lt;ISO&gt;&quot;, &quot;env&quot;: &quot;production&quot; }</code></li>
+</ul>
+<hr>
+<p><em>Generated from the route handlers in <code>backend/src/routes/*</code>. When an endpoint changes,
+update this file in the same change-set.</em></p>

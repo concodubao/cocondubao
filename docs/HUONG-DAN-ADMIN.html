@@ -1,0 +1,168 @@
+<h1>Hướng dẫn dùng app Cò Con — DÀNH CHO QUẢN TRỊ VIÊN (ADMIN)</h1>
+<blockquote>
+<p>Admin <strong>quản lý toàn hệ thống</strong>: tài khoản, thông báo, theo dõi hoạt động, chất lượng AI.
+Giao diện dùng tốt nhất trên <strong>máy tính</strong> (thanh menu bên trái).</p>
+</blockquote>
+<hr>
+<h2>Mục lục</h2>
+<ol>
+<li><a href="#1-%C4%91%C4%83ng-nh%E1%BA%ADp">Đăng nhập</a></li>
+<li><a href="#2-dashboard--t%E1%BB%95ng-quan">Dashboard — Tổng quan</a></li>
+<li><a href="#3-qu%E1%BA%A3n-l%C3%BD-ng%C6%B0%E1%BB%9Di-d%C3%B9ng">Quản lý người dùng</a></li>
+<li><a href="#4-g%E1%BB%ADi-th%C3%B4ng-b%C3%A1o">Gửi thông báo</a></li>
+<li><a href="#5-c%C3%A1c-m%E1%BB%A5c-gi%C3%A1m-s%C3%A1t-kh%C3%A1c">Các mục giám sát khác</a></li>
+<li><a href="#6-chu%E1%BA%A9n-b%E1%BB%8B-cho-bu%E1%BB%95i-t%E1%BA%ADp-hu%E1%BA%A5n">Chuẩn bị cho buổi tập huấn</a></li>
+<li><a href="#7-h%E1%BB%8Fi-%C4%91%C3%A1p-nhanh-faq">Hỏi đáp nhanh (FAQ)</a></li>
+</ol>
+<hr>
+<h2>1. Đăng nhập</h2>
+<ul>
+<li>Giống kỹ sư: chọn <strong>&quot;Kỹ sư / Admin&quot;</strong> → đăng nhập bằng <strong>email + mật khẩu</strong>.</li>
+<li>Admin vào thẳng <strong>Dashboard</strong>.</li>
+<li>Menu admin đầy đủ: <strong>Dashboard · Quản lý user · Gửi thông báo · Báo lỗi AI · Báo cáo cộng đồng · Soát chất lượng AI · Kho tri thức · Test AI · Thời tiết</strong>.</li>
+</ul>
+<p><code>[Ảnh: Dashboard admin]</code></p>
+<hr>
+<h2>2. Dashboard — Tổng quan</h2>
+<p>Xem nhanh sức khỏe hệ thống:</p>
+<ul>
+<li><strong>Người dùng</strong>, <strong>Phiên chat</strong>, <strong>Chờ KS</strong> (câu đang chờ kỹ sư), <strong>Lỗi AI</strong>.</li>
+<li><strong>Chờ quá hạn 24h</strong> và <strong>thời gian phản hồi trung bình</strong> của kỹ sư.</li>
+<li><strong>AI tự trả lời (%)</strong> — mục tiêu <strong>≥ 70%</strong>. Thấp hơn = cần upload thêm tài liệu RAG.</li>
+<li>Biểu đồ <strong>phiên chat 7 ngày</strong>, <strong>cây trồng được hỏi nhiều nhất</strong>.</li>
+<li><strong>AI trả lời yếu gần đây</strong> → gợi ý cần bổ sung tài liệu.</li>
+<li>Khu <strong>Hàng đợi</strong> ngay trên dashboard (nhận &amp; trả lời câu luôn nếu cần).</li>
+</ul>
+<hr>
+<h2>3. Quản lý người dùng</h2>
+<p>Vào <strong>Quản lý user</strong>. 3 tab: <strong>Nông dân / Kỹ sư / Admin</strong>. Có ô tìm kiếm theo tên/SĐT.</p>
+<p>Tab <strong>Kỹ sư</strong> hiện <strong>số đang chờ duyệt</strong> trong ngoặc (vd &quot;Kỹ sư (2)&quot;) khi có người mới đăng ký.</p>
+<p><strong>Việc thường làm:</strong></p>
+<ul>
+<li><strong>Tạo tài khoản kỹ sư/admin</strong>: bấm <strong>&quot;Tạo kỹ sư&quot;</strong> → chọn vai trò (<strong>Kỹ sư / Quản trị viên</strong>) → nhập <strong>họ tên</strong> (tuỳ chọn), <strong>email</strong> + <strong>mật khẩu</strong> (≥ 8 ký tự, bắt buộc) → <strong>Tạo</strong>. Tài khoản tạo kiểu này dùng được ngay.</li>
+<li><strong>Phê duyệt kỹ sư</strong>: kỹ sư <strong>tự đăng ký</strong> ở trạng thái chờ (thẻ mờ) → bấm <strong>&quot;Phê duyệt kỹ sư&quot;</strong> mới đăng nhập được.</li>
+<li><strong>Khóa / Mở khóa</strong> tài khoản (thẻ bị khóa hiện mờ). Khóa = người đó không đăng nhập được nữa.</li>
+<li><strong>Đổi vai trò</strong> (Nông dân ↔ Kỹ sư ↔ Admin) qua ô chọn — <strong>có hỏi xác nhận</strong>.</li>
+<li><strong>Đặt lại PIN cho nông dân</strong> (chỉ tài khoản nông dân có SĐT): bấm <strong>&quot;Đặt lại PIN&quot;</strong> → xác nhận → hiện <strong>mã PIN mới</strong> → bấm vào ô để <strong>copy</strong> → đọc/gửi cho nông dân. <strong>PIN cũ hết hiệu lực ngay</strong>; nông dân tự đổi lại trong Hồ sơ.</li>
+<li><strong>Xem hoạt động</strong> một nông dân: bấm <strong>&quot;Hoạt động&quot;</strong> → xem tổng số phiên + lịch sử câu hỏi gần đây (tiện hỗ trợ qua điện thoại).</li>
+<li><strong>Tìm kiếm</strong> theo tên/SĐT; <strong>Xuất CSV</strong> danh sách theo tab đang xem (nút <strong>CSV</strong>).</li>
+</ul>
+<blockquote>
+<p><em>Lưu ý: với chính tài khoản của mình, bạn <strong>không</strong> thấy nút Khóa/Đổi vai trò — chỉ hiện dòng &quot;Tài khoản của bạn — không thể tự khóa hoặc đổi vai trò&quot;. Đây là cơ chế chống tự khóa nhầm.</em></p>
+</blockquote>
+<p><code>[Ảnh: màn hình Quản lý user]</code></p>
+<hr>
+<h2>4. Gửi thông báo</h2>
+<p>Vào <strong>Gửi thông báo / Soạn thông báo</strong>. Trên cùng có <strong>Preview</strong> cập nhật trực tiếp khi bạn gõ.</p>
+<ol>
+<li>Chọn <strong>loại</strong>:<ul>
+<li><strong>Cảnh báo dịch bệnh</strong> (ưu tiên cao, hiển thị nổi bật)</li>
+<li><strong>Khuyến mãi vật tư</strong> (phân bón, thuốc BVTV giảm giá)</li>
+<li><strong>Thời tiết nông vụ</strong></li>
+</ul>
+</li>
+<li>Nhập <strong>Tiêu đề</strong> (tối đa 100 ký tự) + <strong>Nội dung chi tiết</strong>. Cả hai <strong>bắt buộc</strong>.</li>
+<li><strong>Ảnh minh hoạ</strong> (không bắt buộc): <strong>&quot;Tải ảnh từ máy&quot;</strong> hoặc <strong>dán link ảnh</strong>. Có thể <strong>Gỡ ảnh</strong> để đổi.</li>
+<li><strong>Gửi cho nông dân trồng</strong> (lọc theo cây):<ul>
+<li><strong>Không chọn cây</strong> = gửi cho <strong>tất cả</strong> nông dân.</li>
+<li>Chọn 1+ cây = chỉ gửi cho nông dân trồng cây đó (vd cảnh báo <strong>sâu lúa</strong> → chỉ chọn <strong>Lúa</strong>). Dòng dưới xác nhận &quot;→ Đang gửi cho: ...&quot;.</li>
+</ul>
+</li>
+<li><strong>Thời gian gửi</strong>:<ul>
+<li>Để trống = <strong>Gửi ngay</strong>.</li>
+<li>Chọn ngày giờ (không cho chọn quá khứ) = <strong>Lên lịch gửi</strong>.</li>
+</ul>
+</li>
+<li>Bấm <strong>Gửi ngay / Lên lịch gửi</strong>:<ul>
+<li>Gửi ngay → màn báo <strong>&quot;Gửi thành công!&quot;</strong> kèm <strong>đã gửi X / Y thiết bị</strong> (và số lỗi nếu có).</li>
+<li>Lên lịch → <strong>&quot;Đã lên lịch gửi!&quot;</strong>.</li>
+</ul>
+</li>
+</ol>
+<p><strong>Quản lý thông báo đã lên lịch:</strong> mục <strong>&quot;Đã lên lịch&quot;</strong> liệt kê các tin chờ gửi (kèm giờ) — bấm <strong>Hủy</strong> để gỡ trước khi gửi.</p>
+<p><strong>Gợi ý cảnh báo thời tiết tự động:</strong> hệ thống tự phát hiện thời tiết xấu từ dự báo và tạo <strong>bản nháp</strong> ở mục <strong>&quot;🌦️ Gợi ý cảnh báo thời tiết&quot;</strong>. Admin xem rồi bấm <strong>&quot;Gửi cho nông dân&quot;</strong> hoặc <strong>&quot;Bỏ&quot;</strong>.</p>
+<blockquote>
+<p>Lưu ý: nông dân chỉ nhận nếu họ <strong>bật thông báo</strong> + cho phép quyền trình duyệt; tin còn tôn trọng <strong>khung giờ không làm phiền</strong> của từng người. Vì vậy &quot;X / Y thiết bị&quot; thường nhỏ hơn tổng số nông dân — là bình thường.</p>
+</blockquote>
+<hr>
+<h2>5. Các mục giám sát khác</h2>
+<h3>5.1. Báo lỗi AI</h3>
+<p>Các câu nông dân bấm <strong>&quot;Báo lỗi&quot;</strong>, gom theo lý do: <strong>Sai thông tin / Không liên quan / Khó hiểu</strong> (kèm ghi chú của nông dân nếu có).</p>
+<ul>
+<li>Bấm <strong>&quot;Soạn câu trả lời đúng&quot;</strong> → nhập Câu hỏi + Câu trả lời đúng → lưu thành <strong>QA biên soạn</strong> + embed → AI trả tốt hơn lần sau.</li>
+<li>Hoặc <strong>&quot;Đánh dấu đã xử lý&quot;</strong> để dọn khỏi danh sách.</li>
+</ul>
+<h3>5.2. Báo cáo cộng đồng</h3>
+<p>Bài/bình luận bị nông dân <strong>báo cáo</strong>. Mỗi mục hiện <strong>lý do báo cáo</strong> (chip):</p>
+<ul>
+<li><strong>Xem</strong> → mở bài để đọc nguyên văn.</li>
+<li><strong>Xóa nội dung</strong> → gỡ bài/bình luận vi phạm (có xác nhận).</li>
+<li><strong>Bỏ qua</strong> → đánh dấu đã xử lý, giữ nội dung.</li>
+</ul>
+<h3>5.3. Soát chất lượng AI</h3>
+<p>Giống bên kỹ sư: lọc <strong>Tất cả / 👍 Được khen / Tin cậy thấp (&lt;50%) / Trung bình (50–70%)</strong>; biến câu sai hoặc câu được khen thành <strong>QA chuẩn</strong> (xem <a href="HUONG-DAN-KY-SU.md">hướng dẫn kỹ sư</a>, mục Soát chất lượng AI).</p>
+<h3>5.4. Nhật ký thao tác (Audit log)</h3>
+<p>Lưu lại các thao tác quản trị quan trọng: <strong>Khóa / Mở khóa tài khoản · Đổi vai trò · Đặt lại PIN · Tạo nhân sự · Cập nhật</strong>. Dùng để truy vết ai làm gì.</p>
+<h3>5.5. Kho tri thức &amp; Test AI</h3>
+<p>Admin dùng được như kỹ sư — xem <a href="HUONG-DAN-KY-SU.md">hướng dẫn kỹ sư</a>.</p>
+<hr>
+<h2>6. Chuẩn bị cho buổi tập huấn</h2>
+<p>Việc admin/trainer nên làm <strong>trước</strong> buổi tập huấn tại xã:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Mỗi nông dân: 1 điện thoại có mạng (4G/wifi), có số điện thoại riêng.</li>
+<li><input disabled="" type="checkbox"> Chuẩn bị sẵn vài câu hỏi mẫu để demo (vd: <em>&quot;Lúa bị vàng lá là bệnh gì?&quot;</em>).</li>
+<li><input disabled="" type="checkbox"> <strong>Tạo sẵn tài khoản cho các kỹ sư</strong> (email + mật khẩu) trước buổi học.</li>
+<li><input disabled="" type="checkbox"> Hướng dẫn cách mở app + <strong>&quot;Thêm vào màn hình chính&quot;</strong>.</li>
+<li><input disabled="" type="checkbox"> Nhắc bà con khi mở lần đầu: app hỏi <strong>cho phép Thông báo</strong> và <strong>micro</strong> → bấm <strong>Cho phép</strong>.</li>
+<li><input disabled="" type="checkbox"> Với bà con lớn tuổi: chỉ cách chỉnh <strong>Cỡ chữ hiển thị → Lớn / Rất lớn</strong>.</li>
+</ul>
+<hr>
+<h2>7. Hỏi đáp nhanh (FAQ)</h2>
+<table>
+<thead>
+<tr>
+<th>Tình huống</th>
+<th>Cách xử lý</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Kỹ sư mới chưa đăng nhập được</td>
+<td><strong>Quản lý user</strong> → tab Kỹ sư (có số chờ) → <strong>Phê duyệt kỹ sư</strong></td>
+</tr>
+<tr>
+<td>Nông dân quên PIN</td>
+<td><strong>Quản lý user</strong> → <strong>Đặt lại PIN</strong> → copy PIN mới đọc cho họ</td>
+</tr>
+<tr>
+<td>AI tự trả lời (%) thấp</td>
+<td>Bổ sung tài liệu vào <strong>Kho tri thức</strong>; biến câu hay thành QA ở <strong>Soát chất lượng AI</strong></td>
+</tr>
+<tr>
+<td>Nhiều câu chờ quá hạn 24h</td>
+<td>Nhắc kỹ sư; admin tự nhận &amp; trả lời từ <strong>Dashboard</strong></td>
+</tr>
+<tr>
+<td>Bài cộng đồng bị báo cáo</td>
+<td><strong>Báo cáo cộng đồng</strong> → Xem → <strong>Xóa nội dung</strong> hoặc <strong>Bỏ qua</strong></td>
+</tr>
+<tr>
+<td>Gửi tin &quot;X/Y thiết bị&quot; nhỏ</td>
+<td>Bình thường — chỉ tính máy đã bật thông báo, ngoài giờ &quot;không làm phiền&quot;</td>
+</tr>
+<tr>
+<td>Lỡ lên lịch nhầm</td>
+<td>Mục <strong>Đã lên lịch</strong> → <strong>Hủy</strong> trước giờ gửi</td>
+</tr>
+<tr>
+<td>Không tự khóa được mình</td>
+<td>Đúng thiết kế — nhờ admin khác thao tác nếu cần</td>
+</tr>
+<tr>
+<td>AI hay báo 429/quá tải</td>
+<td>Quota Gemini miễn phí cạn — xem <strong>Báo lỗi AI</strong>; cần bật billing để hết</td>
+</tr>
+</tbody></table>
+<hr>
+<blockquote>
+<p><strong>Tóm tắt:</strong> Theo dõi <strong>Dashboard</strong> → <strong>quản lý tài khoản</strong> → <strong>gửi thông báo</strong> → <strong>giám sát</strong> chất lượng AI &amp; cộng đồng.</p>
+</blockquote>

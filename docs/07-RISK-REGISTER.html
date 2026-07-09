@@ -1,0 +1,527 @@
+<h1>Risk Register — Cò Con Dự Báo</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Document</strong></td>
+<td>07 — Risk Register &amp; Mitigation Plan</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Living document (baseline 2026-06-30)</td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td><a href="01-PROJECT-CHARTER.md">01-PROJECT-CHARTER</a> · <a href="03-ARCHITECTURE.md">03-ARCHITECTURE</a> · <a href="06-TEST-PLAN.md">06-TEST-PLAN</a> · <a href="../IMPROVEMENTS.md">IMPROVEMENTS.md</a> · <a href="../OPERATIONS.md">OPERATIONS.md</a></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>This register tracks <strong>forward-looking risks</strong> to the product. The historical defect
+backlog (IDs G1–J3, mostly resolved) lives in <a href="../IMPROVEMENTS.md">IMPROVEMENTS.md</a>;
+§6 here summarizes which classes of those have been mitigated. Operational procedures
+(backup, monitoring, quota) are in <a href="../OPERATIONS.md">OPERATIONS.md</a>.</p>
+</blockquote>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-scoring-method">Scoring method</a></li>
+<li><a href="#2-risk-heat-map">Risk heat map</a></li>
+<li><a href="#3-active-risk-register">Active risk register</a></li>
+<li><a href="#4-detailed-risk-cards">Detailed risk cards</a></li>
+<li><a href="#5-accepted--residual-risks">Accepted / residual risks</a></li>
+<li><a href="#6-mitigated-risk-classes-historical">Mitigated risk classes (historical)</a></li>
+<li><a href="#7-risk-monitoring--review">Risk monitoring &amp; review</a></li>
+</ol>
+<hr>
+<h2>1. Scoring method</h2>
+<p>Each risk is scored on <strong>Likelihood (L)</strong> × <strong>Impact (I)</strong>, each 1–5; <strong>Score = L × I</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Likelihood</th>
+<th>Meaning</th>
+<th>Impact</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1 Rare</td>
+<td>Unlikely in pilot</td>
+<td>1 Negligible</td>
+<td>Cosmetic</td>
+</tr>
+<tr>
+<td>2 Unlikely</td>
+<td>Could happen</td>
+<td>2 Minor</td>
+<td>Small, recoverable</td>
+</tr>
+<tr>
+<td>3 Possible</td>
+<td>Even odds over time</td>
+<td>3 Moderate</td>
+<td>Noticeable disruption</td>
+</tr>
+<tr>
+<td>4 Likely</td>
+<td>Expected</td>
+<td>4 Major</td>
+<td>Core function impaired / data risk</td>
+</tr>
+<tr>
+<td>5 Almost certain</td>
+<td>Recurring</td>
+<td>5 Severe</td>
+<td>Crop/financial harm, breach, data loss</td>
+</tr>
+</tbody></table>
+<p><strong>Severity bands:</strong> 🟢 Low 1–6 · 🟡 Medium 8–12 · 🟠 High 15–16 · 🔴 Critical 20–25.</p>
+<p><strong>Response strategies:</strong> Mitigate · Accept · Transfer · Avoid.</p>
+<hr>
+<h2>2. Risk heat map</h2>
+<pre><code class="language-mermaid">quadrantChart
+    title Likelihood vs Impact (active risks)
+    x-axis Low Impact --&gt; High Impact
+    y-axis Low Likelihood --&gt; High Likelihood
+    quadrant-1 Monitor closely
+    quadrant-2 Tolerate
+    quadrant-3 Low priority
+    quadrant-4 Mitigate now
+    R1 Gemini quota: [0.78, 0.88]
+    R2 Wrong AI advice: [0.95, 0.45]
+    R3 Single replica: [0.55, 0.30]
+    R4 OTP/SMS in VN: [0.45, 0.60]
+    R5 Key-person: [0.62, 0.55]
+    R6 Stale PWA cache: [0.30, 0.55]
+    R7 Data loss: [0.92, 0.20]
+    R8 Public image URLs: [0.40, 0.40]
+    R9 Provider outage: [0.55, 0.35]
+    R10 KB staleness: [0.62, 0.45]
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<hr>
+<h2>3. Active risk register</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Risk</th>
+<th>Category</th>
+<th>L</th>
+<th>I</th>
+<th>Score</th>
+<th>Band</th>
+<th>Strategy</th>
+<th>Owner</th>
+<th>Status</th>
+<th>Next Review</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>R1</td>
+<td>Gemini free-tier quota exhaustion (429)</td>
+<td>Technical / Cost</td>
+<td>4</td>
+<td>4</td>
+<td>16</td>
+<td>🟠 High</td>
+<td>Mitigate</td>
+<td>Dev</td>
+<td>Open (mitigated, billing pending)</td>
+<td>2026-07-30</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>Incorrect / unsafe AI advice</td>
+<td>Product / Safety</td>
+<td>2</td>
+<td>5</td>
+<td>10</td>
+<td>🟡 Med</td>
+<td>Mitigate</td>
+<td>Dev + Engineers</td>
+<td>Open (controls in place)</td>
+<td>2026-07-30</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>Single-replica scaling ceiling</td>
+<td>Architecture</td>
+<td>2</td>
+<td>3</td>
+<td>6</td>
+<td>🟢 Low</td>
+<td>Accept (planned)</td>
+<td>Dev</td>
+<td>Open (path documented)</td>
+<td>2026-12-31</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>OTP/SMS deliverability in Vietnam</td>
+<td>Onboarding</td>
+<td>3</td>
+<td>3</td>
+<td>9</td>
+<td>🟡 Med</td>
+<td>Mitigate/Transfer</td>
+<td>Dev</td>
+<td>Open (PIN primary)</td>
+<td>2026-07-30</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>Key-person dependence (solo maintainer)</td>
+<td>Organizational</td>
+<td>3</td>
+<td>4</td>
+<td>12</td>
+<td>🟡 Med</td>
+<td>Mitigate</td>
+<td>Sponsor + Dev</td>
+<td>Open</td>
+<td>2026-09-30</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>Stale PWA service-worker cache after deploy</td>
+<td>Operational</td>
+<td>2</td>
+<td>3</td>
+<td>6</td>
+<td>🟢 Low</td>
+<td>Mitigate</td>
+<td>Dev</td>
+<td>Mitigated</td>
+<td>2026-12-31</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>Data loss (Postgres / knowledge base)</td>
+<td>Data</td>
+<td>2</td>
+<td>5</td>
+<td>10</td>
+<td>🟡 Med</td>
+<td>Mitigate/Transfer</td>
+<td>Dev</td>
+<td>Open (runbook)</td>
+<td>2026-07-30</td>
+</tr>
+<tr>
+<td>R8</td>
+<td>Public image URLs leak sensitive photos</td>
+<td>Privacy</td>
+<td>2</td>
+<td>3</td>
+<td>6</td>
+<td>🟢 Low</td>
+<td>Accept (monitored)</td>
+<td>Dev</td>
+<td>Accepted</td>
+<td>2026-12-31</td>
+</tr>
+<tr>
+<td>R9</td>
+<td>Third-party provider outage (Gemini/Supabase/Vercel/Railway)</td>
+<td>Dependency</td>
+<td>3</td>
+<td>3</td>
+<td>9</td>
+<td>🟡 Med</td>
+<td>Mitigate/Transfer</td>
+<td>Dev</td>
+<td>Open</td>
+<td>2026-07-30</td>
+</tr>
+<tr>
+<td>R10</td>
+<td>Knowledge-base staleness / thin coverage</td>
+<td>Product</td>
+<td>3</td>
+<td>3</td>
+<td>9</td>
+<td>🟡 Med</td>
+<td>Mitigate</td>
+<td>Engineers</td>
+<td>Open</td>
+<td>2026-07-30</td>
+</tr>
+<tr>
+<td>R11</td>
+<td>Multi-replica double-send / race (if scaled without locks)</td>
+<td>Architecture</td>
+<td>2</td>
+<td>3</td>
+<td>6</td>
+<td>🟢 Low</td>
+<td>Avoid (until locks)</td>
+<td>Dev</td>
+<td>Open</td>
+<td>2026-12-31</td>
+</tr>
+<tr>
+<td>R12</td>
+<td>Prompt injection via user content</td>
+<td>Security</td>
+<td>2</td>
+<td>2</td>
+<td>4</td>
+<td>🟢 Low</td>
+<td>Accept (narrow blast radius)</td>
+<td>Dev</td>
+<td>Accepted</td>
+<td>2026-12-31</td>
+</tr>
+<tr>
+<td>R13</td>
+<td>Adoption / usability shortfall (elderly users)</td>
+<td>Product</td>
+<td>3</td>
+<td>4</td>
+<td>12</td>
+<td>🟡 Med</td>
+<td>Mitigate</td>
+<td>Dev + Sponsor</td>
+<td>Open</td>
+<td>2026-08-30</td>
+</tr>
+<tr>
+<td>R14</td>
+<td>Cost escalation if usage grows beyond free tier</td>
+<td>Cost</td>
+<td>2</td>
+<td>3</td>
+<td>6</td>
+<td>🟢 Low</td>
+<td>Monitor</td>
+<td>Dev</td>
+<td>Open</td>
+<td>2026-08-30</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>4. Detailed risk cards</h2>
+<h3>R1 — Gemini free-tier quota exhaustion (🟠 16)</h3>
+<ul>
+<li><strong>Description:</strong> The free tier allows only ~tens of generate requests/day per model
+bucket; vision shares the bucket with RAG answers. At peak, answers can fail with 429.</li>
+<li><strong>Triggers:</strong> spike in questions; many photo questions; cache cold after redeploy.</li>
+<li><strong>Mitigation (in place):</strong> FAQ short-circuit; off-topic gate; L1 + durable L2 + semantic
+caches; curated <code>qa_direct</code> (0 LLM); thinking disabled; retry with backoff on 429/503;
+<code>quotaMonitor</code> warns at 80% RPM/RPD via Sentry; friendly user-facing 429 copy.</li>
+<li><strong>Definitive fix:</strong> enable <strong>Gemini billing</strong> (business decision) — the only true
+removal of the cap. Tracked in <a href="01-PROJECT-CHARTER.md#11-budget--resources">Charter §11</a>.</li>
+<li><strong>Contingency:</strong> during outages, low-confidence questions still escalate to engineers.</li>
+</ul>
+<h3>R2 — Incorrect / unsafe AI advice (🟡 10, high impact)</h3>
+<ul>
+<li><strong>Description:</strong> Wrong disease ID or dosage can cause real crop/financial loss.</li>
+<li><strong>Mitigation:</strong> RAG grounding in approved KB; confidence bands (escalate &lt; 0.5, caution
+0.5–0.7); human escalation; curated QA reviewed by engineers; &quot;consult an engineer&quot;
+disclaimer on technical answers; vision-uncertainty → escalate; the <strong>RAG eval suite</strong>
+(<code>backend/eval/</code>) gates prompt/model/threshold changes; 👎 reports feed corrections.</li>
+<li><strong>Residual:</strong> rare confident-but-wrong answers in the 0.5–0.7 band. <strong>Open action A:</strong>
+author <em>differential</em> QA for ambiguous symptoms (yellow leaf/wilt/spots).</li>
+</ul>
+<h3>R3 — Single-replica scaling ceiling (🟢 6)</h3>
+<ul>
+<li><strong>Description:</strong> In-process cache/rate-limit/schedulers are correct at one replica only.</li>
+<li><strong>Mitigation/plan:</strong> documented migration path — Redis for cache/limits/lockout,
+Postgres advisory-lock leader election for schedulers, pgvector index tuning
+(<a href="03-ARCHITECTURE.md#13-scalability--the-single-replica-constraint">Architecture §13</a>).</li>
+<li><strong>Strategy:</strong> accept for pilot; revisit before onboarding multiple communes.</li>
+</ul>
+<h3>R4 — OTP/SMS deliverability in Vietnam (🟡 9)</h3>
+<ul>
+<li><strong>Description:</strong> Twilio SMS deliverability is poor in VN, hurting phone verification.</li>
+<li><strong>Mitigation:</strong> phone + <strong>PIN</strong> is the primary auth path (OTP optional); provider swap
+planned. <strong>Transfer</strong> component: delivery depends on the SMS provider.</li>
+</ul>
+<h3>R5 — Key-person dependence (🟡 12)</h3>
+<ul>
+<li><strong>Description:</strong> A solo maintainer is a single point of failure for build/run/ops.</li>
+<li><strong>Mitigation:</strong> this documentation suite, <code>OPERATIONS.md</code> runbook, <code>CLAUDE.md</code>/
+<code>AI-CONTEXT.md</code>, automated tests, Sentry — all lower the bus-factor and onboarding cost.</li>
+<li><strong>Open action:</strong> recruit/transfer knowledge to a second maintainer.</li>
+</ul>
+<h3>R6 — Stale PWA service-worker cache (🟢 6, mitigated)</h3>
+<ul>
+<li><strong>Description:</strong> A new deploy doesn&#39;t reach an open session until a real reload.</li>
+<li><strong>Mitigation:</strong> auto-reload on SW update; behavior documented; &quot;still broken after
+deploy&quot; is a known false alarm (old cached code).</li>
+</ul>
+<h3>R7 — Data loss (🟡 10, high impact)</h3>
+<ul>
+<li><strong>Description:</strong> Loss of <code>users</code>/<code>messages</code>/<code>knowledge_chunks</code> would be catastrophic.</li>
+<li><strong>Mitigation:</strong> Supabase managed Postgres with point-in-time recovery; backup/restore
+procedure documented in <a href="../OPERATIONS.md">OPERATIONS.md</a> (PITR + <code>pg_dump</code>).</li>
+<li><strong>Transfer:</strong> relies on Supabase durability. <strong>Open action:</strong> verify a periodic
+off-platform <code>pg_dump</code> export.</li>
+</ul>
+<h3>R8 — Public image URLs (🟢 6, accepted)</h3>
+<ul>
+<li><strong>Description:</strong> The <code>images</code> bucket is public; anyone with a link can view a pest/
+community photo. Paths use UUIDs/timestamps (hard to guess).</li>
+<li><strong>Decision:</strong> accepted for pilot (low sensitivity, hard-to-enumerate paths); pest images
+auto-purge after 30 days. Revisit with signed URLs if sensitivity increases.</li>
+</ul>
+<h3>R9 — Third-party provider outage (🟡 9)</h3>
+<ul>
+<li><strong>Description:</strong> Gemini/Supabase/Vercel/Railway/Open-Meteo outages degrade the service.</li>
+<li><strong>Mitigation:</strong> retries on transient AI errors; weather 429 fallback; Sentry alerting;
+<code>/health</code> monitoring. <strong>Transfer:</strong> SLAs of providers; mostly outside our control.</li>
+</ul>
+<h3>R10 — Knowledge-base staleness / thin coverage (🟡 9)</h3>
+<ul>
+<li><strong>Description:</strong> Thin/outdated KB → more escalations and weaker answers.</li>
+<li><strong>Mitigation:</strong> engineer answers can be promoted to curated QA; admin &quot;knowledge gaps&quot;
+view surfaces low-confidence questions; 👍/👎 review loop; ingestion of new documents.</li>
+<li><strong>Owner action:</strong> engineers continuously curate; expand the eval <code>dataset.json</code>.</li>
+</ul>
+<h3>R11 — Multi-replica double-send / race (🟢 6)</h3>
+<ul>
+<li><strong>Description:</strong> Scaling beyond one replica without distributed locks would double-send
+scheduled notifications and duplicate scheduler work.</li>
+<li><strong>Strategy:</strong> <strong>avoid</strong> scaling out until leader election is added (advisory lock/queue).</li>
+</ul>
+<h3>R12 — Prompt injection (🟢 4, accepted)</h3>
+<ul>
+<li><strong>Description:</strong> Malicious user text could try to steer the LLM.</li>
+<li><strong>Assessment (security review):</strong> narrow blast radius — the model only sees the user&#39;s
+own conversation and retrieved public KB; no cross-user data exposure. Accepted.</li>
+</ul>
+<h3>R13 — Adoption / usability shortfall (🟡 12)</h3>
+<ul>
+<li><strong>Description:</strong> Elderly, low-literacy users may struggle, limiting adoption/value.</li>
+<li><strong>Mitigation:</strong> voice &amp; photo input, plain Southern-Vietnamese, large adjustable text,
+high contrast, minimal steps; user manuals + training guide (<code>docs/HUONG-DAN-*</code>).</li>
+<li><strong>Open action:</strong> structured UAT and field training with the cooperative.</li>
+</ul>
+<h3>R14 — Cost escalation beyond free tier (🟢 6)</h3>
+<ul>
+<li><strong>Description:</strong> Growth could push Gemini/Supabase/Railway past free limits.</li>
+<li><strong>Mitigation:</strong> caching minimizes AI calls; quota monitoring; cost is a planned,
+controllable upgrade (billing) rather than a surprise.</li>
+</ul>
+<hr>
+<h2>5. Accepted / residual risks</h2>
+<p>These are explicitly <strong>accepted</strong> for the pilot (from the 2026-06-30 security review and
+design decisions), to be revisited as scale/sensitivity grows:</p>
+<table>
+<thead>
+<tr>
+<th>Item</th>
+<th>Why accepted</th>
+<th>Revisit trigger</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/admin/sentry-test</code> route effectively unreachable (missing <code>verifyJWT</code> → 401)</td>
+<td>Harmless; not a data path</td>
+<td>If converted to a real admin route</td>
+</tr>
+<tr>
+<td>Public image bucket (UUID paths)</td>
+<td>Low sensitivity; pest images auto-purge 30d</td>
+<td>Higher-sensitivity media; complaints</td>
+</tr>
+<tr>
+<td>Farmer JWT valid 30 days</td>
+<td>Denylist + 60s poller block locked accounts promptly</td>
+<td>Stronger session revocation needs</td>
+</tr>
+<tr>
+<td>Prompt injection</td>
+<td>Narrow blast radius (own chat + public KB)</td>
+<td>Any cross-user data in prompts</td>
+</tr>
+<tr>
+<td>No automated load/stress testing</td>
+<td>Pilot scale (tens of users)</td>
+<td>Approaching scale-out</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>6. Mitigated risk classes (historical)</h2>
+<p>The risk-first backlog (IDs G1–J3 in <a href="../IMPROVEMENTS.md">IMPROVEMENTS.md</a>) has already
+<strong>closed</strong> entire classes of risk; summarized so reviewers see what is <em>no longer</em> open:</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Examples (IDs)</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Broken push/notifications</td>
+<td>G1, G4, G5, H5</td>
+<td>Push handler restored, brand icons, correct deep-links, no welcome spam</td>
+</tr>
+<tr>
+<td>Account-lock latency</td>
+<td>G2</td>
+<td>Instant denylist + 60s poller</td>
+</tr>
+<tr>
+<td>Authorization / IDOR</td>
+<td>H1, H2, chat ownership checks</td>
+<td>Session/message ownership enforced; role-appropriate password strength</td>
+</tr>
+<tr>
+<td>Account enumeration</td>
+<td>G8</td>
+<td>OTP response no longer leaks existence/role</td>
+</tr>
+<tr>
+<td>Injection</td>
+<td>J1 (CSV), <code>.or()</code> stripping</td>
+<td>Formula &amp; PostgREST filter injection neutralized</td>
+</tr>
+<tr>
+<td>Quota / cost</td>
+<td>G10, H10, H12</td>
+<td>Semantic + L2 cache, SDK migration, thinking off</td>
+</tr>
+<tr>
+<td>Data hygiene / storage</td>
+<td>G9, H15</td>
+<td>Image cleanup on delete + 30-day pest-image purge</td>
+</tr>
+<tr>
+<td>Dependency vulns</td>
+<td>I5</td>
+<td>2 high vite dev-server vulns fixed; 0 vuln</td>
+</tr>
+<tr>
+<td>Observability gap</td>
+<td>G15, J3</td>
+<td>Sentry both tiers; <code>/health</code>; runbook</td>
+</tr>
+<tr>
+<td>Dead Realtime (silent failure)</td>
+<td>I1</td>
+<td>Replaced with polling</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. Risk monitoring &amp; review</h2>
+<ul>
+<li><strong>Cadence:</strong> review this register at each work &quot;wave&quot; and when adding a major feature.</li>
+<li><strong>Signals watched:</strong> Sentry errors; <code>quotaMonitor</code> 80% alerts; admin dashboard
+(<code>overdueQueue</code>, <code>ragRate</code>, knowledge gaps); 👎 report volume; <code>/health</code> uptime.</li>
+<li><strong>Updates:</strong> when a risk changes status, update the row and note date/owner per the
+repository convention in <code>AI-CONTEXT.md</code>. New defects go to <code>IMPROVEMENTS.md</code>; new
+forward risks go here.</li>
+<li><strong>Escalation:</strong> 🔴/🟠 risks are addressed before feature expansion, consistent with the
+project&#39;s &quot;risks first, features later&quot; principle.</li>
+</ul>

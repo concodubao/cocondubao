@@ -61,6 +61,7 @@ export default function Splash() {
       }
     }
     checkAuth()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (loading) {

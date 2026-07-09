@@ -273,7 +273,7 @@ export default function Knowledge() {
     },
   })
 
-  const docs     = data || []
+  const docs     = useMemo(() => data || [], [data])
   const approved = docs.filter(d => d.status === 'approved').length
   const draft    = docs.filter(d => d.status === 'draft').length
   const total    = docs.length

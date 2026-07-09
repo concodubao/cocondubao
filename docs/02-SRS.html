@@ -1,0 +1,955 @@
+<h1>Software Requirements Specification (SRS) — Cò Con Dự Báo</h1>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Document</strong></td>
+<td>02 — Software Requirements Specification</td>
+</tr>
+<tr>
+<td><strong>Standard</strong></td>
+<td>Structured after IEEE 830</td>
+</tr>
+<tr>
+<td><strong>Version</strong></td>
+<td>1.0.0</td>
+</tr>
+<tr>
+<td><strong>Status</strong></td>
+<td>Baseline (as-built @ 2026-06-30)</td>
+</tr>
+<tr>
+<td><strong>Related</strong></td>
+<td><a href="01-PROJECT-CHARTER.md">01-PROJECT-CHARTER</a> · <a href="03-ARCHITECTURE.md">03-ARCHITECTURE</a> · <a href="05-API.md">05-API</a> · <a href="06-TEST-PLAN.md">06-TEST-PLAN</a></td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>This SRS is written <strong>as-built</strong>: every functional requirement corresponds to behavior
+that exists in the codebase, so it doubles as a verifiable specification. Requirement
+IDs are referenced by the <a href="06-TEST-PLAN.md">Test Plan</a> and <a href="05-API.md">API Reference</a>.</p>
+</blockquote>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-introduction">Introduction</a></li>
+<li><a href="#2-overall-description">Overall description</a></li>
+<li><a href="#3-actors--use-cases">Actors &amp; use cases</a></li>
+<li><a href="#4-functional-requirements">Functional requirements</a></li>
+<li><a href="#5-external-interface-requirements">External interface requirements</a></li>
+<li><a href="#6-non-functional-requirements">Non-functional requirements</a></li>
+<li><a href="#7-data-requirements">Data requirements</a></li>
+<li><a href="#8-assumptions-dependencies--constraints">Assumptions, dependencies &amp; constraints</a></li>
+<li><a href="#9-requirement-traceability">Requirement traceability</a></li>
+</ol>
+<hr>
+<h2>1. Introduction</h2>
+<h3>1.1 Purpose</h3>
+<p>Specify the functional and non-functional requirements of <strong>Cò Con Dự Báo</strong>, a
+Progressive Web App that provides AI-assisted agricultural advice to farmers in Trường
+Khánh commune (Sóc Trăng, Vietnam), with human agronomist escalation and administrative
+tooling.</p>
+<h3>1.2 Scope</h3>
+<p>The product lets farmers ask agronomy questions (text/voice/photo) and receive answers
+from a RAG pipeline grounded in a curated knowledge base; routes low-confidence questions
+to engineers; supports a community feed, broadcast &amp; weather notifications, and weather
+information; and provides admin tools for user management, content moderation, knowledge
+curation, and analytics. Out of scope: e-commerce, payments, IoT/sensor integration,
+native mobile apps, and multi-tenant/multi-commune deployment (see <a href="01-PROJECT-CHARTER.md">Charter</a>).</p>
+<h3>1.3 Definitions &amp; abbreviations</h3>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>RAG</strong></td>
+<td>Retrieval-Augmented Generation — retrieve knowledge chunks, then have an LLM answer grounded in them</td>
+</tr>
+<tr>
+<td><strong>PWA</strong></td>
+<td>Progressive Web App (installable, offline-capable web app)</td>
+</tr>
+<tr>
+<td><strong>Curated QA / <code>qa_direct</code></strong></td>
+<td>A human-authored Q&amp;A served verbatim when retrieval is highly similar</td>
+</tr>
+<tr>
+<td><strong>Escalation</strong></td>
+<td>Routing a question to a human engineer</td>
+</tr>
+<tr>
+<td><strong>Confidence</strong></td>
+<td>Top retrieval cosine similarity, used to decide answer path</td>
+</tr>
+<tr>
+<td><strong>Engineer</strong></td>
+<td>An agronomist user who answers escalated questions and curates knowledge</td>
+</tr>
+<tr>
+<td><strong>JWT / RBAC / RLS</strong></td>
+<td>JSON Web Token / Role-Based Access Control / Row-Level Security</td>
+</tr>
+<tr>
+<td><strong>Quiet hours</strong></td>
+<td>A per-device window during which push notifications are suppressed</td>
+</tr>
+</tbody></table>
+<h3>1.4 References</h3>
+<p><a href="01-PROJECT-CHARTER.md">Project Charter</a>, <a href="03-ARCHITECTURE.md">Architecture/SDD</a>,
+<a href="04-DATABASE.md">Database</a>, <a href="05-API.md">API</a>, <a href="06-TEST-PLAN.md">Test Plan</a>,
+<a href="07-RISK-REGISTER.md">Risk Register</a>, <a href="../OPERATIONS.md">Operations</a>,
+user manuals in <code>docs/HUONG-DAN-*.md</code>.</p>
+<hr>
+<h2>2. Overall description</h2>
+<h3>2.1 Product perspective</h3>
+<p>A new, self-contained system composed of a React PWA, an Express REST API, and a Supabase
+(Postgres + pgvector + Storage) backend, integrating Google Gemini (AI), Open-Meteo
+(weather), Twilio via Supabase Auth (OTP), and browser push services. See
+<a href="03-ARCHITECTURE.md#3-system-context-c4-level-1">Architecture §3–4</a>.</p>
+<h3>2.2 Product functions (summary)</h3>
+<ul>
+<li>AI question answering (text, photo, voice) with human escalation.</li>
+<li>Knowledge-base ingestion and curation.</li>
+<li>Engineer queue workflow.</li>
+<li>Community feed with moderation.</li>
+<li>Broadcast, scheduled, and weather-alert notifications.</li>
+<li>Weather information.</li>
+<li>User &amp; account administration with audit logging and analytics.</li>
+</ul>
+<h3>2.3 User classes</h3>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Description</th>
+<th>Technical proficiency</th>
+<th>Key needs</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Farmer</strong></td>
+<td>Elderly/low-literacy smallholders on cheap phones, outdoors</td>
+<td>Low</td>
+<td>Big text, voice/photo input, plain language, reliability</td>
+</tr>
+<tr>
+<td><strong>Engineer (agronomist)</strong></td>
+<td>Domain experts answering &amp; curating</td>
+<td>Medium</td>
+<td>Efficient queue, knowledge tooling, quality review</td>
+</tr>
+<tr>
+<td><strong>Admin</strong></td>
+<td>Cooperative/commune staff</td>
+<td>Medium</td>
+<td>User mgmt, broadcasts, moderation, analytics, audit</td>
+</tr>
+</tbody></table>
+<h3>2.4 Operating environment</h3>
+<ul>
+<li><strong>Client:</strong> modern mobile/desktop browsers; installable PWA; works on low-end Android.</li>
+<li><strong>Server:</strong> Node.js (ESM) on Railway (single replica) behind a reverse proxy.</li>
+<li><strong>Data:</strong> Supabase Postgres 17 + pgvector; Supabase Storage bucket <code>images</code>.</li>
+<li><strong>Network:</strong> intermittent rural connectivity; shared 4G/NAT common.</li>
+</ul>
+<h3>2.5 Design &amp; implementation constraints</h3>
+<p>See <a href="03-ARCHITECTURE.md#22-hard-constraints">Architecture §2.2</a>: single replica,
+manual <code>psql</code> migrations with soft-degrade, auto-deploy on push, scarce Gemini free-tier
+quota, free-tier infrastructure.</p>
+<hr>
+<h2>3. Actors &amp; use cases</h2>
+<h3>3.1 Use-case diagram</h3>
+<pre><code class="language-mermaid">graph LR
+    farmer([👨‍🌾 Farmer])
+    engineer([👨‍🔬 Engineer])
+    admin([🛠️ Admin])
+    sys([⚙️ System / Scheduler])
+
+    subgraph UC [Cò Con Dự Báo]
+        uc1[Register / Login]
+        uc2[Ask AI by text]
+        uc3[Ask AI with photo]
+        uc4[Ask by voice]
+        uc5[View chat history / bookmarks]
+        uc6[Escalate to engineer]
+        uc7[Rate / report answer]
+        uc8[Community feed: post / comment / like]
+        uc9[Report bad content]
+        uc10[Manage notifications &amp; weather]
+        uc11[Answer engineer queue]
+        uc12[Manage knowledge base]
+        uc13[Review AI quality / curate QA]
+        uc14[Manage users &amp; roles]
+        uc15[Broadcast notifications]
+        uc16[Moderate community]
+        uc17[View analytics &amp; audit]
+        uc18[Generate weather-alert drafts]
+        uc19[Send scheduled notifications]
+        uc20[Clean up old images]
+    end
+
+    farmer --- uc1 &amp; uc2 &amp; uc3 &amp; uc4 &amp; uc5 &amp; uc6 &amp; uc7 &amp; uc8 &amp; uc9 &amp; uc10
+    engineer --- uc1 &amp; uc11 &amp; uc12 &amp; uc13
+    admin --- uc1 &amp; uc11 &amp; uc12 &amp; uc13 &amp; uc14 &amp; uc15 &amp; uc16 &amp; uc17
+    sys --- uc18 &amp; uc19 &amp; uc20
+</code></pre>
+<p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
+<h3>3.2 Key use-case narratives</h3>
+<p><strong>UC-02 — Ask AI by text</strong> <em>(primary)</em></p>
+<ol>
+<li>Farmer types a question and (optionally) selects a crop.</li>
+<li>System runs the RAG pipeline (<a href="03-ARCHITECTURE.md#8-the-rag-subsystem-core">Architecture §8</a>).</li>
+<li>If confidence ≥ 0.5, the system returns an answer (curated or LLM-generated);
+otherwise it escalates to an engineer and tells the farmer.</li>
+<li>The conversation is persisted; the farmer may rate, report, bookmark, or escalate.</li>
+</ol>
+<ul>
+<li><em>Alt:</em> off-topic question → polite decline (no escalation).</li>
+<li><em>Alt:</em> Gemini quota exhausted → friendly &quot;try again in a minute&quot; (429).</li>
+</ul>
+<p><strong>UC-11 — Answer engineer queue</strong> <em>(primary)</em></p>
+<ol>
+<li>Engineer opens the pending queue; sees question, crop, optional photo, wait time.</li>
+<li>Engineer claims an item (atomic) and writes an answer.</li>
+<li>Optionally marks &quot;trustworthy&quot; → the QA is added to the knowledge base and embedded.</li>
+<li>The farmer is notified; the item becomes <code>resolved</code>.</li>
+</ol>
+<ul>
+<li><em>Alt:</em> two engineers claim simultaneously → second gets <code>409</code>.</li>
+<li><em>Alt:</em> item can&#39;t be answered → engineer deletes it; the farmer is notified.</li>
+</ul>
+<p><strong>UC-15 — Broadcast notifications</strong></p>
+<ol>
+<li>Admin composes a notification (type, optional image, crop targeting).</li>
+<li>Admin sends immediately or schedules a time.</li>
+<li>System delivers to opted-in, non-quiet-hours, crop-matched subscribers.</li>
+</ol>
+<p><strong>UC-18 — Generate weather-alert drafts</strong> <em>(system)</em></p>
+<ol>
+<li>Every 6 h the scheduler evaluates tomorrow&#39;s Open-Meteo forecast against thresholds.</li>
+<li>It creates draft alerts (deduped per kind/day) for admin approval — never auto-sent.</li>
+</ol>
+<hr>
+<h2>4. Functional requirements</h2>
+<p>Priority: <strong>M</strong> = Must, <strong>S</strong> = Should, <strong>C</strong> = Could.</p>
+<h3>4.1 Authentication &amp; account (FR-AUTH)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Pri</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-AUTH-01</td>
+<td>M</td>
+<td>Farmers can register/login with a Vietnamese mobile number and a 6-digit PIN.</td>
+</tr>
+<tr>
+<td>FR-AUTH-02</td>
+<td>S</td>
+<td>Farmers can request and verify an SMS OTP (phone verification).</td>
+</tr>
+<tr>
+<td>FR-AUTH-03</td>
+<td>M</td>
+<td>Engineers/admins log in with email + password (≥ 8 chars).</td>
+</tr>
+<tr>
+<td>FR-AUTH-04</td>
+<td>M</td>
+<td>Only admins can create engineer/admin accounts; new engineers start pending approval.</td>
+</tr>
+<tr>
+<td>FR-AUTH-05</td>
+<td>M</td>
+<td>The system issues a JWT (7 days email / 30 days phone) carrying user id, role, name.</td>
+</tr>
+<tr>
+<td>FR-AUTH-06</td>
+<td>M</td>
+<td>A locked account (<code>is_active=false</code>) is rejected within ≤ 60 s even with a valid token.</td>
+</tr>
+<tr>
+<td>FR-AUTH-07</td>
+<td>M</td>
+<td>Users can set/change their password/PIN, enforcing role-appropriate strength.</td>
+</tr>
+<tr>
+<td>FR-AUTH-08</td>
+<td>M</td>
+<td>After 5 wrong PINs, that phone is locked for 10 minutes.</td>
+</tr>
+<tr>
+<td>FR-AUTH-09</td>
+<td>M</td>
+<td>Users can view/update their profile (name, village, crops); crops limited to a whitelist.</td>
+</tr>
+<tr>
+<td>FR-AUTH-10</td>
+<td>M</td>
+<td>Users can self-delete: account disabled, PII nulled, images removed, history kept.</td>
+</tr>
+<tr>
+<td>FR-AUTH-11</td>
+<td>S</td>
+<td>OTP/login responses must not reveal whether a number is already registered.</td>
+</tr>
+</tbody></table>
+<h3>4.2 AI question answering (FR-CHAT)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Pri</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-CHAT-01</td>
+<td>M</td>
+<td>Farmers can ask a text question (≤ 1000 chars) and receive an answer via RAG.</td>
+</tr>
+<tr>
+<td>FR-CHAT-02</td>
+<td>M</td>
+<td>The system grounds answers in approved knowledge chunks; it must not fabricate beyond them.</td>
+</tr>
+<tr>
+<td>FR-CHAT-03</td>
+<td>M</td>
+<td>The system answers social/FAQ messages without consuming AI quota.</td>
+</tr>
+<tr>
+<td>FR-CHAT-04</td>
+<td>M</td>
+<td>The system caches answers (in-memory, durable DB, and semantic) to reduce AI calls.</td>
+</tr>
+<tr>
+<td>FR-CHAT-05</td>
+<td>M</td>
+<td>When a curated QA matches highly (sim ≥ 0.80), serve it verbatim (<code>qa_direct</code>).</td>
+</tr>
+<tr>
+<td>FR-CHAT-06</td>
+<td>M</td>
+<td>When confidence &lt; 0.5 (and not off-topic), escalate to an engineer and inform the farmer.</td>
+</tr>
+<tr>
+<td>FR-CHAT-07</td>
+<td>M</td>
+<td>When confidence is 0.5–0.7, answer with limited context and caution; ≥ 0.7, answer fully.</td>
+</tr>
+<tr>
+<td>FR-CHAT-08</td>
+<td>M</td>
+<td>Farmers can attach a pest photo; the system analyzes it (vision) or escalates if uncertain.</td>
+</tr>
+<tr>
+<td>FR-CHAT-09</td>
+<td>S</td>
+<td>Farmers can ask by voice; provide a server STT fallback for browsers lacking native STT.</td>
+</tr>
+<tr>
+<td>FR-CHAT-10</td>
+<td>M</td>
+<td>Off-topic (non-agriculture) low-confidence questions are politely declined, not escalated.</td>
+</tr>
+<tr>
+<td>FR-CHAT-11</td>
+<td>M</td>
+<td>The system maintains conversation context for follow-up/elliptical questions.</td>
+</tr>
+<tr>
+<td>FR-CHAT-12</td>
+<td>M</td>
+<td>The system retries transient Gemini 429/503 errors and degrades vision→text on failure.</td>
+</tr>
+<tr>
+<td>FR-CHAT-13</td>
+<td>M</td>
+<td>Farmers can view their session history with previews and full-content search.</td>
+</tr>
+<tr>
+<td>FR-CHAT-14</td>
+<td>S</td>
+<td>Farmers can bookmark answers and view a saved list.</td>
+</tr>
+<tr>
+<td>FR-CHAT-15</td>
+<td>M</td>
+<td>Farmers can rate an answer helpful (👍) or report it wrong/irrelevant/confusing (👎).</td>
+</tr>
+<tr>
+<td>FR-CHAT-16</td>
+<td>M</td>
+<td>Farmers can self-escalate an already-answered question to an engineer.</td>
+</tr>
+<tr>
+<td>FR-CHAT-17</td>
+<td>M</td>
+<td>A farmer can only access their own sessions/messages (ownership enforced).</td>
+</tr>
+</tbody></table>
+<h3>4.3 Engineer queue &amp; knowledge base (FR-ENG)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Pri</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-ENG-01</td>
+<td>M</td>
+<td>Engineers/admins can list pending/in-progress/resolved queue items with context and wait time.</td>
+</tr>
+<tr>
+<td>FR-ENG-02</td>
+<td>M</td>
+<td>Claiming a queue item is atomic; a second claimant receives a conflict.</td>
+</tr>
+<tr>
+<td>FR-ENG-03</td>
+<td>M</td>
+<td>Engineers can answer an item; editing a resolved answer overwrites (no duplicate).</td>
+</tr>
+<tr>
+<td>FR-ENG-04</td>
+<td>M</td>
+<td>Engineers can optionally promote an answer into the knowledge base (curated QA, embedded).</td>
+</tr>
+<tr>
+<td>FR-ENG-05</td>
+<td>M</td>
+<td>Deleting an unanswered item notifies the farmer so they don&#39;t wait indefinitely.</td>
+</tr>
+<tr>
+<td>FR-ENG-06</td>
+<td>S</td>
+<td>Engineers see personal stats (resolved totals, weekly, avg response time, KB additions).</td>
+</tr>
+<tr>
+<td>FR-ENG-07</td>
+<td>M</td>
+<td>Engineers/admins can upload PDF/DOCX/TXT documents; text is extracted and stored as draft.</td>
+</tr>
+<tr>
+<td>FR-ENG-08</td>
+<td>M</td>
+<td>Engineers/admins can author curated Q&amp;A directly.</td>
+</tr>
+<tr>
+<td>FR-ENG-09</td>
+<td>M</td>
+<td>Approving a document chunks and embeds it in the background; only approved docs are searchable.</td>
+</tr>
+<tr>
+<td>FR-ENG-10</td>
+<td>M</td>
+<td>Embedding must not destroy existing chunks on failure (replace only after success).</td>
+</tr>
+<tr>
+<td>FR-ENG-11</td>
+<td>M</td>
+<td>Documents can be archived; only non-approved drafts can be hard-deleted.</td>
+</tr>
+<tr>
+<td>FR-ENG-12</td>
+<td>M</td>
+<td>Staff may read an escalated conversation but not arbitrary farmer chats.</td>
+</tr>
+</tbody></table>
+<h3>4.4 Community (FR-COM)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Pri</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-COM-01</td>
+<td>S</td>
+<td>Authenticated users can view a paginated community feed, optionally filtered by crop.</td>
+</tr>
+<tr>
+<td>FR-COM-02</td>
+<td>S</td>
+<td>Users can create posts (text 1–1000, optional image) and delete their own (admin any).</td>
+</tr>
+<tr>
+<td>FR-COM-03</td>
+<td>S</td>
+<td>Users can comment (1–500) and like/unlike posts; authors are notified of new comments.</td>
+</tr>
+<tr>
+<td>FR-COM-04</td>
+<td>M</td>
+<td>Users can report bad posts/comments; admins see a grouped moderation queue and can dismiss.</td>
+</tr>
+<tr>
+<td>FR-COM-05</td>
+<td>M</td>
+<td>Deleting content removes its image and related reports.</td>
+</tr>
+</tbody></table>
+<h3>4.5 Notifications &amp; weather (FR-NOTIF)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Pri</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-NOTIF-01</td>
+<td>M</td>
+<td>Users can subscribe/unsubscribe to Web Push; first enable sends a welcome push.</td>
+</tr>
+<tr>
+<td>FR-NOTIF-02</td>
+<td>M</td>
+<td>Admins can broadcast notifications immediately or schedule them for a future time.</td>
+</tr>
+<tr>
+<td>FR-NOTIF-03</td>
+<td>M</td>
+<td>Delivery respects per-device opt-in types, quiet hours (incl. overnight), and crop targeting.</td>
+</tr>
+<tr>
+<td>FR-NOTIF-04</td>
+<td>M</td>
+<td>A scheduler delivers due scheduled notifications (≤ 60 s granularity, single replica).</td>
+</tr>
+<tr>
+<td>FR-NOTIF-05</td>
+<td>M</td>
+<td>The system generates weather-alert drafts (rain/heat/wind/cold) for admin approval; never auto-sends.</td>
+</tr>
+<tr>
+<td>FR-NOTIF-06</td>
+<td>M</td>
+<td>Users can list their notifications, open one, mark read, and configure settings.</td>
+</tr>
+<tr>
+<td>FR-NOTIF-07</td>
+<td>S</td>
+<td>Farmers who chose crops see crop-matched + general notifications; others see all.</td>
+</tr>
+<tr>
+<td>FR-NOTIF-08</td>
+<td>S</td>
+<td>The app shows local weather (Open-Meteo) with a 429 fallback.</td>
+</tr>
+<tr>
+<td>FR-NOTIF-09</td>
+<td>M</td>
+<td>Expired push subscriptions (HTTP 410) are deactivated automatically.</td>
+</tr>
+</tbody></table>
+<h3>4.6 Administration &amp; analytics (FR-ADMIN)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Pri</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-ADMIN-01</td>
+<td>M</td>
+<td>Admins can list/search users and lock/unlock or change roles (but not on themselves).</td>
+</tr>
+<tr>
+<td>FR-ADMIN-02</td>
+<td>M</td>
+<td>Admins can reset a farmer&#39;s PIN (random 6-digit, returned to relay).</td>
+</tr>
+<tr>
+<td>FR-ADMIN-03</td>
+<td>M</td>
+<td>Admins can view a dashboard (users, sessions, queue, RAG success rate, top crops, trends).</td>
+</tr>
+<tr>
+<td>FR-ADMIN-04</td>
+<td>S</td>
+<td>Admins can view &quot;knowledge gaps&quot; (low-confidence answers) to guide KB additions.</td>
+</tr>
+<tr>
+<td>FR-ADMIN-05</td>
+<td>M</td>
+<td>Admins/engineers can review AI answer quality and curate corrected QAs.</td>
+</tr>
+<tr>
+<td>FR-ADMIN-06</td>
+<td>M</td>
+<td>Admins can review 👎 reports and convert them into corrected knowledge.</td>
+</tr>
+<tr>
+<td>FR-ADMIN-07</td>
+<td>M</td>
+<td>Sensitive admin actions are recorded in an audit log.</td>
+</tr>
+<tr>
+<td>FR-ADMIN-08</td>
+<td>S</td>
+<td>Admins can export the user list as CSV (UTF-8, formula-injection-safe).</td>
+</tr>
+<tr>
+<td>FR-ADMIN-09</td>
+<td>S</td>
+<td>Admins can drill into a farmer&#39;s activity for phone support.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5. External interface requirements</h2>
+<h3>5.1 User interfaces</h3>
+<ul>
+<li>Mobile-first, high-contrast UI for farmers; large fonts and wide touch targets; plain
+Southern-Vietnamese language; voice and photo input; adjustable read-content zoom.</li>
+<li>Sidebar desktop layout for engineer/admin tooling.</li>
+<li>Answers render markdown and append a &quot;consult an engineer&quot; disclaimer for technical
+answers. Full UI design tokens are in <a href="../design.md">design.md</a>.</li>
+</ul>
+<h3>5.2 Software interfaces</h3>
+<table>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Direction</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Google Gemini (<code>@google/genai</code>)</td>
+<td>out</td>
+<td>Embeddings, text generation, vision, STT</td>
+</tr>
+<tr>
+<td>Supabase Postgres + RPC</td>
+<td>both</td>
+<td>System of record; vector search</td>
+</tr>
+<tr>
+<td>Supabase Storage</td>
+<td>both</td>
+<td>Image upload + public URLs</td>
+</tr>
+<tr>
+<td>Open-Meteo</td>
+<td>in</td>
+<td>Weather forecast</td>
+</tr>
+<tr>
+<td>Twilio (via Supabase Auth)</td>
+<td>out</td>
+<td>SMS OTP</td>
+</tr>
+<tr>
+<td>Browser push services (VAPID)</td>
+<td>out</td>
+<td>Web Push delivery</td>
+</tr>
+<tr>
+<td>Sentry</td>
+<td>out</td>
+<td>Error/performance telemetry</td>
+</tr>
+</tbody></table>
+<h3>5.3 Communication interfaces</h3>
+<p>HTTPS JSON REST under <code>/api/v1</code> (see <a href="05-API.md">API</a>); Web Push (VAPID); SMS (OTP).</p>
+<hr>
+<h2>6. Non-functional requirements</h2>
+<h3>6.1 Performance (NFR-PERF)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+<th>Basis</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-PERF-01</td>
+<td>A cached/FAQ/<code>qa_direct</code> answer returns without any LLM call (0 added latency from Gemini).</td>
+<td>Tiered cache design</td>
+</tr>
+<tr>
+<td>NFR-PERF-02</td>
+<td>A full LLM answer targets ≈ 1.8 s of Gemini latency (thinking disabled).</td>
+<td>Measured after SDK migration; <em>estimate, single answer</em></td>
+</tr>
+<tr>
+<td>NFR-PERF-03</td>
+<td>Chat client timeouts are 45 s (text) / 60 s (image) to tolerate retries.</td>
+<td><code>services/api.js</code></td>
+</tr>
+<tr>
+<td>NFR-PERF-04</td>
+<td>Frontend entry bundle kept small (~137 KB) via chunk splitting + lazy routes.</td>
+<td>Build output; <em>estimate</em></td>
+</tr>
+<tr>
+<td>NFR-PERF-05</td>
+<td>Embedding requests are throttled (≥ 700 ms apart) to respect free-tier limits.</td>
+<td><code>services/rag.js</code></td>
+</tr>
+</tbody></table>
+<h3>6.2 Security (NFR-SEC)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-SEC-01</td>
+<td>All non-public endpoints require a valid JWT; roles enforced via <code>requireRole</code>.</td>
+</tr>
+<tr>
+<td>NFR-SEC-02</td>
+<td>Passwords/PINs stored only as bcrypt hashes; never logged or returned.</td>
+</tr>
+<tr>
+<td>NFR-SEC-03</td>
+<td>Per-resource ownership (IDOR) checks on chat, bookmarks, feedback, reports.</td>
+</tr>
+<tr>
+<td>NFR-SEC-04</td>
+<td>RLS enabled on every table; backend uses service-role key, RLS as backstop.</td>
+</tr>
+<tr>
+<td>NFR-SEC-05</td>
+<td>Locked accounts blocked within ≤ 60 s via the denylist.</td>
+</tr>
+<tr>
+<td>NFR-SEC-06</td>
+<td>Rate limiting on chat/auth/OTP; PIN brute-force lockout.</td>
+</tr>
+<tr>
+<td>NFR-SEC-07</td>
+<td>Uploaded images re-encoded (metadata stripped) by <code>sharp</code>.</td>
+</tr>
+<tr>
+<td>NFR-SEC-08</td>
+<td>Input sanitized against PostgREST <code>.or()</code> injection and CSV formula injection.</td>
+</tr>
+<tr>
+<td>NFR-SEC-09</td>
+<td>Security headers via <code>helmet</code>; CORS restricted to the configured frontend origin.</td>
+</tr>
+<tr>
+<td>NFR-SEC-10</td>
+<td>No secrets in source; all via environment variables.</td>
+</tr>
+<tr>
+<td>NFR-SEC-11</td>
+<td>Generic 500 messages to clients (no DB/internal details leaked).</td>
+</tr>
+</tbody></table>
+<h3>6.3 Usability (NFR-USE)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-USE-01</td>
+<td>Primary farmer flows usable by low-literacy elderly users (voice/photo, plain language).</td>
+</tr>
+<tr>
+<td>NFR-USE-02</td>
+<td>High contrast and large, adjustable read-content text for outdoor/bright use.</td>
+</tr>
+<tr>
+<td>NFR-USE-03</td>
+<td>Friendly, non-technical error/empty states in Vietnamese.</td>
+</tr>
+<tr>
+<td>NFR-USE-04</td>
+<td>Technical answers carry a &quot;consult an engineer&quot; disclaimer.</td>
+</tr>
+</tbody></table>
+<h3>6.4 Reliability &amp; availability (NFR-REL)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-REL-01</td>
+<td>Vision failures degrade softly to text RAG; cache failures never break answering.</td>
+</tr>
+<tr>
+<td>NFR-REL-02</td>
+<td>Queries against not-yet-migrated tables degrade softly (no 500).</td>
+</tr>
+<tr>
+<td>NFR-REL-03</td>
+<td>A <code>/health</code> endpoint supports external uptime monitoring.</td>
+</tr>
+<tr>
+<td>NFR-REL-04</td>
+<td>Knowledge embedding is failure-safe (no chunk loss on mid-way error).</td>
+</tr>
+<tr>
+<td>NFR-REL-05</td>
+<td>The scheduled-notification loop guards against overlapping runs.</td>
+</tr>
+</tbody></table>
+<h3>6.5 Maintainability &amp; operability (NFR-MAINT)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-MAINT-01</td>
+<td>Errors reported to Sentry (both tiers) with user/role context in production.</td>
+</tr>
+<tr>
+<td>NFR-MAINT-02</td>
+<td>Gemini quota tracked; a warning is emitted at 80% of RPM/RPD.</td>
+</tr>
+<tr>
+<td>NFR-MAINT-03</td>
+<td>Backups/monitoring/quota procedures documented in <a href="../OPERATIONS.md">OPERATIONS</a>.</td>
+</tr>
+<tr>
+<td>NFR-MAINT-04</td>
+<td>Coding standards and architecture documented (<code>CLAUDE.md</code>, this doc set).</td>
+</tr>
+</tbody></table>
+<h3>6.6 Scalability (NFR-SCALE)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-SCALE-01</td>
+<td>Correct operation at one replica (pilot scale of the cooperative).</td>
+</tr>
+<tr>
+<td>NFR-SCALE-02</td>
+<td>A documented migration path to Redis + distributed locks exists for horizontal scaling.</td>
+</tr>
+</tbody></table>
+<h3>6.7 Portability &amp; compliance (NFR-PORT)</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>NFR-PORT-01</td>
+<td>Installable PWA running on modern mobile/desktop browsers, incl. low-end Android.</td>
+</tr>
+<tr>
+<td>NFR-PORT-02</td>
+<td>All user-facing content in Vietnamese; AI tuned to Southern-Vietnamese phrasing.</td>
+</tr>
+<tr>
+<td>NFR-PORT-03</td>
+<td>Account deletion removes PII while preserving referential history (tuân thủ Nghị định 13/2023/NĐ-CP về bảo vệ dữ liệu cá nhân).</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>7. Data requirements</h2>
+<ul>
+<li>The system of record is Supabase Postgres; the full schema, constraints, and RLS are
+specified in <a href="04-DATABASE.md">04-DATABASE</a>.</li>
+<li>Key entities: <code>users</code>, <code>chat_sessions</code>, <code>messages</code>, <code>engineer_queue</code>,
+<code>knowledge_docs</code>/<code>knowledge_chunks</code>, <code>notifications</code>/<code>push_subscriptions</code>,
+community tables, and feedback/audit tables.</li>
+<li>Embeddings are <code>vector(1536)</code>; changing the embedding model invalidates them (full
+re-embed required).</li>
+<li>Retention: pest chat images are deleted after 30 days; community/notification images
+persist; answer cache entries expire after ~1 hour.</li>
+</ul>
+<hr>
+<h2>8. Assumptions, dependencies &amp; constraints</h2>
+<ul>
+<li><strong>Assumptions:</strong> users have a smartphone with a modern browser and intermittent
+internet; the cooperative provides agronomist time to staff the queue and curate
+knowledge; pilot user count is on the order of tens.</li>
+<li><strong>Dependencies:</strong> availability of Gemini, Supabase, Open-Meteo, Twilio, Vercel, Railway,
+and browser push services (all free tier).</li>
+<li><strong>Constraints:</strong> scarce Gemini free-tier quota (primary source of 429 errors), single
+backend replica, manual migrations, auto-deploy on push. See
+<a href="03-ARCHITECTURE.md#22-hard-constraints">Architecture §2.2</a> and
+<a href="07-RISK-REGISTER.md">Risk Register</a>.</li>
+</ul>
+<hr>
+<h2>9. Requirement traceability</h2>
+<table>
+<thead>
+<tr>
+<th>Requirement group</th>
+<th>Realized in</th>
+<th>Verified by</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>FR-AUTH</td>
+<td><code>routes/auth.js</code>, <code>middleware/auth.js</code></td>
+<td><code>auth.middleware.test.js</code>; <a href="06-TEST-PLAN.md">Test Plan</a> TC-AUTH</td>
+</tr>
+<tr>
+<td>FR-CHAT</td>
+<td><code>routes/chat.js</code>, <code>services/rag.js</code></td>
+<td><code>rag.test.js</code>, <code>chat.access.test.js</code>, RAG eval</td>
+</tr>
+<tr>
+<td>FR-ENG</td>
+<td><code>routes/engineer.js</code>, <code>services/rag.js</code></td>
+<td><code>engineer.queue.test.js</code></td>
+</tr>
+<tr>
+<td>FR-COM</td>
+<td><code>routes/community.js</code></td>
+<td><code>community.test.js</code></td>
+</tr>
+<tr>
+<td>FR-NOTIF</td>
+<td><code>routes/push.js</code>, <code>services/notifications.js</code>, <code>services/weatherAlerts.js</code></td>
+<td><code>notifications.scheduler.test.js</code>, <code>push.scheduled.test.js</code>, <code>weatherAlerts.test.js</code></td>
+</tr>
+<tr>
+<td>FR-ADMIN</td>
+<td><code>routes/admin.js</code></td>
+<td><code>admin.endpoints.test.js</code></td>
+</tr>
+<tr>
+<td>NFR-*</td>
+<td>cross-cutting (<code>index.js</code>, services)</td>
+<td><a href="06-TEST-PLAN.md">Test Plan §NFR</a>, security review, eval</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Each FR maps to concrete handlers and at least one automated test or review activity.
+See the <a href="06-TEST-PLAN.md">Test Plan</a> for the case-by-case matrix.</p>
+</blockquote>

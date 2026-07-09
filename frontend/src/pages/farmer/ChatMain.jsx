@@ -254,11 +254,13 @@ export default function ChatMain() {
   const bottomRef   = useRef(null)
   const textareaRef = useRef(null)
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (!isSpeaking) setSpeakingMsgId(null) }, [isSpeaking])
 
   useEffect(() => {
     const sid = location.state?.sessionId
     if (!sid) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingHist(true)
     chatAPI.getMessages(sid)
       .then(res => {
@@ -278,6 +280,7 @@ export default function ChatMain() {
   }, [location.state?.sessionId])
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (transcript) setInputText(transcript) }, [transcript])
 
   useEffect(() => {

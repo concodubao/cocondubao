@@ -19,6 +19,7 @@ export default function ImageUpload() {
 
   // Ghi âm mô tả bằng giọng nói (nhất quán với màn Trò chuyện)
   const { transcript, isListening, isProcessing, error: sttError, startListening, stopListening } = useSTT()
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { if (transcript) setText(transcript) }, [transcript])
 
   function handleFile(e) {

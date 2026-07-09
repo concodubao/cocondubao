@@ -147,6 +147,7 @@ export default function Queue() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useEffect(() => { loadQueue() }, [tab])
 
   // Realtime Supabase là no-op ở đây: client dùng anon key (không đăng nhập Supabase
@@ -163,6 +164,7 @@ export default function Queue() {
     start()
     document.addEventListener('visibilitychange', onVisible)
     return () => { stop(); document.removeEventListener('visibilitychange', onVisible) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
   async function handleTake(item) {
