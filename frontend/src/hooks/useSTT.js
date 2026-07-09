@@ -12,10 +12,11 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
 const isSafari = /^((?!chrome|android|crios|fxios|edg|opr).)*safari/i.test(navigator.userAgent)
 const hasWebSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
-// Web Speech API CHỈ dùng cho Chromium (Chrome desktop/Android, Edge). Safari —
-// cả iOS, iPadOS lẫn macOS — tuy có webkitSpeechRecognition nhưng hay lỗi
-// 'network'/im lặng không nhận giọng → ép dùng fallback MediaRecorder + Gemini STT.
-const USE_WEB_SPEECH = hasWebSpeech && !isIOS && !isSafari
+// Web Speech API trên Chrome Desktop đôi khi bị lỗi silent (không nhận diện được 
+// dù có tiếng) do xung đột microphone hoặc lỗi kết nối ngầm tới Google Server.
+// → Ép dùng luôn MediaRecorder + Gemini STT (fallback) cho TẤT CẢ trình duyệt
+// để đảm bảo tính ổn định và chính xác cao nhất.
+const USE_WEB_SPEECH = false // Thay vì: hasWebSpeech && !isIOS && !isSafari
 
 export function useSTT() {
   const [transcript,    setTranscript]    = useState('')
