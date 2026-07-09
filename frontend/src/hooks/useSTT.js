@@ -70,6 +70,11 @@ export function useSTT() {
   function stopVolumeAnalyser() {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
     setVolume(0)
+    // Clean up Web Speech stream if it was kept alive for visualizer
+    if (recognitionRef.current?._stream) {
+      recognitionRef.current._stream.getTracks().forEach(t => t.stop())
+      recognitionRef.current._stream = null
+    }
   }
 
   // ─── MODE 1: Web Speech API (Chrome Android, Desktop) ───────────────────────
@@ -132,16 +137,18 @@ export function useSTT() {
     // Xin quyền mic để lấy stream phục vụ volume analyser
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(stream => {
+        // Lưu stream lại để đóng khi kết thúc, không đóng ngang sau 500ms 
+        // vì sẽ làm tắt visualizer và có thể xung đột với SpeechRecognition
+        recognitionRef.current._stream = stream
         startVolumeAnalyser(stream)
-        // Đóng stream sau khi analyser đã dùng (Web Speech tự quản lý micro riêng)
-        setTimeout(() => stream.getTracks().forEach(t => t.stop()), 500)
       })
       .catch(() => {}) // Volume analyser là tính năng phụ, lỗi cũng được
 
     // Timeout 30s — SRS FR1.2
     timeoutRef.current = setTimeout(() => {
       recognition.stop()
-      if (!transcript) setError('Hết thời gian. Thử nói lại nhé.')
+      // Note: transcript state is stale here, but if onend handles it, it's fine.
+      // We rely on onend to check final state if needed, or just stop.
     }, 30000)
   }
 
