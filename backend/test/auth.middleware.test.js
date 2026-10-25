@@ -3,9 +3,11 @@ import jwt from 'jsonwebtoken'
 
 // Middleware giờ import services/supabase.js (denylist tài khoản bị khoá) → mock để
 // không tạo client thật (thiếu env trong test sẽ throw "supabaseUrl is required").
-vi.mock('../src/services/supabase.js', () => ({ supabase: { from: () => ({}) } }))
+const sb = vi.hoisted(() => ({ from: () => ({}) }))
+vi.mock('../src/services/supabase.js', () => ({ supabase: { from: (...a) => sb.from(...a) } }))
 
-const { verifyJWT, requireRole, markInactive, markActive } = await import('../src/middleware/auth.js')
+const { verifyJWT, requireRole, markInactive, markActive, refreshInactiveUsers, setUserRole } =
+  await import('../src/middleware/auth.js')
 
 const SECRET = 'test-secret-key'
 
@@ -119,6 +121,51 @@ describe('verifyJWT', () => {
 
     expect(res.statusCode).toBe(401)
     expect(next).not.toHaveBeenCalled()
+  })
+})
+
+describe('verifyJWT — vai trò staff đã đổi', () => {
+  // DB: eng1 vẫn là engineer; admin1 đã bị hạ xuống farmer (không còn trong danh sách staff)
+  beforeAll(async () => {
+    const result = (q) => ({ data: q === 'staff' ? [{ id: 'eng1', role: 'engineer' }] : [], error: null })
+    sb.from = () => ({
+      select: () => ({
+        eq: () => Promise.resolve(result('inactive')),
+        in: () => Promise.resolve(result('staff')),
+      }),
+    })
+    await refreshInactiveUsers()
+  })
+
+  const call = (payload) => {
+    const req = { headers: { authorization: `Bearer ${jwt.sign(payload, SECRET)}` } }
+    const res = mockRes()
+    const next = vi.fn()
+    verifyJWT(req, res, next)
+    return { res, next }
+  }
+
+  it('token admin của người đã bị hạ quyền → 401 (bắt đăng nhập lại)', () => {
+    const { res, next } = call({ userId: 'admin1', role: 'admin' })
+    expect(res.statusCode).toBe(401)
+    expect(next).not.toHaveBeenCalled()
+  })
+
+  it('token engineer khớp vai trò hiện tại → cho qua', () => {
+    const { next } = call({ userId: 'eng1', role: 'engineer' })
+    expect(next).toHaveBeenCalledOnce()
+  })
+
+  it('token farmer không bị ảnh hưởng', () => {
+    const { next } = call({ userId: 'f1', role: 'farmer' })
+    expect(next).toHaveBeenCalledOnce()
+  })
+
+  it('setUserRole (admin vừa tạo/đổi vai trò) có hiệu lực ngay, không chờ poller', () => {
+    setUserRole('new1', 'engineer')
+    expect(call({ userId: 'new1', role: 'engineer' }).next).toHaveBeenCalledOnce()
+    setUserRole('new1', 'farmer')
+    expect(call({ userId: 'new1', role: 'engineer' }).res.statusCode).toBe(401)
   })
 })
 

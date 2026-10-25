@@ -8,11 +8,23 @@
 
 import express from 'express'
 import bcrypt  from 'bcrypt'
-import { verifyJWT, requireRole, markInactive, markActive } from '../middleware/auth.js'
+import { randomInt } from 'node:crypto'
+import { verifyJWT, requireRole, markInactive, markActive, setUserRole } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
 import { embedAndStoreDoc } from '../services/rag.js'
 
 const router = express.Router()
+
+// limit/offset từ query: chặn NaN (PostgREST lỗi) và limit khổng lồ (kéo cả bảng).
+function pageParams(q, defLimit = 50, maxLimit = 200) {
+  const limit  = Math.min(maxLimit, Math.max(1, parseInt(q.limit, 10)  || defLimit))
+  const offset = Math.max(0, parseInt(q.offset, 10) || 0)
+  return { limit, offset }
+}
+
+// Server Railway chạy UTC → gom ngày theo giờ VN, nếu không phiên 0h–7h sáng
+// bị đếm sang ngày hôm trước.
+const VN_DAY = { day: '2-digit', month: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }
 
 // Ghi nhật ký thao tác admin. Không chặn luồng chính nếu bảng chưa có (degrade mềm).
 async function logAudit(req, action, target, detail) {
@@ -62,10 +74,12 @@ router.post('/engineers', verifyJWT, requireRole('admin'), async (req, res) => {
       .single()
 
     if (error) throw error
+    setUserRole(user.id, role) // để token mới của tài khoản này qua được kiểm vai trò ngay
     logAudit(req, 'create_staff', user, `Tạo tài khoản ${role}`)
     res.json({ success: true, user })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[ADMIN] create staff error:', err)
+    res.status(500).json({ error: 'Không tạo được tài khoản.' })
   }
 })
 
@@ -115,11 +129,11 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
     const dayMap = {}
     for (let i = 6; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000)
-      const key = d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+      const key = d.toLocaleDateString('vi-VN', VN_DAY)
       dayMap[key] = 0
     }
     ;(sessionsByDay || []).forEach(s => {
-      const key = new Date(s.created_at).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+      const key = new Date(s.created_at).toLocaleDateString('vi-VN', VN_DAY)
       if (dayMap[key] !== undefined) dayMap[key]++
     })
 
@@ -220,7 +234,8 @@ router.get('/knowledge-gaps', verifyJWT, requireRole('admin'), async (req, res) 
 // Ít PII (không kèm tên/SĐT nông dân) — chỉ để đánh giá AI đúng/sai.
 // Mở cho cả kỹ sư: họ là người hiểu chuyên môn để bắt câu AI trả lời sai.
 router.get('/ai-review', verifyJWT, requireRole('admin', 'engineer'), async (req, res) => {
-  const { filter = 'all', limit = 40 } = req.query
+  const { filter = 'all' } = req.query
+  const { limit } = pageParams(req.query, 40, 100)
   try {
     const since = new Date(Date.now() - 30 * 86400000).toISOString()
     let answers = []
@@ -329,7 +344,8 @@ router.post('/knowledge-qa', verifyJWT, requireRole('admin', 'engineer'), async 
 
 // ── GET /admin/users ──────────────────────────────────────────────────────────
 router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
-  const { role, search, limit = 50, offset = 0 } = req.query
+  const { role, search } = req.query
+  const { limit, offset } = pageParams(req.query)
 
   let query = supabase
     .from('users')
@@ -349,8 +365,8 @@ router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
   res.json({ users: data })
 })
 
-// Test Sentry route
-router.get('/sentry-test', requireRole('admin'), (req, res) => {
+// Test Sentry route (admin) — trước thiếu verifyJWT nên luôn 401, không dùng được.
+router.get('/sentry-test', verifyJWT, requireRole('admin'), () => {
   throw new Error('Sentry test error from Cò Con Backend!')
 })
 
@@ -380,7 +396,7 @@ router.get('/users/export', verifyJWT, requireRole('admin'), async (req, res) =>
     u.name, u.phone, u.email, ROLE[u.role] || u.role, u.village,
     Array.isArray(u.crops) ? u.crops.join('; ') : '',
     u.is_active ? 'Hoạt động' : 'Khóa',
-    u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN') : '',
+    u.created_at ? new Date(u.created_at).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '',
   ].map(esc).join(','))
 
   // BOM (﻿) để Excel mở đúng tiếng Việt UTF-8
@@ -451,8 +467,9 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
   const { is_active, role } = req.body
   const updates = {}
 
-  if (is_active !== undefined) updates.is_active = is_active
+  if (typeof is_active === 'boolean') updates.is_active = is_active
   if (role && ['farmer','engineer','admin'].includes(role)) updates.role = role
+  if (!Object.keys(updates).length) return res.status(400).json({ error: 'Không có thay đổi hợp lệ.' })
 
   const { data, error } = await supabase
     .from('users')
@@ -464,12 +481,14 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
   if (error) return res.status(500).json({ error: error.message })
 
   // Cập nhật denylist để khoá/mở khoá có hiệu lực tức thì (không chờ poller 60s)
-  if (is_active === false) markInactive(req.params.id)
-  if (is_active === true)  markActive(req.params.id)
+  if (updates.is_active === false) markInactive(req.params.id)
+  if (updates.is_active === true)  markActive(req.params.id)
+  // Đổi vai trò: token cũ mang quyền staff bị vô hiệu ngay (xem middleware/auth.js)
+  if (updates.role) setUserRole(req.params.id, updates.role)
 
   let action = 'update_user', detail = ''
-  if (is_active !== undefined) { action = is_active ? 'unlock_user' : 'lock_user'; detail = is_active ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }
-  if (role) { action = 'change_role'; detail = `Đổi vai trò → ${role}` }
+  if (updates.is_active !== undefined) { action = is_active ? 'unlock_user' : 'lock_user'; detail = is_active ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }
+  if (updates.role) { action = 'change_role'; detail = `Đổi vai trò → ${role}` }
   logAudit(req, action, data, detail)
 
   res.json({ success: true, user: data })
@@ -487,7 +506,7 @@ router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req
       return res.status(400).json({ error: 'Chỉ đặt lại PIN cho tài khoản nông dân.' })
     }
 
-    const pin  = String(Math.floor(100000 + Math.random() * 900000)) // PIN 6 số ngẫu nhiên
+    const pin  = String(randomInt(100000, 1000000)) // PIN 6 số, CSPRNG (không dùng Math.random)
     const hash = await bcrypt.hash(pin, 10)
     const { data, error } = await supabase
       .from('users')
@@ -500,13 +519,15 @@ router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req
     logAudit(req, 'reset_pin', data, 'Đặt lại mã PIN')
     res.json({ success: true, pin, user: data }) // trả PIN để admin báo lại cho nông dân
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    console.error('[ADMIN] reset-pin error:', err)
+    res.status(500).json({ error: 'Không đặt lại được mã PIN.' })
   }
 })
 
 // ── GET /admin/ai-errors ──────────────────────────────────────────────────────
 router.get('/ai-errors', verifyJWT, requireRole('admin'), async (req, res) => {
-  const { reviewed, limit = 30, offset = 0 } = req.query
+  const { reviewed } = req.query
+  const { limit, offset } = pageParams(req.query, 30, 100)
 
   let query = supabase
     .from('ai_error_reports')

@@ -12,7 +12,8 @@ export async function sendPush(subscription, payload) {
     await webpush.sendNotification(subscription, JSON.stringify(payload))
     return { success: true }
   } catch (err) {
-    if (err.statusCode === 410) {
+    // 410 Gone / 404 Not Found = subscription hết hạn hoặc bị huỷ phía push service
+    if (err.statusCode === 410 || err.statusCode === 404) {
       await supabase
         .from('push_subscriptions')
         .update({ active: false })
@@ -23,14 +24,22 @@ export async function sendPush(subscription, payload) {
 }
 
 // ─── Kiểm tra khung giờ yên tĩnh (hỗ trợ khung qua nửa đêm, vd 22:00-06:00) ──
+// Giờ yên tĩnh do nông dân đặt theo giờ VIỆT NAM. Server Railway chạy UTC → trước
+// đây getHours() lệch 7 tiếng: khung 22:00–06:00 thành chặn 05:00–13:00 giờ VN và
+// lại GỬI lúc nửa đêm. VN không có giờ mùa hè → cộng cố định +7h.
+const VN_OFFSET_MIN = 7 * 60
+function vnMinutesOfDay(date = new Date()) {
+  return (date.getUTCHours() * 60 + date.getUTCMinutes() + VN_OFFSET_MIN) % (24 * 60)
+}
+
 export function isQuietHour(quietStart, quietEnd) {
   if (!quietStart || !quietEnd) return false
-  const now  = new Date()
-  const hhmm = now.getHours() * 60 + now.getMinutes()
+  const hhmm = vnMinutesOfDay()
   const [sh, sm] = quietStart.split(':').map(Number)
   const [eh, em] = quietEnd.split(':').map(Number)
   const start = sh * 60 + sm
   const end   = eh * 60 + em
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return false // dữ liệu giờ hỏng → không chặn
   if (start > end) return hhmm >= start || hhmm < end
   return hhmm >= start && hhmm < end
 }
@@ -69,6 +78,10 @@ export async function dispatchNotification(notif) {
     const userMap = Object.fromEntries((users || []).map(u => [u.id, u.crops || []]))
     targetSubs = filtered.filter(sub => {
       const effectiveCrops = (sub.crops_filter?.length ? sub.crops_filter : userMap[sub.user_id]) || []
+      // Chưa chọn cây nào = nhận tất cả — khớp với danh sách thông báo trong app (G19).
+      // Trước đây danh sách hiện cảnh báo gắn cây cho người chưa chọn cây nhưng push
+      // thì không gửi → bà con bỏ lỡ cảnh báo sâu bệnh.
+      if (!effectiveCrops.length) return true
       return cropTags.some(tag => effectiveCrops.includes(tag))
     })
   }

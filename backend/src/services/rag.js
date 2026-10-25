@@ -83,7 +83,7 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
   const key = process.env.GOOGLE_API_KEY
   if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
 
-  const ai = new GoogleGenAI({ apiKey: key.trim() })
+  const ai = getAIClient()
 
   async function embedOne(text, attempt = 0) {
     try {
@@ -176,6 +176,16 @@ export function _clearAnswerCache() {
   _answerCache.clear()
 }
 
+// Kho tri thức vừa đổi (duyệt/sửa/lưu trữ tài liệu, kỹ sư sửa QA) → xoá cache câu
+// trả lời (L1 + L2/DB). Không thì câu SAI đã cache vẫn được trả thêm tới 1 giờ sau
+// khi kỹ sư đã sửa — đúng lúc nông dân hỏi lại để kiểm tra.
+export function invalidateAnswerCaches() {
+  _answerCache.clear()
+  try {
+    supabase.from(CACHE_TABLE).delete().neq('cache_key', '').then(() => {}, () => {})
+  } catch { /* cache chỉ là tối ưu */ }
+}
+
 export function setAnswerCache(question, cropType, result, embedding = null) {
   if (_answerCache.size >= CACHE_MAX) {
     // Xóa entry cũ nhất (insertion order)
@@ -256,7 +266,12 @@ export function getSemanticCache(embedding, cropType) {
 }
 
 // ─── LLM invoke với retry khi gặp 429 ────────────────────────────────────────
-async function invokeLLM(contents, attempt = 0) {
+// Tổng thời gian chờ retry có trần: frontend timeout 45s, Gemini có khi bảo "retry in
+// 40s" → chờ hết thì client đã bỏ đi, request vẫn chạy ngầm tốn quota. Vượt ngân
+// sách thì ném lỗi luôn để route trả 429 thân thiện ("chờ 1 phút rồi hỏi lại").
+const LLM_RETRY_BUDGET_MS = 30_000
+
+async function invokeLLM(contents, attempt = 0, deadline = Date.now() + LLM_RETRY_BUDGET_MS) {
   try {
     const ai = getAIClient()
     incrementGeminiUsage()
@@ -285,9 +300,13 @@ async function invokeLLM(contents, attempt = 0) {
         : Math.min(32000, 2000 * (2 ** attempt))
       // Thêm jitter để tránh thundering herd khi nhiều user cùng retry
       const wait = base + Math.random() * 1000
+      if (Date.now() + wait > deadline) {
+        console.warn(`[RAG] LLM 429/503 — cần chờ ${Math.round(wait / 1000)}s, vượt ngân sách retry → bỏ`)
+        throw err
+      }
       console.warn(`[RAG] LLM 429/503 — chờ ${Math.round(wait / 1000)}s (attempt ${attempt + 1}/4)`)
       await new Promise(r => setTimeout(r, wait))
-      return invokeLLM(contents, attempt + 1)
+      return invokeLLM(contents, attempt + 1, deadline)
     }
     throw err
   }
@@ -431,6 +450,51 @@ export function extractCuratedAnswer(chunk, similarity) {
   return answer.length > 0 ? answer : null
 }
 
+// ─── Tìm chunk liên quan, lọc theo cây trồng ─────────────────────────────────
+// RPC lọc `filter_crop = ANY(crop_tags)` → tài liệu crop_tags RỖNG bị loại khi nông
+// dân có chọn cây. Mà MỌI QA biên soạn (kỹ sư tick "tin cậy", Soát AI, sửa báo lỗi,
+// Soạn Hỏi–Đáp không chọn cây) đều lưu crop_tags rỗng → nông dân đã chọn cây (đa số,
+// ChatMain mặc định cây đầu tiên trong hồ sơ) KHÔNG BAO GIỜ thấy các QA đó.
+// Sửa ở đây (không cần migration): tìm không lọc rồi tự lọc — tags rỗng = áp dụng
+// cho mọi cây, tags có = phải chứa cây đang hỏi.
+const MATCH_COUNT = 5
+async function searchChunks(queryEmbedding, cropType) {
+  const { data, error } = await supabase.rpc('match_knowledge_chunks', {
+    query_embedding: queryEmbedding,
+    match_threshold: 0.5,
+    match_count:     cropType ? MATCH_COUNT * 3 : MATCH_COUNT, // lọc xong vẫn đủ 5
+    filter_crop:     null,
+  })
+  if (error) {
+    console.error('[RAG] pgvector search error:', error)
+    throw error
+  }
+  const chunks = data || []
+  if (!cropType || !chunks.length) return chunks.slice(0, MATCH_COUNT)
+
+  try {
+    const docIds = [...new Set(chunks.map(c => c.doc_id).filter(Boolean))]
+    const { data: docs, error: dErr } = await supabase
+      .from('knowledge_docs').select('id, crop_tags').in('id', docIds)
+    if (dErr || !docs) throw dErr || new Error('no docs')
+    const tagsOf = new Map(docs.map(d => [d.id, d.crop_tags || []]))
+    return chunks
+      .filter(c => { const t = tagsOf.get(c.doc_id) || []; return !t.length || t.includes(cropType) })
+      .slice(0, MATCH_COUNT)
+  } catch (e) {
+    // Không lấy được tags → thà trả chunk không lọc cây còn hơn bỏ trống (đẩy kỹ sư oan)
+    console.warn('[RAG] crop filter skipped:', e?.message)
+    return chunks.slice(0, MATCH_COUNT)
+  }
+}
+
+// Gemini trả text rỗng (bị chặn an toàn / hết token trước khi viết) → trước đây lưu
+// message content null, nông dân thấy bong bóng trống. Chuyển kỹ sư cho chắc.
+function emptyAnswerFallback() {
+  console.warn('[RAG] LLM trả về rỗng → chuyển kỹ sư')
+  return { answer: null, confidence: 0, needEngineer: true, source: 'rag', chunksFound: 0 }
+}
+
 // ─── askRAG: hàm chính được gọi từ chat route ─────────────────────────────────
 // history: mảng { role: 'user'|'assistant', content: string } — 3-5 tin gần nhất
 export async function askRAG(question, cropType = null, history = []) {
@@ -443,49 +507,46 @@ export async function askRAG(question, cropType = null, history = []) {
       return { answer: faqAnswer, confidence: 1.0, needEngineer: false, source: 'faq', chunksFound: 0 }
     }
 
-    // BƯỚC 0B: Cache in-memory (L1) — tránh gọi Gemini cho câu hỏi lặp lại
-    const cached = getAnswerCache(question, cropType)
-    if (cached) {
-      console.log(`[RAG] cache hit (L1) for "${question.slice(0, 50)}..."`)
-      return { ...cached, source: cached.source + '_cached' }
+    // Câu NỐI ("còn cách khác", "đạo ôn thì sao") phụ thuộc câu trước → KHÔNG dùng
+    // cache theo chuỗi câu hỏi: trước đây "còn cách khác" của người hỏi về rầy được
+    // cache, người sau hỏi "còn cách khác" về đạo ôn nhận nhầm câu trả lời về rầy.
+    const retrievalQuery = contextualizeQuery(question, history)
+    const isFollowUp     = retrievalQuery !== question
+    if (isFollowUp) {
+      console.log(`[RAG] contextualize "${question}" → "${retrievalQuery.slice(0, 60)}..." (bỏ qua cache)`)
     }
-
-    // BƯỚC 0C: Cache DB (L2) — bền qua deploy. Nạp lại vào L1 nếu trúng.
     const cacheKey = _cacheKey(question, cropType)
-    const dbCached = await dbGetCache(cacheKey)
-    if (dbCached) {
-      console.log(`[RAG] cache hit (L2/DB) for "${question.slice(0, 50)}..."`)
-      setAnswerCache(question, cropType, dbCached)
-      return { ...dbCached, source: dbCached.source + '_dbcached' }
+
+    if (!isFollowUp) {
+      // BƯỚC 0B: Cache in-memory (L1) — tránh gọi Gemini cho câu hỏi lặp lại
+      const cached = getAnswerCache(question, cropType)
+      if (cached) {
+        console.log(`[RAG] cache hit (L1) for "${question.slice(0, 50)}..."`)
+        return { ...cached, source: cached.source + '_cached' }
+      }
+
+      // BƯỚC 0C: Cache DB (L2) — bền qua deploy. Nạp lại vào L1 nếu trúng.
+      const dbCached = await dbGetCache(cacheKey)
+      if (dbCached) {
+        console.log(`[RAG] cache hit (L2/DB) for "${question.slice(0, 50)}..."`)
+        setAnswerCache(question, cropType, dbCached)
+        return { ...dbCached, source: dbCached.source + '_dbcached' }
+      }
     }
 
     // BƯỚC 1: Embed câu hỏi (đã ghép ngữ cảnh nếu là câu nối) thành vector 1536 chiều
-    const retrievalQuery = contextualizeQuery(question, history)
-    if (retrievalQuery !== question) {
-      console.log(`[RAG] contextualize "${question}" → "${retrievalQuery.slice(0, 60)}..."`)
-    }
     const [queryEmbedding] = await embedTexts([retrievalQuery], 'RETRIEVAL_QUERY')
 
     // BƯỚC 1.5: Semantic cache — câu hỏi cùng ý dù diễn đạt khác → trả thẳng cache,
     // bỏ qua pgvector + LLM (tiết kiệm quota Gemini).
-    const sem = getSemanticCache(queryEmbedding, cropType)
+    const sem = isFollowUp ? null : getSemanticCache(queryEmbedding, cropType)
     if (sem) {
       console.log(`[RAG] semantic cache hit (sim=${sem.similarity.toFixed(3)}) for "${question.slice(0, 50)}..."`)
       return { ...sem.result, source: sem.result.source + '_semcached' }
     }
 
     // BƯỚC 2: Tìm top-5 chunks gần nhất trong pgvector
-    const { data: chunks, error } = await supabase.rpc('match_knowledge_chunks', {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.5,
-      match_count:     5,
-      filter_crop:     cropType || null,
-    })
-
-    if (error) {
-      console.error('[RAG] pgvector search error:', error)
-      throw error
-    }
+    const chunks = await searchChunks(queryEmbedding, cropType)
 
     const topSimilarity = chunks?.[0]?.similarity ?? 0
     const confidence    = topSimilarity
@@ -526,8 +587,10 @@ export async function askRAG(question, cropType = null, history = []) {
         source:       'qa_direct',
         chunksFound:  chunks.length,
       }
-      setAnswerCache(question, cropType, result, queryEmbedding)
-      dbSetCache(cacheKey, cropType, question, result)
+      if (!isFollowUp) {
+        setAnswerCache(question, cropType, result, queryEmbedding)
+        dbSetCache(cacheKey, cropType, question, result)
+      }
       return result
     }
 
@@ -536,6 +599,7 @@ export async function askRAG(question, cropType = null, history = []) {
       const context  = chunks.slice(0, 2).map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`).join('\n\n')
       const contents = buildMessages(context, question, history, true)
       const response = await invokeLLM(contents)
+      if (!response.content?.trim()) return emptyAnswerFallback()
       // Không cache low-confidence answers
       return {
         answer:       response.content,
@@ -554,6 +618,7 @@ export async function askRAG(question, cropType = null, history = []) {
     // BƯỚC 5: Gọi Gemini sinh câu trả lời (với retry tự động nếu 429)
     const contents = buildMessages(context, question, history, false)
     const response = await invokeLLM(contents)
+    if (!response.content?.trim()) return emptyAnswerFallback()
 
     const result = {
       answer:       response.content,
@@ -564,8 +629,10 @@ export async function askRAG(question, cropType = null, history = []) {
     }
 
     // Cache câu trả lời tin cậy cao (confidence ≥ 0.7) để tái sử dụng (L1 + L2/DB)
-    setAnswerCache(question, cropType, result, queryEmbedding)
-    dbSetCache(cacheKey, cropType, question, result)
+    if (!isFollowUp) {
+      setAnswerCache(question, cropType, result, queryEmbedding)
+      dbSetCache(cacheKey, cropType, question, result)
+    }
 
     return result
 
@@ -715,5 +782,6 @@ export async function embedAndStoreDoc(docId) {
   if (!updated?.length) throw new Error('Đã tạo chunks nhưng tài liệu không còn tồn tại (có thể đã bị xóa).')
 
   console.log(`[RAG] Embedded doc "${doc.title}" → ${chunks.length} chunks`)
+  invalidateAnswerCaches() // tri thức mới/đã sửa phải có hiệu lực ngay, không đợi cache hết hạn
   return { chunksCreated: chunks.length }
 }

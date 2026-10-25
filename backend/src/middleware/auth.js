@@ -14,7 +14,23 @@ const _inactiveUsers = new Set()
 export function markInactive(userId) { _inactiveUsers.add(userId) }
 export function markActive(userId)   { _inactiveUsers.delete(userId) }
 
-// Nạp lại danh sách userId bị khoá từ DB (gọi khi boot + định kỳ).
+// ─── Vai trò staff hiện hành (chống JWT mang vai trò cũ) ─────────────────────
+// Role nằm trong JWT nên admin hạ quyền (admin→farmer, engineer→farmer) trước đây
+// KHÔNG có hiệu lực tới khi token hết hạn (7–30 ngày). Giữ Map userId→role của mọi
+// tài khoản engineer/admin; token tự nhận là staff mà role thật khác → bắt đăng
+// nhập lại. Chỉ kiểm khi Map đã nạp xong (tránh chặn nhầm lúc vừa boot).
+// Token farmer được thăng lên staff thì vẫn chạy quyền farmer (ít quyền hơn) tới
+// khi đăng nhập lại — an toàn.
+const STAFF_ROLES = ['engineer', 'admin']
+const _staffRoles = new Map()
+let _staffRolesLoaded = false
+
+export function setUserRole(userId, role) {
+  if (STAFF_ROLES.includes(role)) _staffRoles.set(userId, role)
+  else _staffRoles.delete(userId)
+}
+
+// Nạp lại danh sách userId bị khoá + vai trò staff từ DB (gọi khi boot + định kỳ).
 export async function refreshInactiveUsers() {
   try {
     const { data, error } = await supabase
@@ -26,6 +42,19 @@ export async function refreshInactiveUsers() {
     for (const u of data || []) _inactiveUsers.add(u.id)
   } catch (err) {
     console.warn('[AUTH] refresh inactive users error:', err.message)
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, role')
+      .in('role', STAFF_ROLES)
+    if (error) { console.warn('[AUTH] refresh staff roles failed:', error.message); return }
+    _staffRoles.clear()
+    for (const u of data || []) _staffRoles.set(u.id, u.role)
+    _staffRolesLoaded = true
+  } catch (err) {
+    console.warn('[AUTH] refresh staff roles error:', err.message)
   }
 }
 
@@ -45,10 +74,16 @@ export function verifyJWT(req, res, next) {
 
   try {
     const token = authHeader.split(' ')[1]
-    const payload = jwt.verify(token, process.env.JWT_SECRET)
+    // Ghim thuật toán: chỉ chấp nhận HS256 (token tự ký), chặn alg-confusion.
+    const payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ['HS256'] })
     // Chặn ngay nếu tài khoản đã bị khoá, dù token còn hạn.
     if (_inactiveUsers.has(payload.userId)) {
       return res.status(401).json({ error: 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.' })
+    }
+    // Token mang quyền staff nhưng vai trò thật đã đổi → bắt đăng nhập lại.
+    if (_staffRolesLoaded && STAFF_ROLES.includes(payload.role)
+        && _staffRoles.get(payload.userId) !== payload.role) {
+      return res.status(401).json({ error: 'Quyền tài khoản đã thay đổi. Vui lòng đăng nhập lại.' })
     }
     req.user = payload
     

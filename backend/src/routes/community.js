@@ -24,6 +24,8 @@ function storagePathFromUrl(url) {
   return i === -1 ? null : url.slice(i + marker.length)
 }
 
+const VALID_CROPS = ['rice', 'veggie', 'fruit', 'other']
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 10 * 1024 * 1024 },
@@ -35,7 +37,9 @@ const upload = multer({
 
 // ─── GET /community/feed ──────────────────────────────────────────────────────
 router.get('/feed', verifyJWT, async (req, res) => {
-  const { limit = 20, offset = 0, crop } = req.query
+  const { crop } = req.query
+  const limit  = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20))
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0)
 
   let query = supabase
     .from('posts')
@@ -48,16 +52,17 @@ router.get('/feed', verifyJWT, async (req, res) => {
     .order('created_at', { ascending: false })
     .range(Number(offset), Number(offset) + Number(limit) - 1)
 
-  if (crop) query = query.contains('crop_tags', [crop])
+  if (VALID_CROPS.includes(crop)) query = query.contains('crop_tags', [crop])
 
   const { data: posts, error } = await query
   if (error) return res.status(500).json({ error: error.message })
 
-  // Lấy danh sách bài user hiện tại đã like (để hiển thị trạng thái nút)
-  const { data: myLikes } = await supabase
-    .from('post_likes')
-    .select('post_id')
-    .eq('user_id', req.user.userId)
+  // Bài user hiện tại đã like (để hiển thị trạng thái nút) — chỉ trong trang này,
+  // không kéo toàn bộ lịch sử like của user mỗi lần tải feed.
+  const postIds = (posts || []).map(p => p.id)
+  const { data: myLikes } = postIds.length
+    ? await supabase.from('post_likes').select('post_id').eq('user_id', req.user.userId).in('post_id', postIds)
+    : { data: [] }
 
   const likedSet = new Set((myLikes || []).map(l => l.post_id))
 
@@ -124,6 +129,7 @@ router.post('/posts', verifyJWT,
     if (req.file) {
       try {
         let buf = await sharp(req.file.buffer)
+          .rotate() // xoay theo EXIF trước khi bỏ metadata (ảnh dọc khỏi nằm ngang)
           .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
           .jpeg({ quality: 80 })
           .toBuffer()
@@ -145,8 +151,10 @@ router.post('/posts', verifyJWT,
       }
     }
 
+    // Chỉ nhận mảng loại cây hợp lệ — JSON lạ (object/chuỗi) trước đây làm insert lỗi 500
     let tags = []
-    try { tags = JSON.parse(cropTags || '[]') } catch {}
+    try { tags = JSON.parse(cropTags || '[]') } catch { /* bỏ qua tag hỏng */ }
+    tags = Array.isArray(tags) ? tags.filter(t => VALID_CROPS.includes(t)) : []
 
     const { data: post, error } = await supabase
       .from('posts')

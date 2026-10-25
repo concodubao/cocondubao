@@ -23,6 +23,11 @@ function isMissingTable(err) {
   return /does not exist|schema cache|could not find the table/i.test(err.message || '')
 }
 
+// cropType từ client được lưu vào chat_sessions và dùng lọc RAG → chỉ nhận giá trị hợp lệ.
+const VALID_CROPS = ['rice', 'veggie', 'fruit', 'other']
+const cleanCrop = (c) => (VALID_CROPS.includes(c) ? c : null)
+const MAX_QUESTION = 1000
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits:  { fileSize: 10 * 1024 * 1024 }, // 10MB max
@@ -89,13 +94,28 @@ async function getRecentHistory(sessionId, limit = 10) {
   }))
 }
 
+// ─── Helper: đẩy câu hỏi vào hàng đợi kỹ sư + báo kỹ sư ─────────────────────
+// PHẢI kiểm lỗi insert: trước đây bỏ qua → nông dân được báo "đã chuyển kỹ sư"
+// nhưng hàng đợi trống, không ai trả lời. Trả về true/false = đã vào hàng đợi chưa.
+async function enqueueForEngineer(messageId, pushTitle, question) {
+  const { error } = await supabase.from('engineer_queue').insert({ message_id: messageId, status: 'pending' })
+  if (error) {
+    console.error('[CHAT] engineer_queue insert failed:', error.message)
+    return false
+  }
+  notifyEngineer(pushTitle, (question || '').slice(0, 100))
+    .catch(e => console.warn('[PUSH] notify engineer failed:', e.message))
+  return true
+}
+
 // ─── POST /chat/ask — hỏi bằng text ─────────────────────────────────────────
 router.post('/ask', verifyJWT, async (req, res) => {
-  const { text, cropType, sessionId, testMode } = req.body
+  const { text, sessionId, testMode } = req.body
+  const cropType = cleanCrop(req.body.cropType)
   const userId = req.user.userId
 
-  if (!text?.trim()) return res.status(400).json({ error: 'Vui lòng nhập câu hỏi.' })
-  if (text.length > 1000) return res.status(400).json({ error: 'Câu hỏi quá dài (tối đa 1000 ký tự).' })
+  if (typeof text !== 'string' || !text.trim()) return res.status(400).json({ error: 'Vui lòng nhập câu hỏi.' })
+  if (text.length > MAX_QUESTION) return res.status(400).json({ error: 'Câu hỏi quá dài (tối đa 1000 ký tự).' })
 
   // Chế độ test (chỉ kỹ sư/admin, từ màn Test AI): chạy RAG để xem AI trả lời ra
   // sao nhưng KHÔNG lưu session/message, KHÔNG đẩy hàng đợi kỹ sư, KHÔNG push —
@@ -161,13 +181,7 @@ router.post('/ask', verifyJWT, async (req, res) => {
 
     let engineerQueued = false
     if (result.needEngineer && userMsg) {
-      await supabase.from('engineer_queue').insert({
-        message_id: userMsg.id,
-        status:     'pending',
-      })
-      notifyEngineer('Có câu hỏi mới từ nông dân', text.trim().slice(0, 100))
-        .catch(e => console.warn('[PUSH] notify engineer failed:', e.message))
-      engineerQueued = true
+      engineerQueued = await enqueueForEngineer(userMsg.id, 'Có câu hỏi mới từ nông dân', text.trim())
     }
 
     res.json({
@@ -223,8 +237,11 @@ async function analyzeImageWithGemini(imageBuffer, question) {
 
 // ─── POST /chat/ask-with-image — hỏi kèm ảnh sâu bệnh ───────────────────────
 router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, res) => {
-  const { text, cropType, sessionId } = req.body
+  const { text, sessionId } = req.body
+  const cropType = cleanCrop(req.body.cropType)
   const userId = req.user.userId
+
+  if (text && text.length > MAX_QUESTION) return res.status(400).json({ error: 'Câu hỏi quá dài (tối đa 1000 ký tự).' })
 
   try {
     // Chặn IDOR trước khi tốn công nén/upload ảnh (xem isOwnSession).
@@ -236,8 +253,10 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
     let imageBuffer = null
 
     if (req.file) {
-      // Nén ảnh — 2 bước nếu vẫn còn lớn sau lần đầu
+      // Nén ảnh — 2 bước nếu vẫn còn lớn sau lần đầu. rotate() xoay theo EXIF
+      // trước khi sharp bỏ metadata — nếu không ảnh chụp dọc từ điện thoại bị nằm ngang.
       imageBuffer = await sharp(req.file.buffer)
+        .rotate()
         .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer()
@@ -322,12 +341,9 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
       .select('id')
       .single()
 
+    let engineerQueued = false
     if (result.needEngineer && userMsg) {
-      await supabase.from('engineer_queue').insert({
-        message_id: userMsg.id, status: 'pending',
-      })
-      notifyEngineer('Nông dân gửi ảnh sâu bệnh cần tư vấn', question.slice(0, 100))
-        .catch(e => console.warn('[PUSH]', e.message))
+      engineerQueued = await enqueueForEngineer(userMsg.id, 'Nông dân gửi ảnh sâu bệnh cần tư vấn', question)
     }
 
     res.json({
@@ -336,7 +352,7 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
       source:         result.source,
       sessionId:      sid,
       imageUrl,
-      engineerQueued: result.needEngineer,
+      engineerQueued,
       needEngineer:   result.needEngineer,
       messageId:      answerMsg?.id,
     })
@@ -370,10 +386,12 @@ router.post('/stt-fallback', verifyJWT, uploadAudio.single('audio'), async (req,
       ]
     })
 
-    const transcript = result.text.trim()
+    const transcript = (result.text || '').trim()
+    if (!transcript) return res.status(422).json({ error: 'Không nghe rõ. Bác thử nói lại to và rõ hơn nhé.' })
     res.json({ transcript })
   } catch (err) {
     console.error('[STT] fallback error:', err.message)
+    if (isRateLimit(err)) return res.status(429).json({ error: RATE_LIMIT_MSG })
     res.status(500).json({ error: 'Không nhận dạng được giọng nói. Thử gõ câu hỏi nhé.' })
   }
 })
@@ -413,9 +431,8 @@ router.post('/escalate', verifyJWT, async (req, res) => {
       .from('engineer_queue').select('id').eq('message_id', question.id).limit(1)
     if (existing?.length) return res.json({ success: true, already: true })
 
-    await supabase.from('engineer_queue').insert({ message_id: question.id, status: 'pending' })
-    notifyEngineer('Nông dân muốn kỹ sư tư vấn thêm', (question.content || '').slice(0, 100))
-      .catch(e => console.warn('[PUSH] notify engineer failed:', e.message))
+    const queued = await enqueueForEngineer(question.id, 'Nông dân muốn kỹ sư tư vấn thêm', question.content)
+    if (!queued) return res.status(500).json({ error: 'Không gửi được cho kỹ sư. Thử lại nhé.' })
 
     res.json({ success: true })
   } catch (err) {
@@ -457,7 +474,7 @@ router.post('/report-error', verifyJWT, async (req, res) => {
       message_id: messageId,
       user_id:    req.user.userId,
       error_type: errorType,
-      note:       note?.trim() || null,
+      note:       typeof note === 'string' ? (note.trim().slice(0, 500) || null) : null,
     })
     res.json({ success: true })
   } catch (err) {

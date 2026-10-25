@@ -7,7 +7,7 @@ const SECRET = 'test-secret-key'
 
 const sb = vi.hoisted(() => {
   const queue = []
-  const CHAIN = ['select','insert','update','delete','eq','in','order','range',
+  const CHAIN = ['select','insert','update','upsert','delete','eq','in','order','range',
                  'contains','is','not','single','maybeSingle','limit','or','gte','lt','lte','gt','ilike']
   const makeBuilder = () => {
     const b = {}
@@ -84,5 +84,37 @@ describe('DELETE /push/scheduled/:id — hủy thông báo đã lên lịch', ()
   it('403 với kỹ sư', async () => {
     const res = await request(app).delete('/api/v1/push/scheduled/n1').set(eng())
     expect(res.status).toBe(403)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('POST /push/subscribe — chặn SSRF qua endpoint', () => {
+  const farmer = () => auth(tok('f1', 'farmer'))
+  const sub = (endpoint) => ({ subscription: { endpoint, keys: { p256dh: 'x', auth: 'y' } } })
+
+  it.each([
+    'http://fcm.googleapis.com/fcm/send/abc',         // không https
+    'https://169.254.169.254/latest/meta-data',        // metadata cloud
+    'https://localhost:3000/admin',                    // nội bộ
+    'https://evil.example.com/fcm.googleapis.com',     // host giả
+    'https://fcm.googleapis.com.evil.com/x',           // hậu tố giả
+    'https://fcm.googleapis.com:8443/x',               // cổng lạ
+    'not a url',
+  ])('400 với endpoint không phải push service: %s', async (endpoint) => {
+    const res = await request(app).post('/api/v1/push/subscribe').set(farmer()).send(sub(endpoint))
+    expect(res.status).toBe(400)
+  })
+
+  it('chấp nhận endpoint FCM / Mozilla / Apple / WNS thật', async () => {
+    for (const endpoint of [
+      'https://fcm.googleapis.com/fcm/send/abc123',
+      'https://updates.push.services.mozilla.com/wpush/v2/xyz',
+      'https://web.push.apple.com/QABC',
+      'https://wns2-par02p.notify.windows.com/w/?token=1',
+    ]) {
+      sb.enqueue({ data: [{ endpoint: 'old' }], error: null }, { data: null, error: null })
+      const res = await request(app).post('/api/v1/push/subscribe').set(farmer()).send(sub(endpoint))
+      expect(res.status).toBe(200)
+    }
   })
 })

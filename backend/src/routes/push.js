@@ -29,12 +29,36 @@ const uploadImg = multer({
 // ĐĂNG KÝ / HUỶ ĐĂNG KÝ
 // ══════════════════════════════════════════════════════════════════════════════
 
+// Server sẽ POST tới `endpoint` (welcome + mọi thông báo sau) → nếu nhận URL bất kỳ
+// thì user đăng nhập nào cũng biến backend thành máy bắn request vào host tuỳ ý
+// (SSRF: mạng nội bộ Railway, metadata cloud…). Chỉ chấp nhận https tới push service
+// thật của các trình duyệt.
+const PUSH_HOSTS = [
+  /^fcm\.googleapis\.com$/,                 // Chrome / Android / Opera / Samsung
+  /^android\.googleapis\.com$/,             // GCM cũ
+  /^updates\.push\.services\.mozilla\.com$/, // Firefox
+  /^web\.push\.apple\.com$/,                // Safari / iOS PWA
+  /\.push\.apple\.com$/,
+  /\.notify\.windows\.com$/,                // Edge legacy (WNS)
+]
+export function isValidPushEndpoint(endpoint) {
+  try {
+    const u = new URL(endpoint)
+    return u.protocol === 'https:' && !u.port && PUSH_HOSTS.some(re => re.test(u.hostname))
+  } catch {
+    return false
+  }
+}
+
 // POST /push/subscribe
 router.post('/subscribe', verifyJWT, async (req, res) => {
   const { subscription } = req.body
 
-  if (!subscription?.endpoint || !subscription?.keys) {
+  if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
     return res.status(400).json({ error: 'Thiếu thông tin subscription.' })
+  }
+  if (!isValidPushEndpoint(subscription.endpoint)) {
+    return res.status(400).json({ error: 'Địa chỉ nhận thông báo không hợp lệ.' })
   }
 
   try {
@@ -108,6 +132,7 @@ router.post('/upload-image', verifyJWT, requireRole('admin'),
     if (!req.file) return res.status(400).json({ error: 'Chưa chọn ảnh.' })
     try {
       let buf = await sharp(req.file.buffer)
+        .rotate() // xoay theo EXIF trước khi bỏ metadata
         .resize(1080, 1080, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer()
@@ -377,6 +402,9 @@ router.get('/notifications/:userId', verifyJWT, async (req, res) => {
         notification_reads!left ( read_at )
       `)
       .not('sent_at', 'is', null)
+      // Chỉ lấy lượt đọc CỦA user này. Trước đây embed mọi lượt đọc → 1 người đọc là
+      // thông báo hiện "đã đọc" với tất cả mọi người.
+      .eq('notification_reads.user_id', userId)
       .order('sent_at', { ascending: false })
       .limit(50)
 
@@ -431,11 +459,21 @@ router.patch('/notifications/settings', verifyJWT, async (req, res) => {
   const { notifTypes, cropsFilter, quietStart, quietEnd } = req.body
 
   try {
+    // Validate: dữ liệu rác (chuỗi thay mảng, giờ sai định dạng) trước đây ghi thẳng
+    // vào DB rồi làm scheduler lỗi khi parse ("ab".split(':')) / lọc sai.
+    const HHMM = /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/ // cột time trả về dạng HH:MM:SS
+    const isTime = (v) => v === null || v === '' || (typeof v === 'string' && HHMM.test(v))
+    const strArr = (v) => Array.isArray(v) && v.every(x => typeof x === 'string')
+    if (notifTypes  !== undefined && !strArr(notifTypes))  return res.status(400).json({ error: 'Loại thông báo không hợp lệ.' })
+    if (cropsFilter !== undefined && !strArr(cropsFilter)) return res.status(400).json({ error: 'Bộ lọc cây trồng không hợp lệ.' })
+    if (quietStart  !== undefined && !isTime(quietStart))  return res.status(400).json({ error: 'Giờ bắt đầu không hợp lệ.' })
+    if (quietEnd    !== undefined && !isTime(quietEnd))    return res.status(400).json({ error: 'Giờ kết thúc không hợp lệ.' })
+
     const updates = {}
     if (notifTypes)            updates.notif_types  = notifTypes
-    if (cropsFilter)           updates.crops_filter = cropsFilter
-    if (quietStart !== undefined) updates.quiet_start = quietStart
-    if (quietEnd   !== undefined) updates.quiet_end   = quietEnd
+    if (cropsFilter)           updates.crops_filter = cropsFilter.filter(c => ['rice', 'veggie', 'fruit', 'other'].includes(c))
+    if (quietStart !== undefined) updates.quiet_start = quietStart || null
+    if (quietEnd   !== undefined) updates.quiet_end   = quietEnd   || null
 
     const { data, error } = await supabase
       .from('push_subscriptions')

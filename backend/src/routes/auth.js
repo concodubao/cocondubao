@@ -4,7 +4,7 @@ import bcrypt      from 'bcrypt'
 import rateLimit   from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
 import { supabase }     from '../services/supabase.js'
-import { verifyJWT, requireRole } from '../middleware/auth.js'
+import { verifyJWT, requireRole, setUserRole, markInactive } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -57,26 +57,42 @@ function serverError(res, where, err) {
   return res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại sau.' })
 }
 
-// ─── Khoá chống dò PIN (in-memory; backstop cùng rate-limit theo IP) ──────────
-// PIN 6 số (1 triệu tổ hợp) nên cần chặn dò: sai 5 lần/1 số → khoá 10 phút.
+// ─── Khoá chống dò mật khẩu (in-memory; backstop cùng rate-limit theo IP) ─────
+// PIN 6 số (1 triệu tổ hợp) nên cần chặn dò: sai 5 lần/1 tài khoản → khoá 10 phút.
+// Dùng chung cho đăng nhập email (tài khoản staff/admin — đích giá trị nhất),
+// key dạng 'phone:<sđt>' / 'email:<email>'.
 const MAX_ATTEMPTS = 5
 const LOCK_MS      = 10 * 60 * 1000
-const _loginAttempts = new Map() // phone → { count, lockedUntil }
+const FAIL_WINDOW  = 30 * 60 * 1000  // lần sai cũ hơn 30 phút thì quên (đếm lại từ 0)
+const MAX_TRACKED  = 10_000          // trần bộ nhớ: dò hàng loạt số không làm phình Map
+const _loginAttempts = new Map() // key → { count, lockedUntil, lastFail }
 
-function lockMinutesLeft(phone) {
-  const a = _loginAttempts.get(phone)
+function lockMinutesLeft(key) {
+  const a = _loginAttempts.get(key)
   if (a?.lockedUntil && Date.now() < a.lockedUntil) {
     return Math.ceil((a.lockedUntil - Date.now()) / 60000)
   }
   return 0
 }
-function recordFail(phone) {
-  const a = _loginAttempts.get(phone) || { count: 0, lockedUntil: 0 }
+function recordFail(key) {
+  const now = Date.now()
+  let a = _loginAttempts.get(key)
+  if (!a || (now - a.lastFail > FAIL_WINDOW && now >= a.lockedUntil)) a = { count: 0, lockedUntil: 0, lastFail: 0 }
   a.count += 1
-  if (a.count >= MAX_ATTEMPTS) { a.lockedUntil = Date.now() + LOCK_MS; a.count = 0 }
-  _loginAttempts.set(phone, a)
+  a.lastFail = now
+  if (a.count >= MAX_ATTEMPTS) { a.lockedUntil = now + LOCK_MS; a.count = 0 }
+  _loginAttempts.delete(key) // set lại để key vừa sai nằm cuối thứ tự chèn
+  _loginAttempts.set(key, a)
+  if (_loginAttempts.size > MAX_TRACKED) {
+    // Bỏ entry cũ nhất không còn đang khoá
+    for (const [k, v] of _loginAttempts) {
+      if (now >= v.lockedUntil) { _loginAttempts.delete(k); break }
+    }
+  }
 }
-function clearFail(phone) { _loginAttempts.delete(phone) }
+function clearFail(key) { _loginAttempts.delete(key) }
+
+const MAX_NAME = 100
 
 // ─── POST /auth/request-otp ───────────────────────────────────────────────────
 router.post('/request-otp', otpLimiter, async (req, res) => {
@@ -172,6 +188,8 @@ router.post('/register-email', verifyJWT, requireRole('admin'), async (req, res)
     const { data: user, error } = await supabase.from('users')
       .insert({ email: normalizedEmail, password_hash, role, is_active }).select().single()
     if (error) throw error
+    setUserRole(user.id, role)
+    if (!is_active) markInactive(user.id)
     res.json({ success: true, pending: !is_active })
   } catch (err) {
     return serverError(res, 'auth', err)
@@ -185,15 +203,26 @@ router.post('/login-email', async (req, res) => {
 
   // Tài khoản tạo ra lưu email dạng lowercase (admin.js) → đăng nhập cũng phải
   // chuẩn hóa, nếu không gõ hoa/thừa khoảng trắng sẽ báo sai mật khẩu oan.
-  const normalizedEmail = email.trim().toLowerCase()
+  const normalizedEmail = String(email).trim().toLowerCase()
+  const lockKey = `email:${normalizedEmail}`
+
+  const lockMin = lockMinutesLeft(lockKey)
+  if (lockMin > 0) return res.status(429).json({ error: `Nhập sai mật khẩu nhiều lần. Thử lại sau ${lockMin} phút.` })
 
   try {
     const { data: user } = await supabase.from('users').select('*').eq('email', normalizedEmail).single()
-    if (!user || !user.password_hash) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' })
+    if (!user || !user.password_hash) {
+      recordFail(lockKey)
+      return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' })
+    }
 
-    const valid = await bcrypt.compare(password, user.password_hash)
-    if (!valid) return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' })
+    const valid = await bcrypt.compare(String(password), user.password_hash)
+    if (!valid) {
+      recordFail(lockKey)
+      return res.status(401).json({ error: 'Email hoặc mật khẩu không đúng.' })
+    }
     if (!user.is_active) return res.status(403).json({ error: 'Tài khoản đang chờ phê duyệt hoặc đã bị khoá.' })
+    clearFail(lockKey)
 
     const token = jwt.sign(
       { userId: user.id, phone: user.phone, role: user.role, name: user.name },
@@ -219,15 +248,20 @@ router.post('/register-phone', async (req, res) => {
   if (!/^\d{6}$/.test(password))    return res.status(400).json({ error: 'Mã PIN phải gồm đúng 6 chữ số.' })
 
   try {
-    const { data: existing } = await supabase.from('users').select('id, password_hash').eq('phone', normalized).single()
+    const { data: existing } = await supabase.from('users').select('id, password_hash, is_active').eq('phone', normalized).single()
     if (existing?.password_hash) return res.status(400).json({ error: 'Số điện thoại này đã đăng ký. Vui lòng đăng nhập.' })
+    // Tài khoản bị admin khoá (chưa có PIN) → KHÔNG cho tự đặt PIN để mở khoá lại.
+    // (Trước đây update luôn is_active:true → ai cũng "gỡ khoá" được bằng cách đăng ký.)
+    if (existing && existing.is_active === false) {
+      return res.status(403).json({ error: 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.' })
+    }
 
     const password_hash = await bcrypt.hash(password, 10)
     // Nếu đã có user (vd tạo qua OTP trước đây) nhưng chưa có PIN → gán PIN; nếu chưa có → tạo mới
     let user
     if (existing) {
       const { data, error } = await supabase.from('users')
-        .update({ password_hash, is_active: true }).eq('id', existing.id).select().single()
+        .update({ password_hash }).eq('id', existing.id).select().single()
       if (error) throw error
       user = data
     } else {
@@ -260,7 +294,8 @@ router.post('/login-phone', async (req, res) => {
   const normalized = normalizePhone(phone)
   if (!isValidPhone(normalized)) return res.status(400).json({ error: 'Số điện thoại không hợp lệ.' })
 
-  const lockMin = lockMinutesLeft(normalized)
+  const lockKey = `phone:${normalized}`
+  const lockMin = lockMinutesLeft(lockKey)
   if (lockMin > 0) return res.status(429).json({ error: `Nhập sai mã PIN nhiều lần. Thử lại sau ${lockMin} phút, hoặc dùng "Quên mã PIN".` })
 
   try {
@@ -268,14 +303,14 @@ router.post('/login-phone', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Số điện thoại chưa đăng ký.' })
     if (!user.password_hash) return res.status(401).json({ error: 'Tài khoản chưa đặt mã PIN. Hãy dùng "Quên mã PIN" để đặt lại.' })
 
-    const valid = await bcrypt.compare(password, user.password_hash)
+    const valid = await bcrypt.compare(String(password), user.password_hash)
     if (!valid) {
-      recordFail(normalized)
+      recordFail(lockKey)
       return res.status(401).json({ error: 'Mã PIN không đúng.' })
     }
     if (!user.is_active) return res.status(403).json({ error: 'Tài khoản đã bị khoá.' })
 
-    clearFail(normalized)
+    clearFail(lockKey)
     const token = jwt.sign(
       { userId: user.id, phone: user.phone, role: user.role, name: user.name },
       process.env.JWT_SECRET, { expiresIn: '30d' }
@@ -301,7 +336,8 @@ router.patch('/set-password', verifyJWT, async (req, res) => {
     if (existing?.password_hash) return res.status(400).json({ error: 'Tài khoản đã có mật khẩu. Dùng đổi mật khẩu thay thế.' })
 
     const hash = await bcrypt.hash(password, 12)
-    await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    const { error } = await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    if (error) throw error
     res.json({ success: true })
   } catch (err) {
     return serverError(res, 'auth', err)
@@ -324,7 +360,8 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
     if (!valid) return res.status(401).json({ error: 'Mật khẩu hiện tại không đúng.' })
 
     const hash = await bcrypt.hash(newPassword, 12)
-    await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    const { error } = await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
+    if (error) throw error
     res.json({ success: true })
   } catch (err) {
     return serverError(res, 'auth', err)
@@ -333,11 +370,16 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
 
 // ─── DELETE /auth/account — người dùng tự xoá tài khoản (vô hiệu hoá + xoá PII) ──
 // Dùng update (không hard-delete) để không vỡ FK của lịch sử chat/báo lỗi.
+// Xoá cả SĐT/email/mật khẩu: (1) SĐT là PII — giữ lại là chưa "xoá" thật; (2) nhả
+// unique(phone) để số này đăng ký lại được thành tài khoản MỚI, không kéo lịch sử
+// cũ về (nhà mạng có thể cấp lại số cho người khác).
 router.delete('/account', verifyJWT, async (req, res) => {
   try {
-    await supabase.from('users')
-      .update({ is_active: false, name: null, village: null, crops: [] })
+    const { error } = await supabase.from('users')
+      .update({ is_active: false, name: null, village: null, crops: [], phone: null, email: null, password_hash: null })
       .eq('id', req.user.userId)
+    if (error) throw error
+    markInactive(req.user.userId) // token còn hạn bị chặn ngay
     await supabase.from('push_subscriptions')
       .update({ active: false })
       .eq('user_id', req.user.userId)
@@ -382,11 +424,9 @@ router.patch('/profile', verifyJWT, async (req, res) => {
   try {
     const { name, village, crops } = req.body
     const updates = {}
-    if (name)                 updates.name    = name.trim()
-    if (village !== undefined) updates.village = (village ?? '').trim()
+    if (typeof name === 'string' && name.trim()) updates.name = name.trim().slice(0, MAX_NAME)
+    if (village !== undefined) updates.village = String(village ?? '').trim().slice(0, MAX_NAME)
     if (Array.isArray(crops)) updates.crops   = crops.filter(c => VALID_CROPS.includes(c))
-
-    console.log('[PROFILE] userId:', req.user.userId, '| updates:', updates)
 
     const { data: user, error } = await supabase
       .from('users').update(updates).eq('id', req.user.userId)

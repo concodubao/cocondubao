@@ -11,13 +11,13 @@ async function sendToSubscriptions(subscriptions, payload) {
         payload
       ).catch(err => {
         console.warn('[PUSH] send failed:', err.message)
-        // Nếu subscription hết hạn (410 Gone) → đánh dấu inactive
-        if (err.statusCode === 410) {
+        // Subscription hết hạn (410 Gone / 404 Not Found) → đánh dấu inactive.
+        // (.then(ok, fail) — builder Supabase là thenable, không chắc có .catch)
+        if (err.statusCode === 410 || err.statusCode === 404) {
           supabase.from('push_subscriptions')
             .update({ active: false })
             .eq('endpoint', sub.endpoint)
-            .then(() => {})
-            .catch(() => {})
+            .then(() => {}, () => {})
         }
       })
     )

@@ -35,16 +35,29 @@ beforeEach(() => {
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Giờ yên tĩnh tính theo giờ VN (UTC+7) bất kể múi giờ của server/CI.
+const vnTime = (h) => new Date(Date.UTC(2026, 0, 1, h - 7, 0, 0))
+
 describe('isQuietHour', () => {
+  it('dùng giờ VN, không phải giờ server (Railway chạy UTC)', () => {
+    // 23:00 VN = 16:00 UTC → trong khung 22:00–06:00 dù giờ UTC là 16h
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 1, 16, 0, 0)))
+    expect(isQuietHour('22:00', '06:00')).toBe(true)
+    // 10:00 VN = 03:00 UTC → KHÔNG yên tĩnh dù giờ UTC (03h) nằm trong khung
+    vi.setSystemTime(new Date(Date.UTC(2026, 0, 1, 3, 0, 0)))
+    expect(isQuietHour('22:00', '06:00')).toBe(false)
+    vi.useRealTimers()
+  })
+
   it('khung trong ngày 08:00-17:00', () => {
-    const at = (h) => { vi.setSystemTime(new Date(2026, 0, 1, h, 0, 0)); return isQuietHour('08:00', '17:00') }
+    const at = (h) => { vi.setSystemTime(vnTime(h)); return isQuietHour('08:00', '17:00') }
     expect(at(10)).toBe(true)
     expect(at(20)).toBe(false)
     vi.useRealTimers()
   })
 
   it('khung qua nửa đêm 22:00-06:00', () => {
-    const at = (h) => { vi.setSystemTime(new Date(2026, 0, 1, h, 0, 0)); return isQuietHour('22:00', '06:00') }
+    const at = (h) => { vi.setSystemTime(vnTime(h)); return isQuietHour('22:00', '06:00') }
     expect(at(23)).toBe(true)
     expect(at(3)).toBe(true)
     expect(at(12)).toBe(false)

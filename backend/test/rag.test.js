@@ -4,12 +4,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 // vi.hoisted để các mock fn dùng chung được khởi tạo trước vi.mock (vốn bị hoist lên đầu)
 const mocks = vi.hoisted(() => ({
   rpc:          vi.fn(),
+  from:         vi.fn(),
   invoke:       vi.fn(),
   embedContent: vi.fn(),
 }))
 
 vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(() => ({ rpc: mocks.rpc, from: vi.fn() })),
+  createClient: vi.fn(() => ({ rpc: mocks.rpc, from: mocks.from })),
 }))
 
 // Lõi GoogleGenAI
@@ -32,6 +33,7 @@ const fakeVector = () => ({ embeddings: [{ values: new Array(1536).fill(0.01) }]
 beforeEach(() => {
   process.env.GOOGLE_API_KEY = 'test-key'
   mocks.rpc.mockReset()
+  mocks.from.mockReset()
   mocks.embedContent.mockReset().mockResolvedValue(fakeVector())
   mocks.invoke.mockReset().mockResolvedValue({ text: 'Trả lời mẫu từ Cò Con' })
   _clearAnswerCache()
@@ -270,5 +272,56 @@ describe('askRAG — phân tầng theo confidence', () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'pgvector boom' } })
 
     await expect(askRAG('câu hỏi gây lỗi db')).rejects.toBeDefined()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('askRAG — câu nối, lọc cây trồng, LLM rỗng', () => {
+  const rauChunk = { id: '1', doc_id: 'd1', chunk_text: 'Rầy nâu: phun Actara', similarity: 0.85 }
+
+  it('câu NỐI không dùng/không ghi cache theo chuỗi (tránh trả nhầm ngữ cảnh người khác)', async () => {
+    mocks.rpc.mockResolvedValue({ data: [rauChunk], error: null })
+    const history = [{ role: 'user', content: 'lúa bị rầy nâu phá trị sao' }, { role: 'assistant', content: '...' }]
+
+    await askRAG('còn cách khác', null, history)
+    expect(getAnswerCache('còn cách khác', null)).toBeNull()
+
+    // Người khác hỏi đúng chuỗi đó → vẫn đi pgvector + LLM, không ăn cache
+    await askRAG('còn cách khác', null, [{ role: 'user', content: 'lúa bị đạo ôn cổ bông trị sao' }])
+    expect(mocks.rpc).toHaveBeenCalledTimes(2)
+    expect(mocks.invoke).toHaveBeenCalledTimes(2)
+  })
+
+  it('có chọn cây: giữ tài liệu crop_tags RỖNG (QA biên soạn), loại tài liệu cây khác', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: [
+        { id: 'c1', doc_id: 'fruitDoc', chunk_text: 'Sầu riêng xì mủ', similarity: 0.9 },
+        { id: 'c2', doc_id: 'qaDoc', chunk_text: 'Câu hỏi: Lúa vàng lá?\n\nCâu trả lời: Bón thêm đạm.', similarity: 0.88 },
+      ],
+      error: null,
+    })
+    const builder = { select: () => builder, in: () => Promise.resolve({ data: [
+      { id: 'fruitDoc', crop_tags: ['fruit'] },
+      { id: 'qaDoc', crop_tags: [] },
+    ], error: null }) }
+    mocks.from.mockReturnValue(builder)
+
+    const res = await askRAG('lúa vàng lá bón gì', 'rice')
+
+    // RPC gọi KHÔNG lọc cây (lọc ở JS) để QA không gắn cây vẫn tìm thấy
+    expect(mocks.rpc.mock.calls[0][1].filter_crop).toBeNull()
+    expect(res.source).toBe('qa_direct')
+    expect(res.answer).toBe('Bón thêm đạm.')
+  })
+
+  it('LLM trả về rỗng → chuyển kỹ sư thay vì lưu câu trả lời trống', async () => {
+    mocks.rpc.mockResolvedValue({ data: [rauChunk], error: null })
+    mocks.invoke.mockResolvedValue({ text: '' })
+
+    const res = await askRAG('cách trị rầy nâu trên lúa mùa mưa')
+
+    expect(res.needEngineer).toBe(true)
+    expect(res.answer).toBeNull()
+    expect(getAnswerCache('cách trị rầy nâu trên lúa mùa mưa', null)).toBeNull()
   })
 })

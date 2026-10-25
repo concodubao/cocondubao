@@ -24,6 +24,16 @@ import { startUserStatusSync } from './middleware/auth.js'
 import { startWeatherAlertScheduler } from './services/weatherAlerts.js'
 import { startStorageCleanupScheduler } from './services/storageCleanup.js'
 
+// Thiếu JWT_SECRET thì mọi jwt.sign/verify đều lỗi → đăng nhập hỏng toàn bộ. Dừng
+// ngay lúc boot (Railway báo deploy lỗi) thay vì chạy "khoẻ" mà không ai login được.
+if (!process.env.JWT_SECRET) {
+  console.error('❌ JWT_SECRET chưa được set. Dừng server.')
+  process.exit(1)
+}
+if (process.env.JWT_SECRET.length < 32) {
+  console.warn('⚠️ JWT_SECRET ngắn hơn 32 ký tự — nên đổi sang chuỗi ngẫu nhiên dài (đổi = mọi người phải đăng nhập lại).')
+}
+
 const app = express()
 
 // Railway chạy sau reverse proxy → tin 1 hop để req.ip là IP thật của client
@@ -82,8 +92,10 @@ app.use(cors({
   origin:      process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
 }))
-app.use(express.json({ limit: '10mb' }))
-app.use(express.urlencoded({ extended: true, limit: '10mb' }))
+// Body JSON chỉ chứa text (câu hỏi, câu trả lời, thông báo…) — ảnh/audio/tài liệu đi
+// qua multer riêng. 10MB trước đây vô cớ cho phép đẩy payload lớn vào mọi route.
+app.use(express.json({ limit: '1mb' }))
+app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 
 app.use('/api/v1/auth',          authLimiter, authRoutes)
 app.use('/api/v1/chat',          chatLimiter, chatRoutes)
@@ -102,6 +114,23 @@ app.get('/health', (_, res) => res.json({
 
 // Cần gọi hàm này SAU tất cả các routes để Sentry có thể tóm được mọi lỗi unhandled
 Sentry.setupExpressErrorHandler(app)
+
+// Lỗi lọt tới đây (multer: file quá lớn / sai loại, JSON hỏng, throw đồng bộ…) trước
+// đây rơi vào handler mặc định của Express → trả trang HTML, frontend không đọc được
+// `error`. Trả JSON thống nhất, không lộ stack.
+// eslint-disable-next-line no-unused-vars
+app.use(function(err, req, res, next) {
+  if (err?.name === 'MulterError') {
+    const msg = err.code === 'LIMIT_FILE_SIZE' ? 'File quá lớn.' : 'File tải lên không hợp lệ.'
+    return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: msg })
+  }
+  if (err?.type === 'entity.too.large') return res.status(413).json({ error: 'Dữ liệu gửi lên quá lớn.' })
+  if (err?.type === 'entity.parse.failed') return res.status(400).json({ error: 'Dữ liệu gửi lên không hợp lệ.' })
+  // Lỗi từ fileFilter (cb(new Error('Chỉ hỗ trợ file ảnh'))) — thông báo do mình viết, an toàn để hiện
+  if (err?.message?.startsWith('Chỉ hỗ trợ')) return res.status(400).json({ error: err.message })
+  console.error('[API] unhandled error:', err)
+  res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại sau.' })
+})
 
 app.use(function(req, res) {
   res.status(404).json({ error: 'Endpoint không tồn tại' })

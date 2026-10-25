@@ -2,7 +2,7 @@ import express from 'express'
 import multer  from 'multer'
 import mammoth from 'mammoth'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
-import { embedAndStoreDoc }       from '../services/rag.js'
+import { embedAndStoreDoc, invalidateAnswerCaches } from '../services/rag.js'
 import { notifyFarmer }           from '../services/webpush.js'
 import { supabase }               from '../services/supabase.js'
 
@@ -37,7 +37,9 @@ async function extractText(buffer, mimetype) {
     const { tmpdir }             = await import('os')
     const execFileAsync          = promisify(execFile)
 
-    const tmpPath = join(tmpdir(), `upload_${Date.now()}.pdf`)
+    const { randomUUID }         = await import('crypto')
+    // UUID thay Date.now(): 2 kỹ sư upload cùng mili-giây sẽ ghi đè file tạm của nhau
+    const tmpPath = join(tmpdir(), `upload_${randomUUID()}.pdf`)
     await writeFile(tmpPath, buffer)
     try {
       const { stdout } = await execFileAsync('pdftotext', [tmpPath, '-'], { maxBuffer: 10 * 1024 * 1024 })
@@ -251,23 +253,30 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
       }
     }
 
-    // Câu trả lời mới (lần đầu) hoặc không tìm thấy message cũ → chèn mới
+    // Câu trả lời mới (lần đầu) hoặc không tìm thấy message cũ → chèn mới.
+    // PHẢI kiểm lỗi: nếu chèn hỏng mà vẫn đánh dấu resolved thì câu hỏi biến khỏi
+    // hàng đợi còn nông dân không bao giờ thấy câu trả lời.
     if (!overwritten) {
-      await supabase.from('messages').insert({
+      const { error: msgErr } = await supabase.from('messages').insert({
         session_id: sessionId,
         role:       'engineer',
         content:    newAnswer,
         source:     'engineer',
       })
+      if (msgErr) throw msgErr
     }
 
-    // Cập nhật trạng thái queue → resolved
-    await supabase.from('engineer_queue').update({
+    // Cập nhật trạng thái queue → resolved. Trả lời thẳng câu chưa ai nhận (pending)
+    // thì gán luôn người trả lời — nếu không câu đó không hiện trong lịch sử/thống kê
+    // của kỹ sư (cả hai lọc theo assigned_to).
+    const { error: qErr } = await supabase.from('engineer_queue').update({
       status:           'resolved',
       answer:           newAnswer,
       add_to_knowledge: addToKnowledge,
       resolved_at:      new Date().toISOString(),
+      ...(queueItem.assigned_to ? {} : { assigned_to: req.user.userId }),
     }).eq('id', id)
+    if (qErr) throw qErr
 
     // Nếu đánh dấu "Tin cậy" → tự thêm vào kho tri thức và embed luôn
     if (addToKnowledge && question) {
@@ -622,6 +631,8 @@ router.patch('/:id/archive', verifyJWT, requireRole('engineer', 'admin'), async 
     .eq('id', req.params.id)
 
   if (error) return res.status(500).json({ error: error.message })
+  // Tài liệu bị gỡ (thường vì sai) → câu trả lời đã cache từ nó cũng phải bỏ
+  invalidateAnswerCaches()
   res.json({ success: true })
 })
 
