@@ -35,6 +35,8 @@ Không có lint/test ở backend ngoài vitest. Frontend không có test.
 
 ## Deploy
 
+Railway build backend bằng `nixpacks.toml` (`nodejs_22`, `npm install --legacy-peer-deps --include=optional` + sharp linux-x64) — commit `package-lock.json` sau mỗi lần đổi dependency. ⚠️ npm 10.9.2 trên máy này dính bug arborist (`Cannot read properties of null (reading 'edgesOut')`) khi `npm update`/`audit fix`/install không lockfile → dùng `npx -y npm@11.6.2 <lệnh>`; lockfile sinh ra vẫn tương thích npm 10 (`npm ci` ở CI).
+
 Cả hai deploy **tự động qua git push** (Railway watch backend, Vercel watch frontend). Không có lệnh deploy thủ công — fix chỉ có hiệu lực ở production **sau khi push + redeploy**. Khi sửa bug production, nhớ là backend đang chạy vẫn dùng code cũ cho tới khi push.
 
 ## Database & migrations
@@ -48,21 +50,25 @@ Cả hai deploy **tự động qua git push** (Railway watch backend, Vercel wat
 ## Kiến trúc backend
 
 - `src/index.js` — wiring: helmet, cors, 2 rate-limiter (chat 15/phút theo **userId** rồi fallback IP, auth 10/phút theo IP), mount routes dưới `/api/v1/*`, khởi động notification scheduler + đồng bộ denylist tài khoản bị khoá. `app.set('trust proxy', 1)` là bắt buộc để `req.ip` đúng sau reverse-proxy của Railway. Chat limiter dùng `keyGenerator` thủ công (`userOrIpKey`): khoá theo `user:<userId>` khi có JWT, chưa đăng nhập thì gọi `ipKeyGenerator(req.ip)`. **Quan trọng:** nếu tự viết keyGenerator mà fallback theo IP thì PHẢI dùng `ipKeyGenerator` (export từ express-rate-limit) chứ đừng trả thẳng `req.ip` — trả `req.ip` thô mới gây `ERR_ERL_KEY_GEN_IPV6` trên v8.
-- Auth: JWT tự ký (`middleware/auth.js`: `verifyJWT` đọc `Bearer`, `requireRole(...roles)`). KHÔNG dùng Supabase Auth — password tự hash bằng bcrypt trong `routes/auth.js`.
+- Auth: JWT tự ký HS256 (`middleware/auth.js`: `verifyJWT` đọc `Bearer`, `requireRole(...roles)`). KHÔNG dùng Supabase Auth — password tự hash bằng bcrypt trong `routes/auth.js`. Vì role/khoá nằm trong token sống 7–30 ngày, `verifyJWT` còn kiểm 2 bảng in-memory (poller 60s + cập nhật tức thì từ admin): denylist tài khoản bị khoá, và Map vai trò staff — token engineer/admin của người đã bị đổi vai trò → 401. **Tạo/đổi vai trò staff ở chỗ mới thì phải gọi `setUserRole()`** (nếu không token mới bị chặn tới lượt poll kế). Đăng nhập SĐT lẫn email đều có khoá dò 5 lần sai/10 phút.
 - `services/rag.js` — trái tim hệ thống. Pipeline `askRAG()` phân tầng để **tiết kiệm quota Gemini**, theo thứ tự:
   1. `checkFAQ()` — regex match câu xã giao, trả lời ngay, 0 quota.
   2. Answer cache in-memory (TTL 1h, max 200).
   3. Embed câu hỏi → `match_knowledge_chunks` top-5.
   4. Nếu chunk khớp nhất là QA biên soạn (`"Câu trả lời:"`) và sim ≥ 0.80 → `extractCuratedAnswer()` trả thẳng, bỏ qua LLM (`source: 'qa_direct'`).
-  5. confidence < 0.5 → `needEngineer: true`. 0.5–0.7 → LLM context hạn chế. ≥ 0.7 → LLM đầy đủ + cache.
-- `services/notifications.js` — scheduler in-process (`setInterval` 60s) gửi push đặt lịch + quiet-hours. **In-process nên chỉ đúng khi chạy 1 replica** (Railway hiện 1 replica). Nếu scale nhiều replica thì scheduler + cache + rate-limit in-memory đều phải chuyển sang Redis/queue.
+  5. confidence < 0.5 → `needEngineer: true` (trừ câu lạc đề rõ → `looksOffTopic` từ chối lịch sự). 0.5–0.7 → LLM context hạn chế. ≥ 0.7 → LLM đầy đủ + cache.
+  - **Câu nối** ("còn cách khác"…) được `contextualizeQuery` ghép chủ đề trước khi embed và **bỏ qua mọi tầng cache** (câu trả lời phụ thuộc ngữ cảnh, cache theo chuỗi sẽ trả nhầm cho người khác).
+  - **Lọc cây trồng làm ở JS** (`searchChunks`), RPC gọi với `filter_crop: null`: tài liệu `crop_tags` rỗng = áp dụng mọi cây. Lọc trong SQL (`= ANY(crop_tags)`) làm mọi QA biên soạn (luôn lưu tags rỗng) vô hình với nông dân đã chọn cây.
+  - Duyệt/lưu trữ tài liệu → `invalidateAnswerCaches()` xoá cache L1+L2 để sửa sai có hiệu lực ngay.
+- `services/notifications.js` — scheduler in-process (`setInterval` 60s) gửi push đặt lịch + quiet-hours (tính theo **giờ VN UTC+7**, server chạy UTC — đừng dùng `getHours()`). Push `subscribe` chỉ nhận endpoint https của push service thật (FCM/Mozilla/Apple/WNS) — chặn SSRF vì server POST tới endpoint đó. **In-process nên chỉ đúng khi chạy 1 replica** (Railway hiện 1 replica). Nếu scale nhiều replica thì scheduler + cache + rate-limit in-memory đều phải chuyển sang Redis/queue.
 - Routes mount 2 lần cho gọn URL: `push.js` phục vụ cả `/push` lẫn `/notifications`; `engineer.js` phục vụ cả `/engineer` lẫn `/knowledge`.
 
 ## Models Gemini (quan trọng)
 
 Tất cả qua `GOOGLE_API_KEY`. Free tier tính quota **riêng từng model**, rất thấp (~20 request/ngày/model nhóm generate) → đây là nguồn lỗi 429 chính ở production.
 
-- RAG answer LLM: `gemini-2.5-flash`, `maxOutputTokens: 500`, thinking tắt (`thinkingBudgetTokens: 0`). Gọi trực tiếp qua SDK native `@google/generative-ai` (không còn dùng langchain). `SYSTEM_PROMPT` truyền qua `systemInstruction`.
+- RAG answer LLM: `gemini-2.5-flash`, `maxOutputTokens: 512`, thinking tắt (`thinkingConfig: { thinkingBudget: 0 }`). Gọi qua SDK hợp nhất `@google/genai` (`ai.models.generateContent`, đọc `result.text`) — không còn langchain lẫn `@google/generative-ai` (SDK cũ set thinkingConfig → 400). `SYSTEM_PROMPT` truyền qua `config.systemInstruction`. Retry 429/503 có trần tổng 30s (`LLM_RETRY_BUDGET_MS`) để không vượt timeout 45s của frontend.
+- STT (`/chat/stt-fallback`): `gemini-2.5-flash-lite` (bucket quota riêng). Frontend `useSTT` hiện ép MediaRecorder → STT server cho MỌI trình duyệt (Web Speech của Chrome lỗi im lặng).
 - Vision (chat ảnh, `routes/chat.js`): `gemini-2.5-flash`, `maxOutputTokens: 2048`. Trước dùng `gemini-2.0-flash` nhưng free tier model đó đã về `limit: 0` (Google bỏ free tier) → đổi sang 2.5-flash. **Lưu ý:** 2.5-flash CHUNG bucket quota với RAG answer LLM. Vision thất bại sẽ fallback mềm sang RAG (text-only).
 - Embedding: `gemini-embedding-001`, 1536-dim, gửi tuần tự 700ms/request. **Đổi model embedding = đổi không gian vector → phải re-embed toàn bộ:** `node scripts/reembed_all.js`.
 - `invokeLLM`/`isRateLimit` retry cả 429 (quota) lẫn 503 (overloaded), đọc `retry in Ns` từ message Gemini, có backoff + jitter.
@@ -90,7 +96,8 @@ Frontend (`frontend/.env.local`): `VITE_API_URL`, và Supabase keys cho `service
 
 ## Lưu ý khi viết test (vitest)
 
-- Mock Supabase/Gemini qua `vi.hoisted`. `GoogleGenerativeAI` gọi bằng `new` → mock **phải là `function`** (arrow function không làm constructor được). Mock `getGenerativeModel` trả về object có cả `embedContent` và `generateContent`.
-- LLM mock trả về `{ response: { text: () => '...' } }` (native SDK format), không phải `{ content: '...' }` (langchain format cũ).
+- Mock Supabase/Gemini qua `vi.hoisted`. `GoogleGenAI` gọi bằng `new` → mock **phải là `function`** (arrow function không làm constructor được), trả về `{ models: { embedContent, generateContent } }`.
+- LLM mock trả về `{ text: '...' }` (`@google/genai`: `text` là property), embed mock trả `{ embeddings: [{ values: [...] }] }`.
+- Test dính giờ (giờ yên tĩnh…) phải đặt giờ theo **UTC tường minh** (`Date.UTC(...)`) — server Railway + CI chạy UTC, máy dev chạy UTC+7.
 - Supabase query builder mock kiểu thenable/chainable: mỗi `await` lấy 1 result đã enqueue.
 - `rag.js` export sẵn `checkFAQ`, `extractCuratedAnswer`, `getAnswerCache`/`setAnswerCache`/`_clearAnswerCache`, `embedTexts` để test.

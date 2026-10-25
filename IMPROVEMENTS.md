@@ -105,6 +105,36 @@ Rà toàn bộ backend + các trang frontend chính. Đã sửa & push (`de2c543
 
 **eval RAG — việc tiếp của kỹ sư:** `dataset.json` mới là mẫu khởi tạo; phải mở rộng `reference` theo chuyên môn + thêm case từ mọi câu bị 👎 (chống tái phát). Chạy `npm run eval` trước mỗi lần đổi SYSTEM_PROMPT/model/threshold.
 
+## Đợt 2026-10-25 (rà toàn bộ codebase: deps + bảo mật + logic) — Claude
+
+Rà lại toàn bộ backend + frontend sau ~3.5 tháng không đụng. Tests backend 142 → **158 pass** (+16 test mới), frontend 12 pass, lint 0, build OK.
+
+| ID | Mức | Khu vực | Vấn đề | Hướng sửa | TT |
+|----|-----|---------|--------|-----------|----|
+| K1 | 🔴 Bảo mật | deps | Backend 16 lỗ (1 critical, 10 high: multer DoS, body-parser, xmldom, ip-address SSRF, sharp/libvips CVE…), frontend 17 (vite, zod…) | `npm update` trong semver + sharp 0.34→0.35.5 (ảnh user upload đi qua libvips). Cả 2: **0 vuln**. Verify npm 10 `npm install --legacy-peer-deps` (Railway) + `npm ci` (CI) chạy được lockfile mới | ✅ |
+| K2 | 🔴 Bảo mật | push | SSRF: `/push/subscribe` nhận endpoint bất kỳ, server POST tới đó ngay (welcome) → user nào cũng bắn được request vào mạng nội bộ/metadata cloud | Whitelist https + host push service thật (FCM/Mozilla/Apple/WNS), không cổng lạ | ✅ |
+| K3 | 🔴 Bảo mật | auth | Hạ vai trò (admin→farmer) không có hiệu lực tới khi JWT hết hạn (7–30 ngày) | Map vai trò staff in-memory (poller 60s + `setUserRole` tức thì) → token staff sai vai trò = 401 | ✅ |
+| K4 | 🟠 Bảo mật | auth | `register-phone` set `is_active:true` → tài khoản bị khoá (chưa có PIN) tự "mở khoá" bằng cách đăng ký | Tài khoản bị khoá → 403, không đụng `is_active` | ✅ |
+| K5 | 🟠 Bảo mật | auth | Đăng nhập email (staff/admin) không có khoá dò mật khẩu; Map khoá dò PIN phình vô hạn | Khoá chung 5 sai/10 phút cho cả SĐT + email, cửa sổ quên 30 phút, trần 10k entry | ✅ |
+| K6 | 🟠 Riêng tư | auth | Tự xoá tài khoản giữ lại SĐT/email/hash (PII) + không đăng ký lại được số đó | Xoá cả phone/email/password_hash + denylist ngay; đăng ký lại = tài khoản mới, không kéo lịch sử cũ | ✅ |
+| K7 | 🔴 Bug | rag | Mọi QA biên soạn (crop_tags rỗng) **vô hình** với nông dân đã chọn cây (RPC lọc `= ANY(crop_tags)`; ChatMain mặc định cây đầu trong hồ sơ) → câu đã có QA vẫn bị đẩy kỹ sư/LLM | `searchChunks`: RPC không lọc, lọc ở JS — tags rỗng = mọi cây. Không cần migration | ✅ |
+| K8 | 🔴 Bug | rag | Câu nối ("còn cách khác") bị cache theo chuỗi → người sau hỏi cùng chuỗi về bệnh khác nhận câu trả lời của người trước | Câu nối bỏ qua mọi tầng cache (L1/L2/semantic) cả đọc lẫn ghi | ✅ |
+| K9 | 🟠 Logic | rag | Kỹ sư sửa/lưu trữ tài liệu sai nhưng câu sai đã cache vẫn trả thêm tới 1h | `invalidateAnswerCaches()` khi embed xong/lưu trữ | ✅ |
+| K10 | 🟠 Logic | rag | LLM trả rỗng → lưu message null (bong bóng trống); retry 429 có thể chờ quá timeout 45s của client | Rỗng → chuyển kỹ sư; trần tổng retry 30s | ✅ |
+| K11 | 🔴 Bug | notifications | Giờ yên tĩnh tính theo `getHours()` = **UTC** trên Railway → khung 22:00–06:00 chặn 05:00–13:00 giờ VN và GỬI lúc nửa đêm | Tính theo giờ VN (UTC+7); test đặt giờ UTC tường minh | ✅ |
+| K12 | 🔴 Bug | notifications | Danh sách thông báo embed lượt đọc của MỌI user → 1 người đọc là hiện "đã đọc" với tất cả | Lọc `notification_reads.user_id` | ✅ |
+| K13 | 🟠 UX | notifications | Push gắn cây không gửi cho người chưa chọn cây (danh sách trong app thì hiện, G19) → lỡ cảnh báo | Chưa chọn cây = nhận tất cả (khớp G19) | ✅ |
+| K14 | 🟠 Logic | chat/engineer | Insert `engineer_queue` / message trả lời của kỹ sư không kiểm lỗi → báo "đã chuyển kỹ sư"/"đã trả lời" nhưng thực ra mất | Kiểm lỗi (`enqueueForEngineer`), kỹ sư trả lời câu chưa nhận thì gán `assigned_to` (hiện trong lịch sử/thống kê) | ✅ |
+| K15 | 🟡 UX | ảnh | sharp bỏ EXIF mà không `rotate()` → ảnh chụp dọc (khi client không nén được) bị nằm ngang | `.rotate()` ở chat/community/push | ✅ |
+| K16 | 🟡 Hạ tầng | API | Lỗi multer/JSON rơi vào handler HTML mặc định của Express; body JSON 10MB | Error handler JSON (413/400/500 chung) + body 1MB; fail-fast khi thiếu `JWT_SECRET` | ✅ |
+| K17 | 🟡 Logic | admin | Thống kê theo ngày dùng ngày UTC; PIN reset bằng `Math.random`; limit/offset không chặn; `/admin/sentry-test` thiếu `verifyJWT` | timeZone VN, `crypto.randomInt`, `pageParams`, thêm verifyJWT | ✅ |
+| K18 | 🟡 Validate | nhiều route | cropType/crop_tags/note/cài đặt thông báo không validate (rác vào DB, JSON lạ → 500, giờ hỏng làm scheduler parse lỗi) | Whitelist cây, giới hạn độ dài, regex HH:MM(:SS) | ✅ |
+| K19 | 🟡 Bug | frontend STT | Mỗi lần ghi âm rò 1 `AudioContext` (Chrome giới hạn ~6) → hỏi vài câu là visualizer hỏng; rời trang khi đang ghi vẫn upload | Đóng context khi dừng; unmount bỏ upload + tắt mic | ✅ |
+| K20 | 🟢 Bảo mật | Vercel | Frontend không có security header | `vercel.json`: nosniff, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy, HSTS; SW/manifest no-cache | ✅ |
+| K21 | 🟢 DX | CI | CI backend Node 20, Railway Node 22 | CI → Node 22 | ✅ |
+
+**Chưa làm (cần quyết định/việc của user):** OTP provider; billing Gemini; Scale (Redis…); `match_knowledge_chunks` vẫn còn tham số `filter_crop` (giờ code luôn truyền null — để nguyên, không cần migration). JWT_SECRET prod chưa kiểm được độ dài (server chỉ cảnh báo nếu < 32 ký tự). Playwright e2e chưa chạy lại đợt này.
+
 ### Còn mở (ngoài Sentry/OTP)
 - ⬜ **A** — soạn QA *differential* cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ B (prompt, H14) chỉ tác động câu qua LLM; câu có curated QA (qa_direct) thì serve thẳng QA → sửa hành vi phải sửa QA (việc kỹ sư).
 - ⬜ **Scale** — Redis + leader-election scheduler + billing Gemini + index pgvector (trần 1 replica). (H15 cron cũng cần leader-election khi >1 replica.)

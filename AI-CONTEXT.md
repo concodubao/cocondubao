@@ -26,7 +26,9 @@ Danh sách các quyết định và kiến thức đã ghi nhận:
 - **[Migration cần psql của user]** — .env không có mật khẩu Postgres; viết code degrade mềm, user tự áp migration bằng psql.
 - **[Phóng cỡ chữ = --read-scale]** — KHÔNG dùng CSS zoom cả trang; chỉ scale nội dung đọc.
 - **[Plan bỏ langchain + tắt thinking]** — Xem mục 3 bên dưới.
-- **[⚠️ Lockfile]** — Sau khi thêm/đổi dependency: PHẢI chạy `npm install` để đồng bộ `package-lock.json` rồi commit nó. Railway dùng `npm ci` (nghiêm ngặt) — lockfile lệch/thiếu transitive dep → deploy crash `ERR_MODULE_NOT_FOUND` lúc chạy (đã dính với @sentry, commit `1f1a2eb`).
+- **[⚠️ Lockfile]** — Sau khi thêm/đổi dependency: PHẢI đồng bộ `package-lock.json` rồi commit nó. Railway build qua `nixpacks.toml` (`npm install --legacy-peer-deps --include=optional`), CI dùng `npm ci` — lockfile lệch/thiếu transitive dep → deploy crash `ERR_MODULE_NOT_FOUND` lúc chạy (đã dính với @sentry, commit `1f1a2eb`). ⚠️ npm 10.9.2 trên máy dev dính bug `edgesOut` khi update/audit fix → dùng `npx -y npm@11.6.2 ...` (lockfile vẫn chạy được với npm 10).
+- **[Giờ VN]** — Server Railway + CI chạy UTC. Mọi logic theo giờ/ngày của nông dân (giờ yên tĩnh, thống kê theo ngày, ngày cảnh báo thời tiết) phải tính theo `Asia/Ho_Chi_Minh` (UTC+7, không DST). Không dùng `getHours()`/`toLocaleDateString()` trần.
+- **[Vai trò staff trong JWT]** — tạo/đổi vai trò engineer/admin ở chỗ mới → gọi `setUserRole()` (middleware/auth.js), nếu không token mới bị 401 tới lượt poll 60s.
 
 ---
 
@@ -51,6 +53,19 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 ---
 
 ## 4. Trạng thái hiện tại của codebase
+
+### Đã làm gần đây (2026-10-25) — Claude: rà toàn bộ codebase
+Chi tiết K1–K21 trong IMPROVEMENTS.md. Tóm tắt:
+- **Deps:** backend 16 lỗ (1 critical) + frontend 17 → **0 vuln** (update trong semver, sharp 0.35.5). `@google/genai` 2.10→2.31 (không đổi API dùng).
+- **Bảo mật:** chặn SSRF ở `/push/subscribe` (whitelist push service); hạ vai trò có hiệu lực ngay (Map vai trò staff); `register-phone` không còn mở khoá tài khoản bị khoá; khoá dò mật khẩu cho đăng nhập email; tự xoá tài khoản xoá cả SĐT/email/hash; JWT ghim HS256; error handler JSON + body 1MB; security header Vercel.
+- **Bug logic lớn:** (1) QA biên soạn (crop_tags rỗng) vô hình với nông dân đã chọn cây → lọc cây chuyển sang JS (`searchChunks`); (2) câu nối bị cache theo chuỗi → trả nhầm ngữ cảnh người khác → bỏ qua cache; (3) giờ yên tĩnh lệch 7 tiếng (UTC); (4) "đã đọc" thông báo dùng chung cho mọi user; (5) insert hàng đợi kỹ sư / câu trả lời kỹ sư không kiểm lỗi.
+- **Khác:** xoá cache khi tri thức đổi; LLM rỗng → kỹ sư; trần retry 30s; ảnh xoay theo EXIF; rò AudioContext ở STT; CI Node 22.
+- Tests backend **158 pass** (+16), frontend 12, lint 0, build OK. Chưa chạy lại Playwright e2e.
+
+### Đã làm 2026-07-02 → 07-09 (commit của user, chưa được ghi lúc đó)
+- `2f9cfc6` SYSTEM_PROMPT: phân biệt "câu nông nghiệp tài liệu không có" (→ "hỏi kỹ sư") với câu lạc đề thật.
+- `6ccbe2f` + `7e13015` `useSTT`: **ép MediaRecorder + STT server (`gemini-2.5-flash-lite`) cho MỌI trình duyệt** (`USE_WEB_SPEECH = false`) vì Web Speech trên Chrome lỗi im lặng. ⇒ STT giờ tốn quota Gemini với mọi người dùng.
+- `13e7193` bộ tài liệu `docs/` (charter, SRS, architecture, DB, API, test plan, risk, deployment, UAT, hướng dẫn 4 vai trò, sơ đồ C4/ERD) + `backend/.env.example` + sửa lint frontend.
 
 ### Đã làm gần đây (2026-06-30)
 - ✅ **Gate lạc đề — hạn chế đẩy kỹ sư** (Claude): SYSTEM_PROMPT đã xử câu lạc đề ở band confidence ≥ 0.5 (đi qua LLM → từ chối lịch sự, verify câu bóng đá sim 0.602 OK). NHƯNG câu lạc đề rơi **< 0.5** trước đó bị đẩy kỹ sư (phí công). Thêm `looksOffTopic()` ở nhánh `confidence < 0.5`: lạc đề rõ ràng (bóng đá/giải trí/chính trị...) → từ chối lịch sự (`source:'faq'` để frontend không gắn disclaimer/badge & không lọt knowledge-gaps), **0 quota** (token-match, KHÔNG gọi LLM). BẢO THỦ: chỉ từ chối khi khớp chủ đề ngoài NN **và** không có từ khoá NN nào → nghi ngờ vẫn đẩy kỹ sư. ⚠️ Dùng tokenize `\p{L}` chứ KHÔNG `\b` (chữ có dấu đ/ĩ/ố không phải word-char ASCII → `\b` trượt). Bỏ token mơ hồ 'quả' (trùng "kết quả"). +4 test (rag.test.js 142 pass), eval 8/8.
@@ -81,7 +96,8 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 - ⬜ **A — QA differential** cho triệu chứng mơ hồ: nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ LƯU Ý: prompt (B) chỉ tác động câu đi qua LLM; câu đã có **curated QA (qa_direct, sim≥0.80)** thì serve thẳng QA → muốn đổi hành vi phải SỬA QA đó (việc kỹ sư, nút "Soạn Hỏi–Đáp").
 - ⬜ **Scale** (trần 1 replica): Redis (cache L1/rate-limit/lockout) + leader-election scheduler (advisory lock PG) + billing Gemini + index pgvector. L2 `answer_cache` đã sẵn cross-replica.
 - ✅ **Realtime engineer queue** — ĐÃ VERIFY no-op + sửa (Claude, 2026-06-29): anon client (`auth.uid()`=NULL) + `engineer_queue` RLS bật không policy → Realtime bị chặn. Thay bằng polling (Queue 20s / Dashboard React Query 30s / WaitEngineer getMessages 12s, đều pause khi tab ẩn). Chi tiết ở IMPROVEMENTS.md.
-- ⬜ **Dọn ảnh chat sâu bệnh cũ** — không tự xoá (chỉ khi user xoá account) → storage phình dần.
+- ✅ **Dọn ảnh chat sâu bệnh cũ** — đã có từ H15 (`storageCleanup.js`, cron 24h xoá `pest-images/` > 30 ngày); mục "chưa làm" cũ ở đây là lỗi thời.
+- ⬜ **Billing Gemini** — STT giờ chạy server cho mọi trình duyệt + vision + RAG đều ăn quota free tier rất thấp → bật billing là cách triệt để duy nhất cho 429.
 
 ---
 
