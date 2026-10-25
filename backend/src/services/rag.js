@@ -441,6 +441,15 @@ export function contextualizeQuery(question, history = []) {
 // khớp nhất là một QA như vậy VÀ độ tương đồng đủ cao → dùng luôn câu trả lời đã
 // biên soạn (đã được kiểm duyệt), khỏi gọi Gemini. Giúp câu phổ biến tốn 0 quota.
 const DIRECT_SERVE_THRESHOLD = 0.80
+// Nội dung tài liệu QA biên soạn. Câu hỏi thường là nguyên văn nông dân gõ → vô hiệu
+// hoá dấu phân cách "Câu trả lời:" bên trong nó, nếu không extractCuratedAnswer (tìm
+// dấu ĐẦU TIÊN) sẽ trả phần chữ do nông dân viết như thể là câu trả lời kỹ sư đã duyệt.
+const QA_MARKER_RE = /câu\s*trả\s*lời\s*:/giu
+export function buildQaContent(question, answer) {
+  const q = String(question || '').trim().replace(QA_MARKER_RE, 'câu trả lời -')
+  return `Câu hỏi: ${q}\n\nCâu trả lời: ${String(answer || '').trim()}`
+}
+
 export function extractCuratedAnswer(chunk, similarity) {
   if (!chunk || similarity < DIRECT_SERVE_THRESHOLD) return null
   const text = chunk.chunk_text || ''
@@ -628,8 +637,12 @@ export async function askRAG(question, cropType = null, history = []) {
       chunksFound:  chunks.length,
     }
 
-    // Cache câu trả lời tin cậy cao (confidence ≥ 0.7) để tái sử dụng (L1 + L2/DB)
-    if (!isFollowUp) {
+    // Cache câu trả lời tin cậy cao (confidence ≥ 0.7) để tái sử dụng (L1 + L2/DB).
+    // CHỈ ghi khi sinh KHÔNG kèm lịch sử: cache dùng chung mọi nông dân (khoá chỉ là
+    // cây + câu hỏi) mà buildMessages đưa 10 tin gần nhất của phiên vào prompt → câu
+    // trả lời mang dấu vết hội thoại riêng (có thể cả thông tin cá nhân hoặc nội dung
+    // bị "mớm") sẽ bị phát cho người khác. Đọc cache vẫn được (bản ghi luôn sạch lịch sử).
+    if (!isFollowUp && !history.length) {
       setAnswerCache(question, cropType, result, queryEmbedding)
       dbSetCache(cacheKey, cropType, question, result)
     }

@@ -7,6 +7,7 @@ import * as Sentry from '@sentry/node'
 import 'dotenv/config'
 
 import express        from 'express'
+import './middleware/asyncErrors.js' // Express 4: lỗi handler async → error handler JSON (xem file)
 import cors           from 'cors'
 import helmet         from 'helmet'
 import webpush        from 'web-push'
@@ -78,6 +79,20 @@ const authLimiter = rateLimit({
   message:          { error: 'Thử lại sau 1 phút nhé.' },
 })
 
+// Ghi (POST/PATCH/DELETE) ở community/push/knowledge: 20 req/phút/user. Trước đây
+// không giới hạn → 1 tài khoản có thể đăng ảnh liên tục (mỗi ảnh 1 lần sharp + 1 file
+// vĩnh viễn trong bucket) hoặc bình luận dồn dập để spam push vào máy chủ bài. GET
+// (xem feed, kỹ sư poll hàng đợi 20s) không bị đếm.
+const writeLimiter = rateLimit({
+  windowMs:         60 * 1000,
+  max:              20,
+  standardHeaders:  true,
+  legacyHeaders:    false,
+  keyGenerator:     userOrIpKey,
+  skip:             (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
+  message:          { error: 'Bạn thao tác hơi nhanh, chờ 1 phút rồi thử lại nhé.' },
+})
+
 // VAPID — cấu hình một lần duy nhất khi khởi động
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
@@ -99,12 +114,12 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 
 app.use('/api/v1/auth',          authLimiter, authRoutes)
 app.use('/api/v1/chat',          chatLimiter, chatRoutes)
-app.use('/api/v1/push',          pushRoutes)
-app.use('/api/v1/notifications', pushRoutes)
-app.use('/api/v1/engineer',      engineerRoutes)
-app.use('/api/v1/knowledge',     engineerRoutes)
+app.use('/api/v1/push',          writeLimiter, pushRoutes)
+app.use('/api/v1/notifications', writeLimiter, pushRoutes)
+app.use('/api/v1/engineer',      writeLimiter, engineerRoutes)
+app.use('/api/v1/knowledge',     writeLimiter, engineerRoutes)
 app.use('/api/v1/admin',         adminRoutes)
-app.use('/api/v1/community',    communityRoutes)
+app.use('/api/v1/community',     writeLimiter, communityRoutes)
 
 app.get('/health', (_, res) => res.json({
   status:    'ok',
@@ -136,8 +151,15 @@ app.use(function(req, res) {
   res.status(404).json({ error: 'Endpoint không tồn tại' })
 })
 
+// Express 4 không chuyển promise bị reject của handler async sang error middleware.
+// Không có listener này (Sentry chỉ bật ở production) thì Node 22 THOÁT process khi có
+// 1 lỗi lọt try — một request dị dạng đánh sập cả backend 1 replica. Chỉ log.
+process.on('unhandledRejection', (reason) => {
+  console.error('[API] unhandledRejection:', reason?.message || reason)
+})
+
 const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🐦 Cò Con API đang chạy tại http://localhost:${PORT}`)
   console.log(`📋 Môi trường: ${process.env.NODE_ENV}`)
   console.log(`🔗 Supabase: ${process.env.SUPABASE_URL ? '✅ Connected' : '❌ Missing URL'}`)
@@ -154,3 +176,8 @@ app.listen(PORT, () => {
   // Dọn ảnh sâu bệnh (chat) cũ > 30 ngày để bucket khỏi phình (mỗi 24h).
   startStorageCleanupScheduler()
 })
+
+// Handler treo (lỗi ngoài try ở Express 4, upstream chậm) không được giữ socket mãi.
+// 75s > timeout 60s của request chat ảnh phía frontend.
+server.requestTimeout = 75_000
+server.headersTimeout = 80_000

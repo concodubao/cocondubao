@@ -9,9 +9,9 @@
 import express from 'express'
 import bcrypt  from 'bcrypt'
 import { randomInt } from 'node:crypto'
-import { verifyJWT, requireRole, markInactive, markActive, setUserRole } from '../middleware/auth.js'
+import { verifyJWT, requireRole, markInactive, markActive, setUserRole, revokeTokens } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
-import { embedAndStoreDoc } from '../services/rag.js'
+import { embedAndStoreDoc, buildQaContent } from '../services/rag.js'
 
 const router = express.Router()
 
@@ -327,7 +327,7 @@ router.post('/knowledge-qa', verifyJWT, requireRole('admin', 'engineer'), async 
       .insert({
         title:       `QA: ${question.trim().slice(0, 60)}`,
         source:      'ai_review',
-        content:     `Câu hỏi: ${question.trim()}\n\nCâu trả lời: ${answer.trim()}`,
+        content:     buildQaContent(question, answer),
         status:      'embedding',
         uploaded_by: req.user.userId,
       })
@@ -386,10 +386,12 @@ router.get('/users/export', verifyJWT, requireRole('admin'), async (req, res) =>
   // Bọc trường có dấu phẩy/ngoặc kép/xuống dòng để CSV không vỡ cột; đồng thời
   // vô hiệu CSV formula injection: tên/ấp do nông dân tự nhập, nếu bắt đầu bằng
   // = + - @ (hoặc tab/CR) thì Excel/Sheets coi là công thức → chèn ' để ép text.
+  // Excel tiếng Việt (vi-VN) dùng ';' làm dấu phân cách → "x;=1+1" trước đây tách thành
+  // ô mới bắt đầu bằng '=' (chỉ ký tự ĐẦU trường được vô hiệu). Giờ vô hiệu ký tự công
+  // thức sau MỌI dấu phân cách khả dĩ (, ; tab, xuống dòng) và luôn bọc ngoặc kép.
   const esc = (v) => {
-    let s = v == null ? '' : String(v)
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+    const s = (v == null ? '' : String(v)).replace(/(^|[,;\t\r\n])([=+\-@])/g, "$1'$2")
+    return `"${s.replace(/"/g, '""')}"`
   }
   const header = ['Tên', 'SĐT', 'Email', 'Vai trò', 'Ấp/Xã', 'Cây trồng', 'Trạng thái', 'Ngày tạo']
   const rows = (data || []).map(u => [
@@ -481,7 +483,12 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
   if (error) return res.status(500).json({ error: error.message })
 
   // Cập nhật denylist để khoá/mở khoá có hiệu lực tức thì (không chờ poller 60s)
-  if (updates.is_active === false) markInactive(req.params.id)
+  if (updates.is_active === false) {
+    markInactive(req.params.id)
+    // Khoá = thu hồi luôn token: nếu không, mở khoá sau này "hồi sinh" token cũ
+    // (có thể là token của kẻ đã chiếm tài khoản — lý do bị khoá).
+    revokeTokens(req.params.id)
+  }
   if (updates.is_active === true)  markActive(req.params.id)
   // Đổi vai trò: token cũ mang quyền staff bị vô hiệu ngay (xem middleware/auth.js)
   if (updates.role) setUserRole(req.params.id, updates.role)
@@ -516,6 +523,8 @@ router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req
       .single()
     if (error) throw error
     markActive(req.params.id) // reset-pin đặt is_active:true → bỏ khỏi denylist
+    // PIN mới → mọi phiên đăng nhập bằng PIN cũ (kể cả của kẻ đã biết PIN cũ) hết hiệu lực
+    await revokeTokens(req.params.id)
     logAudit(req, 'reset_pin', data, 'Đặt lại mã PIN')
     res.json({ success: true, pin, user: data }) // trả PIN để admin báo lại cho nông dân
   } catch (err) {
@@ -583,7 +592,7 @@ router.post('/ai-errors/:id/to-knowledge', verifyJWT, requireRole('admin'), asyn
       .insert({
         title:       `QA: ${question.trim().slice(0, 60)}`,
         source:      'ai_error_fix',
-        content:     `Câu hỏi: ${question.trim()}\n\nCâu trả lời: ${answer.trim()}`,
+        content:     buildQaContent(question, answer),
         status:      'embedding',
         uploaded_by: req.user.userId,
       })

@@ -122,7 +122,7 @@ router.post('/posts', verifyJWT,
   },
   async (req, res) => {
     const { content, cropTags } = req.body
-    if (!content?.trim())       return res.status(400).json({ error: 'Nội dung không được để trống.' })
+    if (typeof content !== 'string' || !content.trim()) return res.status(400).json({ error: 'Nội dung không được để trống.' })
     if (content.length > 1000)  return res.status(400).json({ error: 'Bài viết tối đa 1000 ký tự.' })
 
     let imageUrl = null
@@ -214,7 +214,7 @@ async function createReport(targetType, req, res) {
     target_type: targetType,
     target_id:   targetId,
     reporter_id: req.user.userId,
-    reason:      reason?.trim()?.slice(0, 300) || null,
+    reason:      typeof reason === 'string' ? (reason.trim().slice(0, 300) || null) : null,
   })
   // 23505 = trùng unique → đã báo cáo rồi, coi như thành công (idempotent)
   if (error && error.code !== '23505') return res.status(500).json({ error: error.message })
@@ -265,7 +265,7 @@ router.get('/posts/:id/comments', verifyJWT, async (req, res) => {
 // ─── POST /community/posts/:id/comments ──────────────────────────────────────
 router.post('/posts/:id/comments', verifyJWT, async (req, res) => {
   const { content } = req.body
-  if (!content?.trim())      return res.status(400).json({ error: 'Bình luận không được để trống.' })
+  if (typeof content !== 'string' || !content.trim()) return res.status(400).json({ error: 'Bình luận không được để trống.' })
   if (content.length > 500)  return res.status(400).json({ error: 'Bình luận tối đa 500 ký tự.' })
 
   const { data, error } = await supabase

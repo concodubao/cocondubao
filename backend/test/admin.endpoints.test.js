@@ -24,6 +24,10 @@ const sb = vi.hoisted(() => {
 vi.mock('../src/services/supabase.js', () => ({ supabase: sb.supabase }))
 vi.mock('../src/services/rag.js', () => ({
   embedAndStoreDoc: vi.fn().mockResolvedValue({ chunksCreated: 1 }),
+  buildQaContent: (q, a) => `Câu hỏi: ${q}
+
+Câu trả lời: ${a}`,
+  invalidateAnswerCaches: vi.fn(),
 }))
 
 const adminRoutes = (await import('../src/routes/admin.js')).default
@@ -197,6 +201,14 @@ describe('GET /admin/users/export — xuất CSV', () => {
     expect(res.text).toContain('Tên')
     expect(res.text).toContain('Chú Ba')
     expect(res.text).toContain('Nông dân')
+  })
+
+  it('vô hiệu công thức cả sau dấu ";" (Excel vi-VN dùng ; làm phân cách)', async () => {
+    sb.enqueue({ data: [{ name: 'x;=1+1', phone: '+84900000001', role: 'farmer', village: '=HYPERLINK("a")', crops: [], is_active: true, created_at: null }], error: null })
+    const res = await request(app).get('/api/v1/admin/users/export').set(admin())
+    expect(res.text).toContain(`"x;'=1+1"`)
+    expect(res.text).toContain(`"'=HYPERLINK(""a"")"`)
+    expect(res.text).not.toMatch(/(^|[,;"])=1\+1/m)
   })
 })
 

@@ -2,7 +2,7 @@ import express from 'express'
 import multer  from 'multer'
 import mammoth from 'mammoth'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
-import { embedAndStoreDoc, invalidateAnswerCaches } from '../services/rag.js'
+import { embedAndStoreDoc, invalidateAnswerCaches, buildQaContent } from '../services/rag.js'
 import { notifyFarmer }           from '../services/webpush.js'
 import { supabase }               from '../services/supabase.js'
 
@@ -23,6 +23,45 @@ const upload = multer({
   },
 })
 
+const VALID_CROPS = ['rice', 'veggie', 'fruit', 'other']
+
+// limit/offset từ query: chặn NaN và limit khổng lồ (giống pageParams ở admin.js)
+function pageParams(q, defLimit = 20, maxLimit = 100) {
+  const limit  = Math.min(maxLimit, Math.max(1, parseInt(q.limit, 10)  || defLimit))
+  const offset = Math.max(0, parseInt(q.offset, 10) || 0)
+  return { limit, offset }
+}
+
+// ─── Giới hạn tài liệu kho tri thức ──────────────────────────────────────────
+// DOCX là zip: 20MB nén có thể bung ra hàng GB trong heap (mammoth/JSZip bung toàn bộ)
+// → sập process duy nhất. Nội dung chữ không giới hạn → embed hàng chục nghìn chunk
+// (mỗi chunk 1 request Gemini, chung quota với câu hỏi của nông dân).
+const MAX_DOCX_INFLATED = 60 * 1024 * 1024 // tổng dung lượng bung tối đa
+export const MAX_DOC_CHARS = 400_000        // ~400 chunk embed — đủ cho tài liệu kỹ thuật dài
+
+// Bung thử từng mục với maxOutputLength (giới hạn THẬT, không tin kích thước khai
+// trong header zip — header do người upload kiểm soát). Vượt → từ chối trước mammoth.
+export async function assertDocxInflateWithinLimit(buffer, limit = MAX_DOCX_INFLATED) {
+  const { default: JSZip } = await import('jszip')
+  const { inflateRawSync } = await import('zlib')
+  let zip
+  try { zip = await JSZip.loadAsync(buffer) } catch { throw new Error('File DOCX hỏng hoặc không đúng định dạng.') }
+  let total = 0
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir || !entry._data?.compressedContent) continue
+    const remaining = limit - total
+    if (remaining <= 0) throw new Error('File DOCX quá lớn khi giải nén.')
+    let size
+    if (entry._data.compression?.magic === '\x08\x00') {
+      try { size = inflateRawSync(entry._data.compressedContent, { maxOutputLength: remaining }).length }
+      catch { throw new Error('File DOCX quá lớn khi giải nén.') }
+    } else {
+      size = entry._data.compressedContent.length // STORE: không nén
+    }
+    total += size
+  }
+}
+
 // ─── Helper: trích xuất text từ file ─────────────────────────────────────────
 async function extractText(buffer, mimetype) {
   if (mimetype === 'text/plain') {
@@ -42,7 +81,8 @@ async function extractText(buffer, mimetype) {
     const tmpPath = join(tmpdir(), `upload_${randomUUID()}.pdf`)
     await writeFile(tmpPath, buffer)
     try {
-      const { stdout } = await execFileAsync('pdftotext', [tmpPath, '-'], { maxBuffer: 10 * 1024 * 1024 })
+      // timeout: PDF dị dạng không được giữ tiến trình con chạy mãi
+      const { stdout } = await execFileAsync('pdftotext', [tmpPath, '-'], { maxBuffer: 10 * 1024 * 1024, timeout: 60_000 })
       return stdout
     } finally {
       unlink(tmpPath).catch(() => {})
@@ -50,6 +90,7 @@ async function extractText(buffer, mimetype) {
   }
 
   if (mimetype.includes('wordprocessingml')) {
+    await assertDocxInflateWithinLimit(buffer)
     const { value } = await mammoth.extractRawText({ buffer })
     return value
   }
@@ -108,7 +149,8 @@ router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
 
 // GET /engineer/queue — danh sách câu hỏi cần trả lời
 router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
-  const { status = 'pending', limit = 20, offset = 0 } = req.query
+  const { status = 'pending' } = req.query
+  const { limit, offset } = pageParams(req.query)
 
   const { data, error } = await supabase
     .from('engineer_queue')
@@ -286,7 +328,7 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
           .insert({
             title:       `QA: ${question.slice(0, 60)}`,
             source:      'engineer_answer',
-            content:     `Câu hỏi: ${question}\n\nCâu trả lời: ${newAnswer}`,
+            content:     buildQaContent(question, newAnswer),
             status:      'embedding',
             uploaded_by: req.user.userId,
           })
@@ -367,8 +409,9 @@ router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (
 
 // GET /engineer/history — lịch sử câu hỏi đã trả lời của kỹ sư
 router.get('/history', verifyJWT, requireRole('engineer', 'admin'), async (req, res) => {
-  const { crop, limit = 20, offset = 0 } = req.query
-  const filterCrop = crop && crop !== 'all'
+  const { crop } = req.query
+  const { limit, offset } = pageParams(req.query)
+  const filterCrop = VALID_CROPS.includes(crop)
 
   // Khi lọc theo cây trồng → dùng inner join để lọc NGAY Ở DB. Trước đây lọc
   // client-side sau .range() nên phân trang sai và total chỉ là số của 1 trang.
@@ -474,9 +517,13 @@ router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
     if (!content?.trim()) {
       return res.status(422).json({ error: 'File không có nội dung text. Thử file khác nhé.' })
     }
+    if (content.length > MAX_DOC_CHARS) {
+      return res.status(413).json({ error: `Tài liệu quá dài (${Math.round(content.length / 1000)}k ký tự, tối đa ${MAX_DOC_CHARS / 1000}k). Hãy tách thành nhiều file nhỏ.` })
+    }
 
     let tags = []
     try { tags = JSON.parse(cropTags || '[]') } catch { tags = [] }
+    tags = Array.isArray(tags) ? tags.filter(t => VALID_CROPS.includes(t)) : []
 
     const { data: doc, error } = await supabase
       .from('knowledge_docs')
@@ -518,7 +565,6 @@ router.post('/qa', verifyJWT, requireRole('engineer', 'admin'), async (req, res)
   if (!question?.trim() || !answer?.trim()) {
     return res.status(400).json({ error: 'Cần nhập cả câu hỏi và câu trả lời.' })
   }
-  const VALID_CROPS = ['rice', 'veggie', 'fruit', 'other']
   const tags = Array.isArray(cropTags) ? cropTags.filter(c => VALID_CROPS.includes(c)) : []
 
   try {
@@ -528,7 +574,7 @@ router.post('/qa', verifyJWT, requireRole('engineer', 'admin'), async (req, res)
         title:       `QA: ${question.trim().slice(0, 60)}`,
         source:      'manual_qa',
         crop_tags:   tags,
-        content:     `Câu hỏi: ${question.trim()}\n\nCâu trả lời: ${answer.trim()}`,
+        content:     buildQaContent(question, answer),
         status:      'embedding',
         uploaded_by: req.user.userId,
       })
@@ -562,7 +608,7 @@ router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res
     .order('created_at', { ascending: false })
 
   if (status) query = query.eq('status', status)
-  if (crop)   query = query.contains('crop_tags', [crop])
+  if (VALID_CROPS.includes(crop)) query = query.contains('crop_tags', [crop])
 
   const { data, error } = await query
   if (error) return res.status(500).json({ error: error.message })
@@ -600,10 +646,19 @@ router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async 
 
     if (!doc) return res.status(404).json({ error: 'Không tìm thấy tài liệu.' })
     if (!doc.content) return res.status(422).json({ error: 'Tài liệu không có nội dung.' })
+    if (doc.content.length > MAX_DOC_CHARS) {
+      return res.status(413).json({ error: `Tài liệu quá dài để embed (tối đa ${MAX_DOC_CHARS / 1000}k ký tự). Hãy tách nhỏ.` })
+    }
 
-    await supabase.from('knowledge_docs')
+    // Chuyển sang 'embedding' có điều kiện: bấm Duyệt 2 lần (hoặc 2 người cùng bấm)
+    // trước đây chạy 2 vòng embed song song trên cùng tài liệu → gấp đôi quota Gemini.
+    const { data: claimed, error: claimErr } = await supabase.from('knowledge_docs')
       .update({ status: 'embedding', updated_at: new Date().toISOString() })
       .eq('id', id)
+      .neq('status', 'embedding')
+      .select('id')
+    if (claimErr) throw claimErr
+    if (!claimed?.length) return res.status(409).json({ error: 'Tài liệu đang được embed, vui lòng chờ.' })
 
     res.json({ accepted: true, docId: id, message: 'Đang embed, vui lòng chờ vài phút...' })
 

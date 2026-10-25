@@ -4,7 +4,7 @@ import bcrypt      from 'bcrypt'
 import rateLimit   from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
 import { supabase }     from '../services/supabase.js'
-import { verifyJWT, requireRole, setUserRole, markInactive } from '../middleware/auth.js'
+import { verifyJWT, requireRole, setUserRole, markInactive, revokeTokens } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -30,7 +30,7 @@ function isValidPhone(normalized) {
 // Trước đây cả hai chỉ check ≥ 6 ký tự → staff có thể hạ mật khẩu xuống 6 ký tự qua
 // đổi mật khẩu (yếu hơn chuẩn tạo tài khoản), và nông dân có thể đặt "PIN" không phải số.
 function validateSecret(secret, role) {
-  if (!secret) return role === 'farmer' ? 'Vui lòng nhập mã PIN.' : 'Vui lòng nhập mật khẩu.'
+  if (!secret || typeof secret !== 'string') return role === 'farmer' ? 'Vui lòng nhập mã PIN.' : 'Vui lòng nhập mật khẩu.'
   if (role === 'farmer') {
     if (!/^\d{6}$/.test(secret)) return 'Mã PIN phải gồm đúng 6 chữ số.'
   } else if (secret.length < 8) {
@@ -40,6 +40,10 @@ function validateSecret(secret, role) {
 }
 
 function normalizePhone(raw) {
+  // Body JSON có thể gửi số/mảng/object: không phải chuỗi → trả '' để isValidPhone từ
+  // chối (400). Trước đây raw.replace ném TypeError ngoài try → unhandled rejection
+  // (Express 4 không bắt) → không có Sentry thì sập cả process.
+  if (typeof raw !== 'string') return ''
   const digits = raw.replace(/\D/g, '')
   if (digits.startsWith('84')) return '+' + digits
   if (digits.startsWith('0'))  return '+84' + digits.slice(1)
@@ -250,26 +254,18 @@ router.post('/register-phone', async (req, res) => {
   try {
     const { data: existing } = await supabase.from('users').select('id, password_hash, is_active').eq('phone', normalized).single()
     if (existing?.password_hash) return res.status(400).json({ error: 'Số điện thoại này đã đăng ký. Vui lòng đăng nhập.' })
-    // Tài khoản bị admin khoá (chưa có PIN) → KHÔNG cho tự đặt PIN để mở khoá lại.
-    // (Trước đây update luôn is_active:true → ai cũng "gỡ khoá" được bằng cách đăng ký.)
-    if (existing && existing.is_active === false) {
-      return res.status(403).json({ error: 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.' })
+    // Đã có tài khoản (tạo qua OTP trước đây) nhưng chưa có PIN → KHÔNG cho tự gán PIN ở
+    // đây: route này không chứng minh người gọi sở hữu số điện thoại, nên trước đây ai
+    // biết số là chiếm được tài khoản đó (lịch sử chat, ảnh, cả vai trò staff nếu đã được
+    // nâng quyền). Chủ thật nhờ admin "Đặt lại PIN" (admin.js reset-pin).
+    if (existing) {
+      return res.status(409).json({ error: 'Số điện thoại này đã có tài khoản. Vui lòng liên hệ quản trị viên để được cấp mã PIN.' })
     }
 
     const password_hash = await bcrypt.hash(password, 10)
-    // Nếu đã có user (vd tạo qua OTP trước đây) nhưng chưa có PIN → gán PIN; nếu chưa có → tạo mới
-    let user
-    if (existing) {
-      const { data, error } = await supabase.from('users')
-        .update({ password_hash }).eq('id', existing.id).select().single()
-      if (error) throw error
-      user = data
-    } else {
-      const { data, error } = await supabase.from('users')
-        .insert({ phone: normalized, role: 'farmer', is_active: true, password_hash }).select().single()
-      if (error) throw error
-      user = data
-    }
+    const { data: user, error } = await supabase.from('users')
+      .insert({ phone: normalized, role: 'farmer', is_active: true, password_hash }).select().single()
+    if (error) throw error
 
     const token = jwt.sign(
       { userId: user.id, phone: user.phone, role: user.role, name: user.name },
@@ -353,16 +349,27 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
   if (currentPassword === newPassword) return res.status(400).json({ error: 'Mật khẩu mới phải khác mật khẩu cũ.' })
 
   try {
-    const { data: user } = await supabase.from('users').select('password_hash').eq('id', req.user.userId).single()
+    const { data: user } = await supabase.from('users')
+      .select('id, phone, role, name, password_hash').eq('id', req.user.userId).single()
     if (!user?.password_hash) return res.status(400).json({ error: 'Tài khoản chưa có mật khẩu.' })
 
-    const valid = await bcrypt.compare(currentPassword, user.password_hash)
-    if (!valid) return res.status(401).json({ error: 'Mật khẩu hiện tại không đúng.' })
+    // 400 chứ không 401: interceptor frontend coi mọi 401 là hết phiên → gõ sai mật
+    // khẩu cũ trước đây bị đá ra màn đăng nhập.
+    const valid = await bcrypt.compare(String(currentPassword), user.password_hash)
+    if (!valid) return res.status(400).json({ error: 'Mật khẩu hiện tại không đúng.' })
 
     const hash = await bcrypt.hash(newPassword, 12)
     const { error } = await supabase.from('users').update({ password_hash: hash }).eq('id', req.user.userId)
     if (error) throw error
-    res.json({ success: true })
+
+    // Mọi phiên cũ (máy khác, kẻ đã biết PIN cũ) hết hiệu lực; thiết bị hiện tại nhận
+    // token mới để không bị đăng xuất.
+    await revokeTokens(user.id)
+    const token = jwt.sign(
+      { userId: user.id, phone: user.phone, role: user.role, name: user.name },
+      process.env.JWT_SECRET, { expiresIn: user.role === 'farmer' ? '30d' : '7d' }
+    )
+    res.json({ success: true, token })
   } catch (err) {
     return serverError(res, 'auth', err)
   }

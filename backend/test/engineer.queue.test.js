@@ -35,6 +35,10 @@ vi.mock('../src/services/webpush.js', () => ({
 }))
 vi.mock('../src/services/rag.js', () => ({
   embedAndStoreDoc: vi.fn().mockResolvedValue({ chunksCreated: 1 }),
+  buildQaContent: (q, a) => `Câu hỏi: ${q}
+
+Câu trả lời: ${a}`,
+  invalidateAnswerCaches: vi.fn(),
 }))
 
 const engineerRoutes = (await import('../src/routes/engineer.js')).default
@@ -316,5 +320,16 @@ describe('PATCH /engineer/queue/:id/answer — sửa câu đã trả lời = ghi
 
     expect(res.status).toBe(200)
     expect(res.body.updated).toBe(false)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('assertDocxInflateWithinLimit — chặn DOCX zip bomb trước khi mammoth bung', () => {
+  it('từ chối file bung vượt giới hạn, chấp nhận file nhỏ', async () => {
+    const { default: JSZip } = await import('jszip')
+    const { assertDocxInflateWithinLimit } = await import('../src/routes/engineer.js')
+    const mk = async (n) => { const z = new JSZip(); z.file('word/document.xml', 'a'.repeat(n)); return z.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }) }
+    await expect(assertDocxInflateWithinLimit(await mk(2_000_000), 1_000_000)).rejects.toThrow()
+    await expect(assertDocxInflateWithinLimit(await mk(10_000), 1_000_000)).resolves.toBeUndefined()
   })
 })

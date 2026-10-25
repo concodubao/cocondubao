@@ -25,6 +25,26 @@ const STAFF_ROLES = ['engineer', 'admin']
 const _staffRoles = new Map()
 let _staffRolesLoaded = false
 
+// ─── Thu hồi token theo thời điểm (đổi/đặt lại PIN, khoá tài khoản) ───────────
+// JWT không có version → đổi PIN/admin đặt lại PIN không làm token cũ (tới 30 ngày)
+// mất hiệu lực; mở khoá còn "hồi sinh" mọi token cũ. Lưu users.tokens_valid_after:
+// token có iat trước mốc đó bị từ chối. Cột cần migration
+// 20261025000000_tokens_valid_after.sql — chưa áp thì poller lỗi êm, bỏ qua kiểm tra.
+// Mốc làm tròn xuống giây (iat theo giây) để token cấp lại ngay sau đó vẫn hợp lệ.
+const _tokensValidAfter = new Map() // userId → ms
+
+export async function revokeTokens(userId) {
+  const at = Math.floor(Date.now() / 1000) * 1000
+  _tokensValidAfter.set(userId, at)
+  try {
+    const { error } = await supabase.from('users')
+      .update({ tokens_valid_after: new Date(at).toISOString() }).eq('id', userId)
+    if (error) console.warn('[AUTH] revokeTokens chưa lưu DB (thiếu migration?):', error.message)
+  } catch (err) {
+    console.warn('[AUTH] revokeTokens error:', err.message)
+  }
+}
+
 export function setUserRole(userId, role) {
   if (STAFF_ROLES.includes(role)) _staffRoles.set(userId, role)
   else _staffRoles.delete(userId)
@@ -56,6 +76,18 @@ export async function refreshInactiveUsers() {
   } catch (err) {
     console.warn('[AUTH] refresh staff roles error:', err.message)
   }
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, tokens_valid_after')
+      .not('tokens_valid_after', 'is', null)
+    if (error) return // cột chưa có (chưa áp migration) → giữ mốc in-memory hiện có
+    for (const u of data || []) {
+      const at = new Date(u.tokens_valid_after).getTime()
+      if (Number.isFinite(at)) _tokensValidAfter.set(u.id, Math.max(at, _tokensValidAfter.get(u.id) || 0))
+    }
+  } catch { /* degrade mềm */ }
 }
 
 // Khởi động poller đồng bộ denylist (gọi 1 lần khi boot trong index.js).
@@ -79,6 +111,11 @@ export function verifyJWT(req, res, next) {
     // Chặn ngay nếu tài khoản đã bị khoá, dù token còn hạn.
     if (_inactiveUsers.has(payload.userId)) {
       return res.status(401).json({ error: 'Tài khoản đã bị khoá. Vui lòng liên hệ quản trị viên.' })
+    }
+    // Token cấp trước lần đổi/đặt lại PIN hoặc khoá tài khoản → hết hiệu lực.
+    const validAfter = _tokensValidAfter.get(payload.userId)
+    if (validAfter && (payload.iat || 0) * 1000 < validAfter) {
+      return res.status(401).json({ error: 'Phiên đăng nhập đã hết hiệu lực. Vui lòng đăng nhập lại.' })
     }
     // Token mang quyền staff nhưng vai trò thật đã đổi → bắt đăng nhập lại.
     if (_staffRolesLoaded && STAFF_ROLES.includes(payload.role)
