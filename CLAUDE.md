@@ -92,7 +92,7 @@ Scripts kho tri thức: `backend/scripts/seed_rag.js` (tạo doc seed mới — 
 ## Biến môi trường
 
 Backend (`backend/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `GOOGLE_API_KEY`, `JWT_SECRET`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_CONTACT`, `FRONTEND_URL`, `PORT`, `NODE_ENV`.
-Frontend (`frontend/.env.local`): `VITE_API_URL`, và Supabase keys cho `services/supabase.js`.
+Frontend (`frontend/.env.local`): `VITE_API_URL` (+ `VITE_VAPID_PUBLIC_KEY`, `VITE_SENTRY_DSN`). Frontend KHÔNG còn Supabase client.
 
 ## Lưu ý khi viết test (vitest)
 

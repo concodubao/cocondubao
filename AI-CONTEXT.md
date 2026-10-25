@@ -54,6 +54,18 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 
 ## 4. Trạng thái hiện tại của codebase
 
+### ⚠️ Trạng thái hạ tầng (2026-10-26)
+- **Backend Railway ĐANG TẮT**: gói Railway hết hạn → domain `laudable-happiness-production-cdfb.up.railway.app` trả "Application not found". User sẽ gia hạn sau; khi chạy lại Railway tự deploy từ `master` (đã có mọi fix). Frontend Vercel vẫn chạy nhưng mọi API lỗi.
+- **Việc user phải làm ở dashboard** (code không làm được): (1) Supabase → API Keys: tắt legacy keys / rotate JWT secret (service_role legacy từng lộ trong lịch sử git repo public); (2) áp migration `supabase/migrations/20261025000000_security_hardening.sql` (RLS + cột `tokens_valid_after`) rồi chạy các truy vấn kiểm tra ở cuối file; (3) tạo cặp VAPID mới (khoá cũ từng lộ).
+
+### Đã làm 2026-10-26 — Claude: security audit (cloudflare/security-audit-skill) + sửa
+Chi tiết L1–L14 trong IMPROVEMENTS.md. Skill cài ở `.claude/skills/security-audit` (validator `.cjs` không chạy được trên Windows vì thiếu O_NOFOLLOW — dùng shim gọi `validateDocument`). Gotcha mới:
+- **Express 4 + async**: đã vá toàn cục ở `middleware/asyncErrors.js` (import đầu `index.js`) — lỗi handler async giờ tới error handler JSON. Đừng gỡ.
+- **Thu hồi token**: đổi PIN/reset PIN/khoá tài khoản → gọi `revokeTokens(userId)`; chỗ mới đổi bí mật cũng phải gọi.
+- **QA biên soạn**: luôn tạo nội dung bằng `buildQaContent(question, answer)` (rag.js), đừng tự ghép chuỗi "Câu hỏi:/Câu trả lời:".
+- **register-phone** không còn gán PIN cho tài khoản có sẵn (409) → nông dân OTP cũ nhờ admin "Đặt lại PIN".
+- Frontend không còn Supabase client (đã gỡ `services/supabase.js` + dependency).
+
 ### Đã làm gần đây (2026-10-25) — Claude: rà toàn bộ codebase
 Chi tiết K1–K21 trong IMPROVEMENTS.md. Tóm tắt:
 - **Deps:** backend 16 lỗ (1 critical) + frontend 17 → **0 vuln** (update trong semver, sharp 0.35.5). `@google/genai` 2.10→2.31 (không đổi API dùng).

@@ -135,6 +135,29 @@ Rà lại toàn bộ backend + frontend sau ~3.5 tháng không đụng. Tests ba
 
 **Chưa làm (cần quyết định/việc của user):** OTP provider; billing Gemini; Scale (Redis…); `match_knowledge_chunks` vẫn còn tham số `filter_crop` (giờ code luôn truyền null — để nguyên, không cần migration). JWT_SECRET prod chưa kiểm được độ dài (server chỉ cảnh báo nếu < 32 ký tự). Playwright e2e chưa chạy lại đợt này.
 
+## Đợt 2026-10-26 (sửa theo security audit — Claude)
+
+Audit bằng skill `cloudflare/security-audit-skill` (cài ở `.claude/skills/security-audit`, profile quick, output `~/security-audit-skill/cocon-du-bao/run-1/`). Dừng sau Phase 2 (hunting) theo quyết định chủ dự án → **15 lead chưa được verifier độc lập xác nhận** (máy không có sandbox nên mọi lead đều `needs_validation`). Sửa thẳng các lead sửa được bằng code; backend tests 158 → **168 pass**.
+
+| ID | Mức | Khu vực | Vấn đề | Hướng sửa | TT |
+|----|-----|---------|--------|-----------|----|
+| L1 | 🔴 Bảo mật | auth | `register-phone` gán PIN cho tài khoản CÓ SẴN chưa có PIN mà không chứng minh sở hữu SĐT → chiếm tài khoản (cả role staff nếu đã nâng quyền) | Số đã có tài khoản → 409, nhờ admin "Đặt lại PIN" | ✅ |
+| L2 | 🔴 Bảo mật | DB/RLS | `users_self` FOR ALL không WITH CHECK → phiên Supabase Auth tự chèn dòng users role admin rồi login-email | Migration `20261025000000_security_hardening.sql`: drop mọi policy client + revoke quyền ghi anon/authenticated | ⬜ **cần user áp** |
+| L3 | 🔴 Bảo mật | secrets | `backend/.env` thật nằm trong lịch sử git (repo PUBLIC): service_role JWT legacy (hết hạn 2036), VAPID private key (chưa đổi) | Supabase: tắt legacy API keys / rotate JWT secret; tạo cặp VAPID mới | ⬜ **việc của user** |
+| L4 | 🟠 Bảo mật | auth | Đổi PIN / admin đặt lại PIN không thu hồi token cũ (30 ngày); mở khoá hồi sinh token cũ | `users.tokens_valid_after` + `revokeTokens()` (đổi PIN, reset-pin, khoá); đổi PIN trả token mới. Degrade mềm khi chưa áp migration | ✅ (đủ hiệu lực sau migration) |
+| L5 | 🟠 Bảo mật | rag | Cache dùng chung lưu câu trả lời sinh KÈM lịch sử phiên của 1 nông dân → phát cho người khác | Chỉ ghi cache khi sinh không có lịch sử (đọc vẫn được) | ✅ |
+| L6 | 🟠 Bảo mật | rag | Câu hỏi nông dân chứa "Câu trả lời:" → `extractCuratedAnswer` trả chữ nông dân như QA kỹ sư duyệt | `buildQaContent()` vô hiệu dấu phân cách trong câu hỏi (4 chỗ tạo QA) | ✅ |
+| L7 | 🟠 Riêng tư | frontend | Đăng xuất không huỷ push + không xoá Workbox `api-cache` → máy dùng chung lộ /auth/me, bookmark, thông báo riêng của người trước | `utils/clearSession.js`: logout huỷ push (server+trình duyệt) + xoá api-cache; xoá cache cả khi 401 và khi login | ✅ |
+| L8 | 🟠 Availability | backend | Express 4 không bắt reject của handler async → body dị dạng (phone là số…) làm treo request / sập process khi không có Sentry | `middleware/asyncErrors.js` (như express-async-errors) + `unhandledRejection` logger + `requestTimeout`; type-check `normalizePhone`, community | ✅ |
+| L9 | 🟠 Availability | upload | DOCX zip bomb bung toàn bộ trong heap; nội dung không giới hạn → hàng chục nghìn lệnh embed; Duyệt 2 lần → 2 vòng embed | Bung thử có `maxOutputLength` (60MB) trước mammoth; `MAX_DOC_CHARS` 400k; approve chuyển trạng thái có điều kiện (409); pdftotext timeout 60s | ✅ |
+| L10 | 🟡 Abuse | community/push | Không rate-limit ghi: đăng ảnh vô hạn (bucket không dọn), spam bình luận → spam push chủ bài | `writeLimiter` 20 ghi/phút/user cho community/push/knowledge (GET không tính) | ✅ |
+| L11 | 🟡 Bảo mật | admin CSV | Chống formula injection chỉ xét ký tự đầu → `x;=1+1` thành ô công thức trong Excel vi-VN (phân cách `;`) | Vô hiệu `= + - @` sau mọi dấu phân cách + luôn bọc ngoặc kép | ✅ |
+| L12 | 🟡 UX/Bảo mật | auth | Sai mật khẩu cũ khi đổi trả 401 → interceptor đá ra màn login | Trả 400 | ✅ |
+| L13 | 🟢 Hardening | nhiều nơi | push-sw điều hướng URL bất kỳ trong payload; engineer queue không chặn limit; cropTags upload không whitelist; client Supabase thừa ở frontend | SW chỉ nhận path `/...`; `pageParams`; whitelist cây; gỡ `services/supabase.js` + dependency | ✅ |
+| L14 | 🟡 Riêng tư | storage | Ảnh chat sâu bệnh ở bucket public, URL vĩnh viễn, prefix theo userId (lộ qua feed) | Chuyển bucket private + signed URL ngắn hạn (cần backend chạy để làm & test) | ⬜ |
+
+**Ghi chú audit (chưa xử lý, rủi ro thấp/thiết kế):** staff đọc toàn bộ phiên chat một khi đã escalate; `knowledge_docs` phê duyệt 1 người (không 4-mắt); dọn ảnh khi xoá account chỉ lấy 100 file/thư mục (storage list mặc định); orphan ảnh khi insert post lỗi.
+
 ### Còn mở (ngoài Sentry/OTP)
 - ⬜ **A** — soạn QA *differential* cho triệu chứng mơ hồ (vàng lá/héo/đốm lá): nguyên nhân + dấu hiệu phân biệt + cách trị. ⚠️ B (prompt, H14) chỉ tác động câu qua LLM; câu có curated QA (qa_direct) thì serve thẳng QA → sửa hành vi phải sửa QA (việc kỹ sư).
 - ⬜ **Scale** — Redis + leader-election scheduler + billing Gemini + index pgvector (trần 1 replica). (H15 cron cũng cần leader-election khi >1 replica.)
