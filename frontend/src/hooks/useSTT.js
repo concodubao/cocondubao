@@ -31,6 +31,7 @@ export function useSTT() {
   const audioChunksRef  = useRef([])
   const animFrameRef    = useRef(null)
   const analyserRef     = useRef(null)
+  const audioCtxRef     = useRef(null)
   const timeoutRef      = useRef(null)
 
   // Cleanup khi unmount
@@ -38,8 +39,15 @@ export function useSTT() {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
       if (recognitionRef.current) recognitionRef.current.stop()
-      if (mediaRecRef.current?.state === 'recording') mediaRecRef.current.stop()
+      if (mediaRecRef.current?.state === 'recording') {
+        // Rời trang khi đang ghi: bỏ upload (onstop sẽ gửi audio + setState trên
+        // component đã unmount), chỉ tắt mic.
+        mediaRecRef.current.onstop = null
+        mediaRecRef.current.stream?.getTracks().forEach(t => t.stop())
+        mediaRecRef.current.stop()
+      }
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
+      audioCtxRef.current?.close().catch(() => {})
     }
   }, [])
 
@@ -47,6 +55,7 @@ export function useSTT() {
   async function startVolumeAnalyser(stream) {
     try {
       const ctx      = new AudioContext()
+      audioCtxRef.current = ctx
       const source   = ctx.createMediaStreamSource(stream)
       const analyser = ctx.createAnalyser()
       analyser.fftSize = 256
@@ -71,6 +80,12 @@ export function useSTT() {
   function stopVolumeAnalyser() {
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
     setVolume(0)
+    // Đóng AudioContext: trình duyệt giới hạn số context đang mở (Chrome ~6) → trước
+    // đây mỗi lần ghi âm rò 1 context, hỏi vài câu là visualizer/mic hỏng tới khi reload.
+    if (audioCtxRef.current) {
+      audioCtxRef.current.close().catch(() => {})
+      audioCtxRef.current = null
+    }
     // Clean up Web Speech stream if it was kept alive for visualizer
     if (recognitionRef.current?._stream) {
       recognitionRef.current._stream.getTracks().forEach(t => t.stop())
