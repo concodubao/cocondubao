@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { clearApiCache } from '../utils/clearSession'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -17,6 +18,7 @@ api.interceptors.response.use(
   err => {
     if (err.response?.status === 401) {
       localStorage.removeItem('cocon-auth')
+      clearApiCache() // response cache của phiên vừa hết hạn không được để lại cho người sau
       window.location.href = '/login'
     }
     return Promise.reject(err)

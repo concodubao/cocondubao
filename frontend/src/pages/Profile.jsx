@@ -44,7 +44,11 @@ function PasswordModal({ mode, isFarmer, onClose, onSuccess }) {
     setError(''); setLoading(true)
     try {
       if (isSet) await authAPI.setPassword(newPw)
-      else       await authAPI.changePassword(current, newPw)
+      else {
+        // Đổi PIN thu hồi mọi phiên cũ → server cấp token mới cho thiết bị này
+        const res = await authAPI.changePassword(current, newPw)
+        if (res.data?.token) useAuthStore.getState().setToken(res.data.token)
+      }
       onSuccess(isSet ? 'set' : 'change')
     } catch (err) {
       setError(err.response?.data?.error || 'Không thực hiện được. Thử lại nhé.')

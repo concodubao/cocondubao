@@ -31,7 +31,10 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   // Nút "Bỏ qua" chỉ đóng thông báo, không mở app
   if (event.action === 'dismiss') return
-  const url = event.notification.data?.url || '/'
+  // Chỉ điều hướng trong app (đường dẫn tương đối '/...', không '//host'): payload do
+  // server ký VAPID, nhưng khoá VAPID từng lộ trong lịch sử git → không tin URL ngoài.
+  const raw = event.notification.data?.url
+  const url = typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       const existing = list.find(c => c.url.includes(self.location.origin))

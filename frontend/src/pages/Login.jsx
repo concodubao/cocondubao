@@ -3,6 +3,7 @@ import { Navigate, Link } from 'react-router-dom'
 import { authAPI } from '../services/api'
 import { useAuthStore } from '../stores/authStore'
 import PasswordInput from '../components/PasswordInput'
+import { clearApiCache } from '../utils/clearSession'
 
 // ─── Role cards ─────────────────────────────────────────────
 const ROLES = [
@@ -120,6 +121,7 @@ function StepPhonePin({ agreed }) {
         ? await authAPI.registerPhone(p, pin)
         : await authAPI.loginPhone(p, useLegacy ? textPass : pin)
       const { token, user, isNewUser } = res.data
+      await clearApiCache() // không để cache API của tài khoản trước lẫn vào phiên mới
       setToken(token); setUser(user)
       window.location.href = isNewUser ? '/profile?onboard=true' : '/home'
     } catch (err) {
@@ -205,6 +207,7 @@ function StepEmailPassword({ agreed }) {
     try {
       const res = await authAPI.loginEmail(email, password)
       const { token, user, isNewUser } = res.data
+      await clearApiCache() // không để cache API của tài khoản trước lẫn vào phiên mới
       setToken(token); setUser(user)
       window.location.href = isNewUser ? '/profile?onboard=true'
         : user.role === 'admin'    ? '/admin'

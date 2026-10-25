@@ -85,7 +85,6 @@ export default defineConfig({
         manualChunks(id) {
           if (!id.includes('node_modules')) return
           if (/[\\/]react(-dom|-router-dom)?[\\/]|[\\/]scheduler[\\/]/.test(id)) return 'react-vendor'
-          if (id.includes('@supabase')) return 'supabase'
           if (id.includes('@sentry'))   return 'sentry'
           if (id.includes('@tanstack')) return 'query'
         },
