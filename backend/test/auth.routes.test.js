@@ -85,3 +85,18 @@ describe('revokeTokens — token cấp trước mốc thu hồi bị từ chối
     expect((await request(app).get('/me-check').set('Authorization', `Bearer ${fresh}`)).status).toBe(200)
   })
 })
+
+describe('asyncErrors — reject của handler async tới error handler JSON', () => {
+  it('kể cả reject giá trị falsy (không được "đi tiếp" sang route sau)', async () => {
+    await import('../src/middleware/asyncErrors.js')
+    const a = express()
+    a.get('/boom', async () => { throw new TypeError('x') })
+    a.get('/falsy', () => Promise.reject(undefined))
+    a.get('/falsy', (req, res) => res.json({ leaked: true })) // không được tới đây
+    a.use((err, req, res, next) => res.status(500).json({ error: err.message })) // eslint-disable-line no-unused-vars
+    expect((await request(a).get('/boom')).status).toBe(500)
+    const r = await request(a).get('/falsy')
+    expect(r.status).toBe(500)
+    expect(r.body.leaked).toBeUndefined()
+  })
+})

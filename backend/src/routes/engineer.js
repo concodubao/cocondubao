@@ -36,30 +36,48 @@ function pageParams(q, defLimit = 20, maxLimit = 100) {
 // DOCX là zip: 20MB nén có thể bung ra hàng GB trong heap (mammoth/JSZip bung toàn bộ)
 // → sập process duy nhất. Nội dung chữ không giới hạn → embed hàng chục nghìn chunk
 // (mỗi chunk 1 request Gemini, chung quota với câu hỏi của nông dân).
-const MAX_DOCX_INFLATED = 60 * 1024 * 1024 // tổng dung lượng bung tối đa
+const MAX_DOCX_INFLATED = 30 * 1024 * 1024 // tổng dung lượng bung tối đa (ảnh nhúng gần như không nén)
+// Phần XML mammoth dựng thành cây DOM (word/*.xml): mỗi MB XML ≈ hàng chục MB object
+// trong heap → giới hạn riêng, chặt hơn. 400k ký tự chữ (MAX_DOC_CHARS) hiếm khi cần >8MB XML.
+const MAX_DOCX_XML_PART = 8 * 1024 * 1024
 export const MAX_DOC_CHARS = 400_000        // ~400 chunk embed — đủ cho tài liệu kỹ thuật dài
+
+const DOCX_TOO_LARGE = 'File DOCX quá lớn khi giải nén.'
+const DOCX_BROKEN    = 'File DOCX hỏng hoặc không đúng định dạng.'
 
 // Bung thử từng mục với maxOutputLength (giới hạn THẬT, không tin kích thước khai
 // trong header zip — header do người upload kiểm soát). Vượt → từ chối trước mammoth.
-export async function assertDocxInflateWithinLimit(buffer, limit = MAX_DOCX_INFLATED) {
+// Dùng nội bộ JSZip (_data.compressedContent / compression.magic) — nếu bản JSZip khác
+// không có các trường đó thì TỪ CHỐI (fail closed) thay vì bỏ qua kiểm tra.
+export async function assertDocxInflateWithinLimit(buffer, limit = MAX_DOCX_INFLATED, partLimit = MAX_DOCX_XML_PART) {
   const { default: JSZip } = await import('jszip')
   const { inflateRawSync } = await import('zlib')
   let zip
-  try { zip = await JSZip.loadAsync(buffer) } catch { throw new Error('File DOCX hỏng hoặc không đúng định dạng.') }
+  try { zip = await JSZip.loadAsync(buffer) } catch { throw new Error(DOCX_BROKEN) }
   let total = 0
-  for (const entry of Object.values(zip.files)) {
-    if (entry.dir || !entry._data?.compressedContent) continue
-    const remaining = limit - total
-    if (remaining <= 0) throw new Error('File DOCX quá lớn khi giải nén.')
+  for (const [name, entry] of Object.entries(zip.files)) {
+    if (entry.dir || entry._data === '') continue // thư mục / mục rỗng: JSZip & mammoth đều không bung
+    const content = entry._data?.compressedContent
+    if (!content) throw new Error(DOCX_BROKEN)
+    const isXmlPart = /^word\/.*\.xml$/i.test(name)
+    const cap = Math.min(limit - total, isXmlPart ? partLimit : Infinity)
+    if (cap <= 0) throw new Error(DOCX_TOO_LARGE)
     let size
     if (entry._data.compression?.magic === '\x08\x00') {
-      try { size = inflateRawSync(entry._data.compressedContent, { maxOutputLength: remaining }).length }
-      catch { throw new Error('File DOCX quá lớn khi giải nén.') }
+      try {
+        size = inflateRawSync(content, { maxOutputLength: cap }).length
+      } catch (e) {
+        throw new Error(e?.code === 'ERR_BUFFER_TOO_LARGE' ? DOCX_TOO_LARGE : DOCX_BROKEN)
+      }
+    } else if (entry._data.compression?.magic === '\x00\x00') {
+      size = content.length // STORE: không nén
+      if (size > cap) throw new Error(DOCX_TOO_LARGE)
     } else {
-      size = entry._data.compressedContent.length // STORE: không nén
+      throw new Error(DOCX_BROKEN) // phương thức nén lạ: JSZip cũng không đọc được
     }
     total += size
   }
+  if (total > limit) throw new Error(DOCX_TOO_LARGE)
 }
 
 // ─── Helper: trích xuất text từ file ─────────────────────────────────────────
@@ -652,10 +670,13 @@ router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async 
 
     // Chuyển sang 'embedding' có điều kiện: bấm Duyệt 2 lần (hoặc 2 người cùng bấm)
     // trước đây chạy 2 vòng embed song song trên cùng tài liệu → gấp đôi quota Gemini.
+    // Ngoại lệ: kẹt 'embedding' > 30 phút (process sập/redeploy giữa chừng, lỗi ở luồng
+    // tạo QA) → cho Duyệt lại, nếu không tài liệu kẹt vĩnh viễn (409 mãi).
+    const staleBefore = new Date(Date.now() - 30 * 60_000).toISOString()
     const { data: claimed, error: claimErr } = await supabase.from('knowledge_docs')
       .update({ status: 'embedding', updated_at: new Date().toISOString() })
       .eq('id', id)
-      .neq('status', 'embedding')
+      .or(`status.neq.embedding,updated_at.lt.${staleBefore}`)
       .select('id')
     if (claimErr) throw claimErr
     if (!claimed?.length) return res.status(409).json({ error: 'Tài liệu đang được embed, vui lòng chờ.' })

@@ -29,7 +29,7 @@ let _staffRolesLoaded = false
 // JWT không có version → đổi PIN/admin đặt lại PIN không làm token cũ (tới 30 ngày)
 // mất hiệu lực; mở khoá còn "hồi sinh" mọi token cũ. Lưu users.tokens_valid_after:
 // token có iat trước mốc đó bị từ chối. Cột cần migration
-// 20261025000000_tokens_valid_after.sql — chưa áp thì poller lỗi êm, bỏ qua kiểm tra.
+// 20261025000000_security_hardening.sql — chưa áp thì poller lỗi êm, bỏ qua kiểm tra.
 // Mốc làm tròn xuống giây (iat theo giây) để token cấp lại ngay sau đó vẫn hợp lệ.
 const _tokensValidAfter = new Map() // userId → ms
 
@@ -57,9 +57,12 @@ export async function refreshInactiveUsers() {
       .from('users')
       .select('id')
       .eq('is_active', false)
-    if (error) { console.warn('[AUTH] refresh inactive users failed:', error.message); return }
-    _inactiveUsers.clear()
-    for (const u of data || []) _inactiveUsers.add(u.id)
+    // Mỗi khối độc lập: 1 truy vấn lỗi KHÔNG được làm bỏ qua các khối sau.
+    if (error) console.warn('[AUTH] refresh inactive users failed:', error.message)
+    else {
+      _inactiveUsers.clear()
+      for (const u of data || []) _inactiveUsers.add(u.id)
+    }
   } catch (err) {
     console.warn('[AUTH] refresh inactive users error:', err.message)
   }
@@ -69,23 +72,34 @@ export async function refreshInactiveUsers() {
       .from('users')
       .select('id, role')
       .in('role', STAFF_ROLES)
-    if (error) { console.warn('[AUTH] refresh staff roles failed:', error.message); return }
-    _staffRoles.clear()
-    for (const u of data || []) _staffRoles.set(u.id, u.role)
-    _staffRolesLoaded = true
+    if (error) console.warn('[AUTH] refresh staff roles failed:', error.message)
+    else {
+      _staffRoles.clear()
+      for (const u of data || []) _staffRoles.set(u.id, u.role)
+      _staffRolesLoaded = true
+    }
   } catch (err) {
     console.warn('[AUTH] refresh staff roles error:', err.message)
   }
 
+  // Chỉ nạp mốc thu hồi còn có thể có tác dụng (token sống tối đa 30 ngày) và phân
+  // trang: PostgREST cắt mặc định 1000 dòng, mà số dòng có mốc chỉ tăng dần.
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id, tokens_valid_after')
-      .not('tokens_valid_after', 'is', null)
-    if (error) return // cột chưa có (chưa áp migration) → giữ mốc in-memory hiện có
-    for (const u of data || []) {
-      const at = new Date(u.tokens_valid_after).getTime()
-      if (Number.isFinite(at)) _tokensValidAfter.set(u.id, Math.max(at, _tokensValidAfter.get(u.id) || 0))
+    const since = new Date(Date.now() - 31 * 86_400_000).toISOString()
+    const PAGE = 1000
+    for (let from = 0; ; from += PAGE) {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, tokens_valid_after')
+        .gt('tokens_valid_after', since)
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1)
+      if (error) break // cột chưa có (chưa áp migration) → giữ mốc in-memory hiện có
+      for (const u of data || []) {
+        const at = new Date(u.tokens_valid_after).getTime()
+        if (Number.isFinite(at)) _tokensValidAfter.set(u.id, Math.max(at, _tokensValidAfter.get(u.id) || 0))
+      }
+      if (!data || data.length < PAGE) break
     }
   } catch { /* degrade mềm */ }
 }

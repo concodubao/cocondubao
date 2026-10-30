@@ -332,4 +332,21 @@ describe('assertDocxInflateWithinLimit — chặn DOCX zip bomb trước khi mam
     await expect(assertDocxInflateWithinLimit(await mk(2_000_000), 1_000_000)).rejects.toThrow()
     await expect(assertDocxInflateWithinLimit(await mk(10_000), 1_000_000)).resolves.toBeUndefined()
   })
+
+  it('giới hạn riêng phần word/*.xml (mammoth dựng DOM) chặt hơn tổng', async () => {
+    const { default: JSZip } = await import('jszip')
+    const { assertDocxInflateWithinLimit } = await import('../src/routes/engineer.js')
+    const z = new JSZip(); z.file('word/document.xml', '<w:p/>'.repeat(200_000)) // ~1.2MB XML
+    const buf = await z.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
+    await expect(assertDocxInflateWithinLimit(buf, 10_000_000, 1_000_000)).rejects.toThrow(/quá lớn/)
+    // ảnh (không phải XML) cùng kích thước thì chỉ tính vào tổng
+    const z2 = new JSZip(); z2.file('word/media/img.png', 'x'.repeat(1_200_000))
+    const buf2 = await z2.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
+    await expect(assertDocxInflateWithinLimit(buf2, 10_000_000, 1_000_000)).resolves.toBeUndefined()
+  })
+
+  it('file không phải zip → báo "hỏng", không phải "quá lớn"', async () => {
+    const { assertDocxInflateWithinLimit } = await import('../src/routes/engineer.js')
+    await expect(assertDocxInflateWithinLimit(Buffer.from('not a zip'))).rejects.toThrow(/hỏng/)
+  })
 })

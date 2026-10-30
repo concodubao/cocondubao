@@ -387,6 +387,7 @@ router.delete('/account', verifyJWT, async (req, res) => {
       .eq('id', req.user.userId)
     if (error) throw error
     markInactive(req.user.userId) // token còn hạn bị chặn ngay
+    await revokeTokens(req.user.userId) // và không hồi sinh nếu admin kích hoạt lại tài khoản
     await supabase.from('push_subscriptions')
       .update({ active: false })
       .eq('user_id', req.user.userId)

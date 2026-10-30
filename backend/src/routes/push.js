@@ -65,12 +65,13 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
     // Welcome chỉ gửi LẦN ĐẦU user bật thông báo (chưa có endpoint active nào).
     // Khoá theo USER chứ không theo endpoint: trình duyệt cũ / iOS Safari có thể
     // sinh endpoint MỚI mỗi lần subscribe → nếu gửi welcome theo từng endpoint mới
-    // sẽ spam mỗi lần chuyển trang. Đã có bất kỳ endpoint active nào → không welcome.
+    // sẽ spam mỗi lần chuyển trang. Đã TỪNG có endpoint nào (kể cả đã tắt) → không
+    // welcome: đăng xuất giờ tắt subscription, nếu chỉ xét active thì mỗi lần đăng nhập
+    // lại đều nhận welcome.
     const { data: userActive } = await supabase
       .from('push_subscriptions')
       .select('endpoint')
       .eq('user_id', req.user.userId)
-      .eq('active', true)
       .limit(1)
     const isFirstForUser = !userActive?.length
 

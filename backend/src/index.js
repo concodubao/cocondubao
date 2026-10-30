@@ -79,19 +79,24 @@ const authLimiter = rateLimit({
   message:          { error: 'Thử lại sau 1 phút nhé.' },
 })
 
-// Ghi (POST/PATCH/DELETE) ở community/push/knowledge: 20 req/phút/user. Trước đây
+// Giới hạn GHI (POST/PATCH/DELETE) theo user ở community & engineer/knowledge. Trước đây
 // không giới hạn → 1 tài khoản có thể đăng ảnh liên tục (mỗi ảnh 1 lần sharp + 1 file
 // vĩnh viễn trong bucket) hoặc bình luận dồn dập để spam push vào máy chủ bài. GET
 // (xem feed, kỹ sư poll hàng đợi 20s) không bị đếm.
-const writeLimiter = rateLimit({
+// Mỗi khu vực một bộ đếm riêng (không dùng chung 1 bucket cho mọi tính năng).
+// push/notifications KHÔNG giới hạn: ghi ở đó là idempotent (đánh dấu đã đọc, đăng ký
+// thiết bị, cài đặt) và đọc vài thông báo đã sinh nhiều lần ghi → dễ chặn nhầm.
+const makeWriteLimiter = (max) => rateLimit({
   windowMs:         60 * 1000,
-  max:              20,
+  max,
   standardHeaders:  true,
   legacyHeaders:    false,
   keyGenerator:     userOrIpKey,
   skip:             (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
   message:          { error: 'Bạn thao tác hơi nhanh, chờ 1 phút rồi thử lại nhé.' },
 })
+const communityLimiter = makeWriteLimiter(20) // đăng bài/ảnh, bình luận, like, báo cáo
+const staffLimiter     = makeWriteLimiter(60) // kỹ sư: nhận/trả lời/xoá câu hỏi, tài liệu
 
 // VAPID — cấu hình một lần duy nhất khi khởi động
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
@@ -114,12 +119,12 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }))
 
 app.use('/api/v1/auth',          authLimiter, authRoutes)
 app.use('/api/v1/chat',          chatLimiter, chatRoutes)
-app.use('/api/v1/push',          writeLimiter, pushRoutes)
-app.use('/api/v1/notifications', writeLimiter, pushRoutes)
-app.use('/api/v1/engineer',      writeLimiter, engineerRoutes)
-app.use('/api/v1/knowledge',     writeLimiter, engineerRoutes)
+app.use('/api/v1/push',          pushRoutes)
+app.use('/api/v1/notifications', pushRoutes)
+app.use('/api/v1/engineer',      staffLimiter, engineerRoutes)
+app.use('/api/v1/knowledge',     staffLimiter, engineerRoutes)
 app.use('/api/v1/admin',         adminRoutes)
-app.use('/api/v1/community',     writeLimiter, communityRoutes)
+app.use('/api/v1/community',     communityLimiter, communityRoutes)
 
 app.get('/health', (_, res) => res.json({
   status:    'ok',
@@ -135,6 +140,8 @@ Sentry.setupExpressErrorHandler(app)
 // `error`. Trả JSON thống nhất, không lộ stack.
 // eslint-disable-next-line no-unused-vars
 app.use(function(err, req, res, next) {
+  // Handler đã trả lời rồi mới lỗi → không gửi lần 2 (ERR_HTTP_HEADERS_SENT)
+  if (res.headersSent) return next(err)
   if (err?.name === 'MulterError') {
     const msg = err.code === 'LIMIT_FILE_SIZE' ? 'File quá lớn.' : 'File tải lên không hợp lệ.'
     return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: msg })
@@ -177,7 +184,10 @@ const server = app.listen(PORT, () => {
   startStorageCleanupScheduler()
 })
 
-// Handler treo (lỗi ngoài try ở Express 4, upstream chậm) không được giữ socket mãi.
-// 75s > timeout 60s của request chat ảnh phía frontend.
+// requestTimeout/headersTimeout chỉ giới hạn thời gian NHẬN request (chống client gửi
+// chậm); headersTimeout phải ≤ requestTimeout mới có tác dụng. server.timeout = socket
+// im lặng quá lâu (handler treo do upstream không trả lời) → đóng; 150s > timeout dài
+// nhất phía frontend (120s khi duyệt tài liệu).
 server.requestTimeout = 75_000
-server.headersTimeout = 80_000
+server.headersTimeout = 20_000
+server.timeout        = 150_000

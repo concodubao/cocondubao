@@ -30,7 +30,15 @@ DROP POLICY IF EXISTS knowledge_farmer_read ON public.knowledge_docs;
 -- 3) Lớp chặn thứ hai: thu quyền ghi bảng public của anon/authenticated (service_role
 --    không bị ảnh hưởng). Bảng tạo về sau cũng không tự cấp quyền ghi.
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA public FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM anon, authenticated;
+-- FOR ROLE postgres: default privileges chỉ áp cho bảng do role đó tạo về sau (bảng tạo
+-- bằng SQL Editor/psql). Bảng do supabase_admin tạo không thuộc phạm vi này.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM anon, authenticated;
+
+-- 4) RPC tìm vector: anon/authenticated gọi được qua PostgREST (dù RLS trả 0 dòng, vẫn
+--    tốn CPU quét vector). Chỉ backend (service_role) cần gọi.
+REVOKE EXECUTE ON FUNCTION public.match_knowledge_chunks(public.vector, double precision, integer, text) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.match_knowledge_chunks(public.vector, double precision, integer, text) TO service_role;
 
 COMMIT;
 
@@ -48,6 +56,10 @@ COMMIT;
 -- d) Tài khoản có SĐT nhưng chưa đặt PIN (register-phone giờ trả 409, admin cấp PIN):
 --      SELECT role, count(*) FROM public.users
 --       WHERE phone IS NOT NULL AND password_hash IS NULL AND is_active GROUP BY role;
+-- f) Tài liệu QA tạo TRƯỚC bản vá có thể chứa dấu "Câu trả lời:" do nông dân chèn trong
+--    câu hỏi (xem L6) — soát tay, sửa/lưu trữ nếu nội dung đáng ngờ:
+--      SELECT id, title FROM public.knowledge_docs
+--       WHERE content LIKE 'Câu hỏi:%Câu trả lời:%Câu trả lời:%';
 -- e) Storage (không có trong migration): kiểm policy bucket 'images':
 --      SELECT policyname, roles, cmd FROM pg_policies WHERE schemaname='storage' AND tablename='objects';
 --    Không nên có policy SELECT/INSERT/UPDATE/DELETE cho anon/authenticated trên bucket này.

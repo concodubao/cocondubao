@@ -15,7 +15,10 @@ if (!Layer.prototype.__coconAsyncPatched) {
     if (fn.length > 3) return next() // không phải request handler chuẩn
     try {
       const ret = fn(req, res, next)
-      if (ret && typeof ret.then === 'function') ret.then(undefined, next)
+      // reject(undefined/null/0) vẫn phải là lỗi, không được "đi tiếp" sang route sau
+      if (ret && typeof ret.then === 'function') {
+        ret.then(undefined, (err) => next(err || new Error('Rejected promise')))
+      }
     } catch (err) {
       next(err)
     }

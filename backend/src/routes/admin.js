@@ -483,15 +483,15 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
   if (error) return res.status(500).json({ error: error.message })
 
   // Cập nhật denylist để khoá/mở khoá có hiệu lực tức thì (không chờ poller 60s)
-  if (updates.is_active === false) {
-    markInactive(req.params.id)
-    // Khoá = thu hồi luôn token: nếu không, mở khoá sau này "hồi sinh" token cũ
-    // (có thể là token của kẻ đã chiếm tài khoản — lý do bị khoá).
-    revokeTokens(req.params.id)
-  }
+  if (updates.is_active === false) markInactive(req.params.id)
   if (updates.is_active === true)  markActive(req.params.id)
   // Đổi vai trò: token cũ mang quyền staff bị vô hiệu ngay (xem middleware/auth.js)
   if (updates.role) setUserRole(req.params.id, updates.role)
+  // Khoá, MỞ khoá, đổi vai trò đều thu hồi token cũ. Nếu không, "hoàn tác" (mở khoá,
+  // nâng quyền lại) sẽ hồi sinh token cũ — có thể của kẻ đã chiếm tài khoản (lý do bị
+  // khoá/hạ quyền), kể cả tài khoản bị khoá trước khi có cơ chế thu hồi. Mở khoá luôn an
+  // toàn: login từ chối tài khoản bị khoá nên mọi token hiện có đều cũ hơn lúc khoá.
+  if (updates.is_active !== undefined || updates.role) await revokeTokens(req.params.id)
 
   let action = 'update_user', detail = ''
   if (updates.is_active !== undefined) { action = is_active ? 'unlock_user' : 'lock_user'; detail = is_active ? 'Mở khóa tài khoản' : 'Khóa tài khoản' }
