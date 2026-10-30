@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './stores/authStore'
 import { useDisplayStore } from './stores/displayStore'
+import { resyncDevicePush } from './utils/clearSession'
 
 // ─── Pages tải ngay (luồng lõi nông dân: mở app → đăng nhập → trang chủ → hỏi) ──
 import Splash        from './pages/Splash'
@@ -91,6 +92,15 @@ function ProtectedRoute({ children, allowedRoles }) {
 
 export default function App() {
   const readScale = useDisplayStore(s => s.fontScale)
+  const userId    = useAuthStore(s => s.user?.id)
+  const token     = useAuthStore(s => s.token)
+
+  useEffect(() => {
+    // Đăng xuất huỷ push của thiết bị (máy dùng chung) → sau khi đăng nhập, gắn lại push
+    // cho tài khoản hiện tại nếu quyền đã cấp. Chạy cho MỌI vai trò (trang kỹ sư không
+    // dùng usePush, trước đây kỹ sư mất thông báo hàng đợi sau lần đăng xuất đầu tiên).
+    if (userId && token) resyncDevicePush(userId, token)
+  }, [userId, token])
 
   useEffect(() => {
     // Dọn sạch CSS `zoom` của bản font-scale CŨ (zoom cả trang gây vỡ/tràn layout).

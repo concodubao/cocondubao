@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from 'react'
 import { pushAPI } from '../services/api'
+import { setPushOptOut } from '../utils/clearSession'
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -79,6 +80,7 @@ export function usePush(userId) {
       console.log('[PUSH] browser subscription endpoint:', subscription.endpoint.slice(0, 60) + '...')
 
       await pushAPI.subscribe({ subscription })
+      setPushOptOut(userId, false) // user chủ động bật → cho phép tự gắn lại sau đăng nhập
       console.log('[PUSH] subscription saved to server ✓')
       setIsSubscribed(true)
       setError(null)
@@ -105,10 +107,12 @@ export function usePush(userId) {
         await sub.unsubscribe()
         setIsSubscribed(false)
       }
+      // Tôn trọng lựa chọn TẮT: resyncDevicePush (App.jsx) không tự bật lại cho user này
+      setPushOptOut(userId, true)
     } catch (err) {
       console.error('[PUSH] unsubscribe error:', err)
     }
-  }, [])
+  }, [userId])
 
   return { permission, isSubscribed, error, subscribe, unsubscribe }
 }

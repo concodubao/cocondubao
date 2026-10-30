@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { clearApiCache } from '../utils/clearSession'
+import { cleanupAfterSessionEnd } from '../utils/clearSession'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -15,11 +15,20 @@ api.interceptors.request.use(config => {
 
 api.interceptors.response.use(
   res => res,
-  err => {
+  async err => {
     if (err.response?.status === 401) {
-      localStorage.removeItem('cocon-auth')
-      clearApiCache() // response cache của phiên vừa hết hạn không được để lại cho người sau
-      window.location.href = '/login'
+      // Chỉ kết thúc phiên nếu request lỗi mang ĐÚNG token đang lưu. Sau khi đổi PIN,
+      // request còn bay bằng token cũ (hoặc tab khác) sẽ 401 — trước đây xoá luôn token
+      // MỚI vừa nhận và đá người dùng ra màn đăng nhập.
+      const stored = JSON.parse(localStorage.getItem('cocon-auth') || '{}')
+      const current = stored?.state?.token
+      const sent = String(err.config?.headers?.Authorization || '').replace(/^Bearer\s+/, '')
+      if (!current || !sent || sent === current) {
+        localStorage.removeItem('cocon-auth')
+        // Dọn cache API + push của phiên vừa hết (máy dùng chung) TRƯỚC khi rời trang
+        await cleanupAfterSessionEnd()
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(err)
   }

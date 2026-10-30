@@ -33,8 +33,13 @@ self.addEventListener('notificationclick', (event) => {
   if (event.action === 'dismiss') return
   // Chỉ điều hướng trong app (đường dẫn tương đối '/...', không '//host'): payload do
   // server ký VAPID, nhưng khoá VAPID từng lộ trong lịch sử git → không tin URL ngoài.
-  const raw = event.notification.data?.url
-  const url = typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
+  // Kiểm bằng URL parser (không so chuỗi): '/\\host' hay '/<TAB>/host' qua được phép so
+  // startsWith nhưng trình duyệt vẫn hiểu là host khác.
+  let url = '/'
+  try {
+    const u = new URL(event.notification.data?.url || '/', self.location.origin)
+    if (u.origin === self.location.origin) url = u.pathname + u.search + u.hash
+  } catch { /* URL hỏng → về trang chủ */ }
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       const existing = list.find(c => c.url.includes(self.location.origin))

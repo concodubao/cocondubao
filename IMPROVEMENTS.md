@@ -156,6 +156,25 @@ Audit bằng skill `cloudflare/security-audit-skill` (cài ở `.claude/skills/s
 | L13 | 🟢 Hardening | nhiều nơi | push-sw điều hướng URL bất kỳ trong payload; engineer queue không chặn limit; cropTags upload không whitelist; client Supabase thừa ở frontend | SW chỉ nhận path `/...`; `pageParams`; whitelist cây; gỡ `services/supabase.js` + dependency | ✅ |
 | L14 | 🟡 Riêng tư | storage | Ảnh chat sâu bệnh ở bucket public, URL vĩnh viễn, prefix theo userId (lộ qua feed) | Chuyển bucket private + signed URL ngắn hạn (cần backend chạy để làm & test) | ⬜ |
 
+### Rà lại bản vá L (2026-10-31, 4 reviewer độc lập, guidance mode, `~/security-audit-skill/cocon-du-bao/diff-review-1/`)
+
+Xác nhận đúng: bản vá Express async (phủ cả route handler, giữ Sentry, không double-next), chặn chiếm tài khoản register-phone, vô hiệu marker QA, cổng DOCX dùng chung JSZip với mammoth, migration không đụng service_role/RPC. Lỗi/hồi quy tìm thấy và đã sửa:
+
+| ID | Loại | Vấn đề | Sửa |
+|----|------|--------|-----|
+| M1 | Hồi quy | Đăng xuất huỷ push trình duyệt → kỹ sư âm thầm mất thông báo hàng đợi (trang staff không dùng usePush); nông dân nhận lại welcome mỗi lần login | `resyncDevicePush` ở App.jsx (mọi vai trò, không hỏi lại quyền) + cờ opt-out theo user khi chủ động tắt; welcome chỉ khi user CHƯA TỪNG có subscription |
+| M2 | Bảo mật | Phiên kết thúc do 401 (hết hạn/thu hồi) không dọn push → thông báo riêng của người trước vẫn tới máy | Interceptor 401 dọn push trình duyệt + cache (có timeout) trước khi rời trang |
+| M3 | Hồi quy | Đổi PIN: request bay bằng token cũ / tab khác 401 → xoá token MỚI, đá ra login | Chỉ kết thúc phiên khi token của request lỗi = token đang lưu |
+| M4 | Bảo mật | Hạ quyền rồi nâng lại / mở khoá tài khoản khoá từ trước → hồi sinh token cũ; xoá account không thu hồi | `revokeTokens` cả khi khoá, mở khoá, đổi vai trò, tự xoá tài khoản |
+| M5 | Bảo mật | Poller: khối lỗi `return` sớm bỏ qua khối sau; mốc thu hồi có thể vượt trần 1000 dòng PostgREST | Khối độc lập; chỉ nạp mốc 31 ngày gần nhất, phân trang |
+| M6 | Hồi quy | 1 bucket 20 ghi/phút dùng chung push/notifications/engineer/community → đọc ~7 thông báo là bị 429 | Bỏ giới hạn ở push/notifications (ghi idempotent); community 20/phút, staff 60/phút, bộ đếm riêng |
+| M7 | Bảo mật | Cổng DOCX 60MB vẫn cho XML ~60MB → mammoth dựng DOM nhiều GB | word/*.xml ≤ 8MB, tổng ≤ 30MB, fail-closed khi JSZip đổi nội bộ, phân biệt "hỏng"/"quá lớn" |
+| M8 | Hồi quy | Tài liệu kẹt 'embedding' (sập giữa chừng) không bao giờ Duyệt lại được (409) | Cho Duyệt lại khi kẹt > 30 phút |
+| M9 | Bảo mật | Chặn URL ở push-sw bị vượt bằng `/\host`, `/<TAB>/host` | So origin bằng `new URL()` |
+| M10 | Hardening | reject giá trị falsy lọt sang route sau; error handler không kiểm headersSent; headersTimeout > requestTimeout (vô hiệu) | Sửa cả 3 + `server.timeout` 150s; migration: default privileges `FOR ROLE postgres`, thu quyền EXECUTE RPC vector của anon |
+
+Còn lại (thấp, có chủ ý chưa làm): race login đọc hash cũ trùng giây đổi PIN; chat limiter key tin token chưa kiểm thu hồi; cache vẫn có thể bị "mớm" ngay trong câu hỏi đầu (không lịch sử) — phạm vi hẹp, có từ trước.
+
 **Ghi chú audit (chưa xử lý, rủi ro thấp/thiết kế):** staff đọc toàn bộ phiên chat một khi đã escalate; `knowledge_docs` phê duyệt 1 người (không 4-mắt); dọn ảnh khi xoá account chỉ lấy 100 file/thư mục (storage list mặc định); orphan ảnh khi insert post lỗi.
 
 ### Còn mở (ngoài Sentry/OTP)
