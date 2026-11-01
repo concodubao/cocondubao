@@ -54,6 +54,12 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 
 ## 4. Trạng thái hiện tại của codebase
 
+### ⚠️ Chuyển backend sang Render (2026-11-01, Claude)
+- User quyết định dùng **Render** (có thể quay lại Railway làm dự phòng). Đã thêm `backend/Dockerfile`, `backend/.dockerignore`, `render.yaml` (Singapore, free, healthcheck `/health`), biến `RUN_SCHEDULERS` (máy dự phòng = `false`). Hướng dẫn deploy + rotate secret + failover: OPERATIONS.md mục 0/0b.
+- **Railway bị sự cố lộ biến môi trường 2026-10-21** → mọi secret từng đặt trên Railway coi như lộ: rotate hết trước khi deploy Render (Google key tạo mới trong CÙNG project để giữ quyền gemini-2.5-*).
+- Model Gemini: giữ `gemini-2.5-flash` (rẻ nhất, tắt được thinking, không deprecated). 3.x không tắt hẳn thinking được. `gemini-embedding-001` tắt ngày 2028-05-14 → cần chuyển `gemini-embedding-2` + re-embed trước đó.
+- Docker Desktop có cài nhưng daemon chưa chạy → image CHƯA build thử local; build đầu tiên trên Render là lần kiểm tra.
+
 ### ⚠️ Trạng thái hạ tầng (2026-10-26)
 - **Backend Railway ĐANG TẮT**: gói Railway hết hạn → domain `laudable-happiness-production-cdfb.up.railway.app` trả "Application not found". User sẽ gia hạn sau; khi chạy lại Railway tự deploy từ `master` (đã có mọi fix). Frontend Vercel vẫn chạy nhưng mọi API lỗi.
 - **Việc user phải làm ở dashboard** (code không làm được): (1) Supabase → API Keys: tắt legacy keys / rotate JWT secret (service_role legacy từng lộ trong lịch sử git repo public); (2) áp migration `supabase/migrations/20261025000000_security_hardening.sql` (RLS + cột `tokens_valid_after`) rồi chạy các truy vấn kiểm tra ở cuối file; (3) tạo cặp VAPID mới (khoá cũ từng lộ).

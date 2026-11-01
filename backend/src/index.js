@@ -171,11 +171,19 @@ const server = app.listen(PORT, () => {
   console.log(`📋 Môi trường: ${process.env.NODE_ENV}`)
   console.log(`🔗 Supabase: ${process.env.SUPABASE_URL ? '✅ Connected' : '❌ Missing URL'}`)
 
+  // Đồng bộ denylist tài khoản bị khoá + vai trò staff + mốc thu hồi token — LUÔN chạy
+  // (bảo mật), kể cả ở máy dự phòng.
+  startUserStatusSync()
+
+  // Các job nền chỉ được chạy ở ĐÚNG 1 máy: chạy 2 nơi (vd Render + Railway dự phòng)
+  // sẽ gửi trùng thông báo đặt lịch / nháp cảnh báo. Máy dự phòng đặt RUN_SCHEDULERS=false.
+  if (process.env.RUN_SCHEDULERS === 'false') {
+    console.log('[CRON] RUN_SCHEDULERS=false → máy dự phòng, KHÔNG chạy job nền')
+    return
+  }
+
   // Scheduler gửi thông báo đặt lịch (quét mỗi 60s). In-process — đúng khi 1 replica.
   startNotificationScheduler()
-
-  // Đồng bộ denylist tài khoản bị khoá (để khoá có hiệu lực sớm dù JWT còn hạn).
-  startUserStatusSync()
 
   // Quét thời tiết tạo bản nháp cảnh báo cho admin duyệt (mỗi 6h).
   startWeatherAlertScheduler()

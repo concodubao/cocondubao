@@ -1,11 +1,46 @@
 # OPERATIONS.md — Vận hành Cò Con (backup · monitoring · quota)
 
-Runbook cho 3 việc "trưởng thành sản phẩm" mà backlog tính năng không cover. Hạ tầng hiện tại:
-backend trên **Railway** (`laudable-happiness`, 1 replica), DB **Supabase** (ref `mcloxncymnhiuubjzgbh`),
-frontend **Vercel** (`cocondubao.vercel.app`), lỗi app đã có **Sentry**.
+Runbook cho các việc "trưởng thành sản phẩm" mà backlog tính năng không cover. Hạ tầng
+(2026-11): backend chuyển sang **Render** (Docker, `render.yaml`); Railway cũ (`laudable-happiness`)
+hết hạn + dính sự cố lộ biến môi trường 2026-10-21 — có thể quay lại làm **máy dự phòng**.
+DB **Supabase** (ref `mcloxncymnhiuubjzgbh`), frontend **Vercel** (`cocondubao.vercel.app`), lỗi app **Sentry**.
 
-URL backend production: `https://laudable-happiness-production-cdfb.up.railway.app`
 Health endpoint: `GET /health` → `{"status":"ok","env":"production"}`.
+
+---
+
+## 0. Deploy backend lên Render (thay Railway)
+
+**Trước khi deploy — rotate MỌI secret** (sự cố Railway 2026-10-21 + `backend/.env` từng nằm
+trong lịch sử git repo public). Tự sinh trên máy, không dán vào chat/AI:
+```
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"   # JWT_SECRET
+npx web-push generate-vapid-keys                                                  # VAPID_*
+```
+1. **Google**: tạo API key MỚI trong **cùng project** (giữ quyền dùng gemini-2.5-*), giới hạn
+   key chỉ cho Generative Language API, xoá key cũ. Bật billing + budget alert + cap request/ngày.
+2. **Supabase**: phục hồi project nếu đang pause; Settings → API Keys: tắt legacy JWT keys,
+   tạo secret key mới; đổi mật khẩu DB; áp `supabase/migrations/20261025000000_security_hardening.sql`.
+3. **Render**: Dashboard → New → **Blueprint** → chọn repo → Render đọc `render.yaml`, hỏi các
+   biến `sync: false` → điền giá trị MỚI. Region Singapore. `FRONTEND_URL=https://cocondubao.vercel.app`.
+4. Chờ build xong → mở `https://<tên-service>.onrender.com/health` thấy `status: ok`.
+5. **Vercel**: Settings → Environment Variables: `VITE_API_URL=https://<tên-service>.onrender.com/api/v1`,
+   `VITE_VAPID_PUBLIC_KEY=<khoá public mới>` → Redeploy. (Thiết bị tự đăng ký lại push theo khoá mới.)
+6. Kiểm tra tay 5 phút: đăng nhập nông dân → hỏi 1 câu → kỹ sư trả lời → đổi PIN → đăng xuất/đăng nhập.
+
+**Render free ngủ sau 15 phút không có request** (lần đầu sau đó chờ ~30–60s; job nền dừng khi
+ngủ). Cho pilot: đặt monitor uptime ping `/health` mỗi ~10 phút (mục 2) để giữ thức — kiểm tra
+điều khoản Render hiện hành; hoặc lên gói trả phí always-on (~5–7 USD/tháng) cho ổn định hẳn.
+
+## 0b. Hai máy: chính + dự phòng (Render + Railway)
+
+App thiết kế cho **1 bản chạy**: job nền (thông báo đặt lịch, nháp thời tiết, dọn ảnh), cache,
+rate-limit, khoá dò PIN đều in-memory. Vì vậy:
+- **Máy chính** (đang nhận traffic): `RUN_SCHEDULERS=true`.
+- **Máy dự phòng**: cùng code + cùng secret, `RUN_SCHEDULERS=false` (vẫn phục vụ request, không chạy job nền).
+- **Chuyển máy khi máy chính chết**: đổi `VITE_API_URL` trên Vercel → Redeploy; đặt
+  `RUN_SCHEDULERS=true` ở máy dự phòng và `false` (hoặc tắt) máy cũ. KHÔNG để 2 máy cùng `true`.
+- Railway có thể build cùng `backend/Dockerfile` (đổi builder sang Dockerfile) thay cho nixpacks.
 
 ---
 

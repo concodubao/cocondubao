@@ -1,0 +1,41 @@
+# Render Blueprint — backend Cò Con (Render Dashboard → New → Blueprint → chọn repo).
+# Giá trị `sync: false` = Render hỏi khi tạo; điền bằng SECRET ĐÃ ROTATE (sau sự cố
+# Railway 2026-10-21), không dùng lại giá trị cũ. Frontend vẫn ở Vercel.
+services:
+  - type: web
+    name: cocon-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore          # gần Việt Nam nhất
+    plan: free                 # free: ngủ sau 15 phút không có request (xem OPERATIONS.md)
+    healthCheckPath: /health
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - backend/**           # sửa frontend/docs không làm deploy lại backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RUN_SCHEDULERS    # máy chính = true; máy dự phòng (vd Railway) = false
+        value: "true"
+      - key: FRONTEND_URL      # CORS: https://cocondubao.vercel.app
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY  # chỉ dùng cho OTP (Supabase Auth)
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: JWT_SECRET         # chuỗi ngẫu nhiên ≥ 32 ký tự
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_CONTACT      # mailto:...
+        sync: false
+      - key: SENTRY_DSN
+        sync: false

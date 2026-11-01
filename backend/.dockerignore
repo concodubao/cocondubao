@@ -1,0 +1,14 @@
+# Không đưa vào image: secret, dependency của máy dev, test, script chạy tay.
+.env
+.env.*
+!.env.example
+node_modules
+test
+eval
+scripts
+coverage
+*.log
+Dockerfile
+.dockerignore
+railway.json
+nixpacks.toml

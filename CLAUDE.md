@@ -10,7 +10,7 @@ Cò Con là PWA tư vấn nông nghiệp cho nông dân xã Trường Khánh, S�
 
 Hai package độc lập, **không có** package.json ở root:
 
-- `backend/` — Express API (ESM, `"type": "module"`). Deploy lên Railway (service `laudable-happiness`).
+- `backend/` — Express API (ESM, `"type": "module"`). Deploy lên **Render** bằng `backend/Dockerfile` + `render.yaml` (từ 2026-11; Railway cũ hết hạn + sự cố lộ env 2026-10-21, có thể làm máy dự phòng — xem OPERATIONS.md mục 0/0b).
 - `frontend/` — React 19 + Vite + Tailwind v4 PWA. Deploy lên Vercel (`cocondubao.vercel.app`).
 - `supabase/migrations/` — schema Postgres + pgvector (nguồn sự thật của DB).
 
@@ -35,7 +35,7 @@ Không có lint/test ở backend ngoài vitest. Frontend không có test.
 
 ## Deploy
 
-Railway build backend bằng `nixpacks.toml` (`nodejs_22`, `npm install --legacy-peer-deps --include=optional` + sharp linux-x64) — commit `package-lock.json` sau mỗi lần đổi dependency. ⚠️ npm 10.9.2 trên máy này dính bug arborist (`Cannot read properties of null (reading 'edgesOut')`) khi `npm update`/`audit fix`/install không lockfile → dùng `npx -y npm@11.6.2 <lệnh>`; lockfile sinh ra vẫn tương thích npm 10 (`npm ci` ở CI).
+Render build backend bằng `backend/Dockerfile` (Node 22 + poppler-utils, `npm ci --omit=dev`). `RUN_SCHEDULERS=false` ở máy dự phòng (job nền chỉ chạy ở 1 máy). Railway cũ build bằng `nixpacks.toml` (`nodejs_22`, `npm install --legacy-peer-deps --include=optional` + sharp linux-x64) — commit `package-lock.json` sau mỗi lần đổi dependency. ⚠️ npm 10.9.2 trên máy này dính bug arborist (`Cannot read properties of null (reading 'edgesOut')`) khi `npm update`/`audit fix`/install không lockfile → dùng `npx -y npm@11.6.2 <lệnh>`; lockfile sinh ra vẫn tương thích npm 10 (`npm ci` ở CI).
 
 Cả hai deploy **tự động qua git push** (Railway watch backend, Vercel watch frontend). Không có lệnh deploy thủ công — fix chỉ có hiệu lực ở production **sau khi push + redeploy**. Khi sửa bug production, nhớ là backend đang chạy vẫn dùng code cũ cho tới khi push.
 
