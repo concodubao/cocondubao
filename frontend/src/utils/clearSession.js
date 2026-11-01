@@ -82,9 +82,17 @@ export async function resyncDevicePush(userId, token) {
     const vapid = import.meta.env.VITE_VAPID_PUBLIC_KEY
     if (!vapid) return
     const reg = await navigator.serviceWorker.ready
+    const appKey = urlBase64ToUint8Array(vapid)
     let sub = await reg.pushManager.getSubscription()
+    if (sub) {
+      // Đổi cặp khoá VAPID (rotate sau sự cố lộ khoá) → subscription cũ ký theo khoá cũ,
+      // server gửi bằng khoá mới sẽ bị push service từ chối. Tạo lại cho khớp khoá mới.
+      const cur = new Uint8Array(sub.options?.applicationServerKey || [])
+      const sameKey = cur.length === appKey.length && cur.every((b, i) => b === appKey[i])
+      if (!sameKey) { await sub.unsubscribe().catch(() => {}); sub = null }
+    }
     if (!sub) {
-      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid) })
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: appKey })
     }
     await fetch(`${API_URL}/push/subscribe`, {
       method: 'POST',
