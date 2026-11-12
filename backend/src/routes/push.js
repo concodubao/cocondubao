@@ -154,6 +154,19 @@ router.post('/upload-image', verifyJWT, requireRole('admin'),
   }
 )
 
+// Thời điểm đặt lịch → ISO UTC, hoặc null nếu không hợp lệ.
+// Ô <input type="datetime-local"> cho chuỗi KHÔNG có múi giờ ("2026-11-13T08:00"). Server
+// chạy UTC nên new Date() hiểu đó là 08:00 UTC = 15:00 giờ VN → thông báo gửi TRỄ 7 TIẾNG.
+// Admin luôn đặt theo giờ Việt Nam → chuỗi thiếu múi giờ được coi là UTC+7. Frontend mới
+// đã gửi ISO có múi giờ; nhánh này giữ cho bản PWA cũ còn nằm trong cache service worker.
+const NAIVE_DATETIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/
+export function parseScheduleAt(value) {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const s = value.trim()
+  const t = new Date(NAIVE_DATETIME.test(s) ? `${s.replace(' ', 'T')}+07:00` : s)
+  return Number.isNaN(t.getTime()) ? null : t.toISOString()
+}
+
 // POST /push/send — Admin gửi broadcast thông báo
 router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
   const {
@@ -172,11 +185,10 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
   // Chuẩn hoá thời điểm đặt lịch (nếu có)
   let scheduledAt = null
   if (scheduleAt) {
-    const t = new Date(scheduleAt)
-    if (isNaN(t.getTime())) {
+    scheduledAt = parseScheduleAt(scheduleAt)
+    if (!scheduledAt) {
       return res.status(400).json({ error: 'Thời điểm đặt lịch không hợp lệ.' })
     }
-    scheduledAt = t.toISOString()
   }
 
   try {

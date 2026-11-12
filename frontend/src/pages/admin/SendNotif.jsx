@@ -106,8 +106,15 @@ function WeatherDraftsList() {
   )
 }
 
+// "Bây giờ" theo GIỜ MÁY, dạng YYYY-MM-DDTHH:mm cho thuộc tính min của ô datetime-local.
+// toISOString() trả giờ UTC → min lệch 7 tiếng so với giờ admin đang thấy.
+function localDateTimeInputValue(d = new Date()) {
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000)
+  return local.toISOString().slice(0, 16)
+}
+
 const TYPE_OPTIONS = [
-  { id: 'alert',     Icon: AlertTriangle, label: 'Cảnh báo dịch bệnh', desc: 'Ưu tiên cao — hiển thị nổi bật', color: '#ef4444', bg: '#fef2f2' },
+  { id: 'alert',    Icon: AlertTriangle, label: 'Cảnh báo dịch bệnh', desc: 'Ưu tiên cao — hiển thị nổi bật', color: '#ef4444', bg: '#fef2f2' },
   { id: 'promotion', Icon: Tag,           label: 'Khuyến mãi vật tư',  desc: 'Phân bón, thuốc BVTV giảm giá', color: '#3b82f6', bg: '#eff6ff' },
   { id: 'weather',   Icon: Cloud,         label: 'Thời tiết nông vụ',  desc: 'Thời tiết ảnh hưởng mùa vụ',   color: '#f59e0b', bg: '#fffbeb' },
 ]
@@ -204,7 +211,10 @@ export default function SendNotif() {
       type,
       cropTags:   crops,   // [] = tất cả; có cây = chỉ nông dân trồng cây đó
       imageUrl:   imageUrl.trim() || undefined,
-      scheduleAt: scheduleAt || undefined,
+      // Ô datetime-local cho chuỗi không múi giờ ("2026-11-13T08:00"). Gửi thẳng thì server
+      // (chạy UTC) hiểu là 08:00 UTC = 15:00 giờ VN → trễ 7 tiếng. new Date() ở trình duyệt
+      // hiểu đúng theo giờ máy của admin → gửi ISO có múi giờ.
+      scheduleAt: scheduleAt ? new Date(scheduleAt).toISOString() : undefined,
     })
   }
 
@@ -220,6 +230,11 @@ export default function SendNotif() {
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', margin: 0 }}>
             {result.scheduled ? 'Đã lên lịch gửi!' : 'Gửi thành công!'}
           </h2>
+          {result.scheduled && result.scheduledAt && (
+            <p style={{ fontSize: 15, color: '#64748b', margin: 0 }}>
+              Sẽ gửi lúc <strong>{new Date(result.scheduledAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</strong>
+            </p>
+          )}
           {!result.scheduled && (
             <p style={{ fontSize: 15, color: '#64748b', margin: 0 }}>
               Đã gửi đến <strong>{result.sent}</strong> / {result.total} thiết bị
@@ -334,7 +349,7 @@ export default function SendNotif() {
           <p style={s.sDesc}>Để trống = gửi ngay. Chọn thời gian để lên lịch.</p>
           <input id="schedule-time" type="datetime-local" value={scheduleAt}
             onChange={e => setScheduleAt(e.target.value)}
-            min={new Date().toISOString().slice(0, 16)}
+            min={localDateTimeInputValue()}
             style={s.input} />
         </section>
 

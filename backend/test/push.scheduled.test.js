@@ -29,7 +29,7 @@ vi.mock('../src/services/notifications.js', () => ({
 // sharp là native module — mock để test không phụ thuộc binary theo nền tảng
 vi.mock('sharp', () => ({ default: vi.fn() }))
 
-const pushRoutes = (await import('../src/routes/push.js')).default
+const { default: pushRoutes, parseScheduleAt } = await import('../src/routes/push.js')
 const app = express()
 app.use(express.json())
 app.use('/api/v1/push', pushRoutes)
@@ -41,6 +41,47 @@ const eng   = () => auth(tok('eng1', 'engineer'))
 
 beforeAll(() => { process.env.JWT_SECRET = SECRET })
 beforeEach(() => { sb.reset() })
+
+// ══════════════════════════════════════════════════════════════════════════════
+// N2 (2026-11-12): chuỗi datetime-local không múi giờ từng bị server UTC hiểu là giờ UTC
+// → thông báo đặt 08:00 giờ VN lại gửi lúc 15:00.
+describe('parseScheduleAt — giờ đặt lịch theo giờ Việt Nam', () => {
+  it('chuỗi không múi giờ = giờ VN (UTC+7), không phụ thuộc múi giờ máy chạy', () => {
+    expect(parseScheduleAt('2026-11-13T08:00')).toBe('2026-11-13T01:00:00.000Z')
+    expect(parseScheduleAt('2026-11-13T08:00:30')).toBe('2026-11-13T01:00:30.000Z')
+    expect(parseScheduleAt('2026-11-13 08:00')).toBe('2026-11-13T01:00:00.000Z')
+    // 00:30 giờ VN vẫn thuộc ngày hôm trước theo UTC
+    expect(parseScheduleAt('2026-11-13T00:30')).toBe('2026-11-12T17:30:00.000Z')
+  })
+
+  it('chuỗi đã có múi giờ thì giữ đúng thời điểm đó', () => {
+    expect(parseScheduleAt('2026-11-13T01:00:00.000Z')).toBe('2026-11-13T01:00:00.000Z')
+    expect(parseScheduleAt('2026-11-13T08:00:00+07:00')).toBe('2026-11-13T01:00:00.000Z')
+  })
+
+  it('giá trị rác → null', () => {
+    for (const v of ['', '   ', 'ngày mai', '2026-13-45T99:99', 123, null, undefined, {}]) {
+      expect(parseScheduleAt(v), String(v)).toBeNull()
+    }
+  })
+})
+
+describe('POST /push/send — đặt lịch', () => {
+  it('lưu thời điểm theo giờ VN khi client gửi chuỗi không múi giờ', async () => {
+    sb.enqueue({ data: { id: 'n1', title: 'T', body: 'B', type: 'alert', image_url: null, crop_tags: [] }, error: null })
+    const res = await request(app).post('/api/v1/push/send').set(admin())
+      .send({ title: 'T', body: 'B', scheduleAt: '2026-11-13T08:00' })
+    expect(res.status).toBe(200)
+    expect(res.body.scheduled).toBe(true)
+    expect(res.body.scheduledAt).toBe('2026-11-13T01:00:00.000Z')
+  })
+
+  it('400 khi thời điểm không hợp lệ', async () => {
+    const res = await request(app).post('/api/v1/push/send').set(admin())
+      .send({ title: 'T', body: 'B', scheduleAt: 'ngày mai' })
+    expect(res.status).toBe(400)
+  })
+})
 
 // ══════════════════════════════════════════════════════════════════════════════
 describe('GET /push/scheduled — admin xem thông báo đã lên lịch', () => {
