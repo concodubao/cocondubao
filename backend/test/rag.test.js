@@ -66,6 +66,54 @@ describe('checkFAQ', () => {
     // nhưng câu có nội dung thật KHÔNG bị bắt nhầm
     expect(checkFAQ('vậy còn đạo ôn thì sao')).toBeNull()
   })
+
+  // N1 (2026-11-12): FAQ từng nuốt câu hỏi nông nghiệp thật vì pattern không neo + \b
+  // không hiểu chữ có dấu. Mỗi câu dưới đây TRƯỚC ĐÂY nhận câu trả lời xã giao.
+  it('KHÔNG nuốt câu hỏi nông nghiệp có lẫn lời xã giao / cụm giống FAQ', () => {
+    for (const q of [
+      'Hiện tại lúa nhà tôi bị sâu cuốn lá phải làm sao?',      // "Hi" + "ện"
+      'Hiệu quả của phân NPK 20-20-15 cho lúa thế nào?',
+      'Hiện giờ phun được chưa?',                                 // không có từ khoá nông nghiệp
+      'Chào Cò Con, lúa tôi bị vàng lá phải phun thuốc gì?',
+      'Chào, giờ phun được chưa',
+      'Bón đạm lúc lúa trổ có đúng không?',
+      'Phun Beam 75WP 15g cho 8 lít nước có đúng không',
+      'Phun vậy có đúng không',
+      'Cảm ơn Cò Con, cho tôi hỏi thêm rầy nâu phun thuốc gì?',
+      'Phân hữu cơ giúp gì cho đất ruộng?',
+      'Cho em hỏi vôi giúp gì',
+      'Nhà nước hỗ trợ gì cho nông dân bị ngập mặn',
+      'Ok vậy đạo ôn thì phun thuốc gì',
+      'Thuốc trừ sâu sinh học có tin được không?',
+      'Bạn giúp gì được cho lúa bị vàng lá?',                    // gọi "bạn" nhưng là câu hỏi thật
+    ]) expect(checkFAQ(q), q).toBeNull()
+  })
+
+  it('vẫn bắt lời xã giao thuần (kèm xưng hô, từ đệm, emoji)', () => {
+    for (const q of [
+      'Xin chào', 'chào Cò Con nha', 'Hi', 'alo alo', 'chào buổi sáng', 'CHÀO BẠN!',
+      'cảm ơn', 'Cảm ơn Cò Con nhiều nha', 'dạ cám ơn bạn rất nhiều ạ', 'ok cảm ơn 😊', 'thanks',
+      'ok', 'Ok rồi', 'được rồi nha', 'hiểu rồi', 'chào tạm biệt', 'bye',
+    ]) expect(checkFAQ(q), q).toBeTypeOf('string')
+  })
+
+  it('vẫn bắt câu hỏi về chính Cò Con', () => {
+    for (const q of [
+      'Cò Con là ai?', 'giới thiệu về bản thân đi', 'bạn tên gì',
+      'Cò Con làm được gì?', 'bạn có thể giúp được những gì', 'làm được gì vậy', 'app này có chức năng gì',
+      'Cò Con trả lời có đúng không', 'thông tin này có tin được không', 'có đúng không?', 'độ chính xác của Cò Con thế nào',
+    ]) expect(checkFAQ(q), q).toBeTypeOf('string')
+  })
+
+  it('chào ≠ tạm biệt: mỗi câu về đúng nhóm trả lời', () => {
+    expect(checkFAQ('chào tạm biệt')).toContain('mùa màng bội thu')
+    expect(checkFAQ('chào cò con')).toContain('Chào bà con')
+    expect(checkFAQ('ok cảm ơn')).toContain('Không có gì')
+  })
+
+  it('chữ có dấu dạng tổ hợp (NFD) vẫn khớp', () => {
+    expect(checkFAQ('cảm ơn'.normalize('NFD'))).toBeTypeOf('string')
+  })
 })
 
 describe('looksOffTopic — phát hiện câu lạc đề (bảo thủ)', () => {

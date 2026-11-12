@@ -313,15 +313,54 @@ async function invokeLLM(contents, attempt = 0, deadline = Date.now() + LLM_RETR
 }
 
 // ─── FAQ — trả lời không cần RAG ────────────────────────────────────────────
+// FAQ trả lời ngay với confidence 1.0 và KHÔNG gắn disclaimer, nên khớp nhầm là nuốt
+// mất câu hỏi thật của bà con. Trước đây pattern không neo (/cảm ơn/, /có đúng không/…)
+// và dùng \b — mà \b của JS coi chữ có dấu là "không phải chữ", nên /^hi\b/ khớp cả
+// "Hiện tại lúa bị sâu…", "Hiệu quả của phân…". Hai quy tắc để không tái diễn:
+//   1. Câu XÃ GIAO (chào, cảm ơn, tạm biệt, ok) chỉ khớp khi CẢ câu là lời xã giao —
+//      "Chào Cò Con, lúa vàng lá phun gì?" phải đi tiếp vào RAG.
+//   2. Câu HỎI VỀ COCON (là ai, làm được gì, có đúng không) phải nhắc tới Cò Con/bạn
+//      hoặc đứng một mình, và bị bỏ qua nếu câu có từ khoá nông nghiệp (botDirected).
+// Ranh giới từ dùng \p{L}\p{N} (cờ u), KHÔNG dùng \b.
+const FAQ_L    = '\\p{L}\\p{N}'
+const FAQ_B0   = `(?<![${FAQ_L}])`
+const FAQ_B1   = `(?![${FAQ_L}])`
+const FAQ_END  = `[^${FAQ_L}]*$`  // chỉ còn dấu câu / emoji / khoảng trắng tới hết câu
+// Từ đệm/xưng hô được phép theo sau lời xã giao ("cảm ơn Cò Con nhiều nha", "chào buổi sáng")
+const FAQ_TRAIL = '(?:[\\s,]+(?:cò con|bạn|em|anh|chị|cô|chú|bác|cả nhà|mọi người|admin|ad'
+  + '|rất nhiều|nhiều lắm|nhiều|lắm|nha|nhé|nghen|nghe|nhen|hen|nè|ạ|à|ơi|luôn|rồi|vậy|thôi'
+  + '|buổi sáng|buổi trưa|buổi chiều|buổi tối))*'
+const FAQ_PREFIX = '(?:(?:dạ|vâng|ừ|ờ|ok|oke|okê)[\\s,]+)?'
+// Cả câu là lời xã giao `core` (+ tiền tố "dạ/ok", + từ đệm) thì mới khớp.
+const faqWhole = (core) => new RegExp(`^${FAQ_PREFIX}(?:${core})${FAQ_TRAIL}${FAQ_END}`, 'iu')
+// Cụm `src` xuất hiện trong câu, có ranh giới từ đúng với tiếng Việt.
+const faqHas   = (src)  => new RegExp(`${FAQ_B0}(?:${src})${FAQ_B1}`, 'iu')
+
+const FAQ_GREET = '(?:xin chào|chào|hi|hello|hey|alo)'
+const FAQ_BOT   = 'cò con|bạn|mày|mi|app|ứng dụng'
+const FAQ_CAP   = 'làm được (?:những )?gì|giúp (?:được )?(?:những )?gì|giúp gì được'
+  + '|có (?:những )?(?:tính năng|chức năng) gì|(?:tính năng|chức năng) gì|hỗ trợ (?:được )?(?:những )?gì'
+const FAQ_ACC   = 'có đúng không|có chính xác không|chính xác không|(?:có )?tin được không|có đáng tin không|có sai không'
+
 const FAQ = [
   {
-    patterns: [/giới thiệu.*bản thân/i, /bạn là ai/i, /cò con là (gì|ai)/i, /em là ai/i, /mày là ai/i, /mi là ai/i],
+    botDirected: true,
+    patterns: [
+      faqHas('giới thiệu.{0,20}bản thân'), faqHas('bạn là ai'), faqHas('cò con là (?:gì|ai)'),
+      faqHas('em là ai'), faqHas('mày là ai'), faqHas('mi là ai'),
+    ],
     answer: `Mình là Cò Con 🐦 — trợ lý nông nghiệp AI do nhóm kỹ sư nông nghiệp xây dựng, để giúp bà con xã Trường Khánh, Sóc Trăng.
 
 Mình được huấn luyện từ tài liệu kỹ thuật canh tác và kết nối với đội ngũ kỹ sư để hỗ trợ bà con 24/7. Cứ hỏi thoải mái nhé! 🌾`,
   },
   {
-    patterns: [/làm được gì/i, /giúp (được )?(gì|những gì)/i, /có tính năng gì/i, /chức năng gì/i, /hỗ trợ gì/i],
+    botDirected: true,
+    patterns: [
+      // "Cò Con (có thể) làm được gì" — phải gọi tên Cò Con/bạn ngay trước cụm hỏi…
+      faqHas(`(?:${FAQ_BOT})(?:\\s+(?:có thể|thì|ơi|này|sẽ|biết|còn))*\\s+(?:${FAQ_CAP})`),
+      // …hoặc cả câu chỉ có cụm hỏi ("làm được gì vậy?"). "Phân hữu cơ giúp gì cho đất" KHÔNG khớp.
+      faqWhole(FAQ_CAP),
+    ],
     answer: `Cò Con có thể giúp bà con:
 
 1. **Hỏi về sâu bệnh** — nhận diện triệu chứng, cách phòng trị
@@ -333,25 +372,33 @@ Mình được huấn luyện từ tài liệu kỹ thuật canh tác và kết 
 Bà con hỏi gì về đồng ruộng cũng được nhé! 🌱`,
   },
   {
-    patterns: [/^(xin chào|chào|hi|hello|hey|alo)\b/i, /^(chào cò con|chào bạn)/i],
+    patterns: [faqWhole(`${FAQ_GREET}(?:[\\s,!]+${FAQ_GREET})*`)],
     answer: `Chào bà con! 👋 Mình là Cò Con, trợ lý nông nghiệp đây. Hôm nay bà con cần hỏi gì về cây trồng không?`,
   },
   {
-    patterns: [/cảm ơn/i, /thanks/i, /thank you/i],
+    patterns: [faqWhole('(?:xin\\s+)?(?:cảm ơn|cám ơn|thank you|thanks|thank|tks)')],
     answer: `Không có gì bà con ơi! Bà con có thêm câu hỏi gì về cây trồng cứ hỏi tiếp nhé 😊`,
   },
   {
-    patterns: [/độ chính xác/i, /có đúng không/i, /tin được không/i, /có sai không/i],
+    botDirected: true,
+    patterns: [
+      // Hỏi về độ tin cậy CỦA CÒ CON ("Cò Con trả lời có đúng không", "thông tin này tin được không").
+      // "Bón đạm lúc lúa trổ có đúng không?" là câu hỏi kỹ thuật → KHÔNG khớp.
+      faqHas(`(?:${FAQ_BOT}|câu trả lời|thông tin)(?:\\s+(?:trả lời|nói|tư vấn|có thể|thì|này|đó|của bạn|của cò con|ơi|vậy))*\\s+(?:${FAQ_ACC})`),
+      faqWhole(FAQ_ACC),
+      new RegExp(`${FAQ_B0}độ chính xác(?:\\s+(?:của|cò con|bạn|app|ứng dụng|câu trả lời|thông tin|thế nào|ra sao|bao nhiêu|là|như|sao))*${FAQ_END}`, 'iu'),
+    ],
     answer: `Mình cố gắng trả lời chính xác dựa trên tài liệu kỹ thuật được kiểm duyệt. Tuy nhiên, thông tin mang tính tham khảo và có thể có sai sót.
 
 Với những quyết định quan trọng như phun thuốc liều cao hay xử lý bệnh nặng, bà con nên xác nhận thêm với kỹ sư địa phương để chắc chắn hơn nhé. 🙏`,
   },
   {
-    patterns: [/^(tạm biệt|bye|goodbye|chào tạm biệt)\b/i, /^(ok|okê|oke|được rồi|hiểu rồi|rõ rồi)\b/i],
+    patterns: [faqWhole('chào tạm biệt|tạm biệt|bye bye|bye|goodbye|okay|okie|okê|oke|ok|được rồi|hiểu rồi|rõ rồi|biết rồi')],
     answer: `Dạ! Bà con cần gì cứ quay lại hỏi Cò Con nhé. Chúc bà con mùa màng bội thu 🌾`,
   },
   {
-    patterns: [/bạn tên (gì|là gì)/i, /tên (bạn|mày|mi) là/i],
+    botDirected: true,
+    patterns: [faqHas('(?:bạn|mày|mi|cò con) tên (?:là )?gì'), faqHas('tên (?:của )?(?:bạn|mày|mi|cò con) là')],
     answer: `Mình tên là Cò Con 🐦 — trợ lý nông nghiệp của bà con. Bà con cần hỏi gì về cây trồng cứ nói nhé!`,
   },
   {
@@ -368,9 +415,20 @@ Với những quyết định quan trọng như phun thuốc liều cao hay xử
 ]
 
 export function checkFAQ(question) {
-  const q = question.trim()
+  // NFC: một số bàn phím gửi chữ có dấu dạng tổ hợp (NFD) → không khớp pattern viết NFC.
+  const q = String(question || '').normalize('NFC').trim()
+  if (!q) return null
+  let agri // tính lười: chỉ cần khi có nhóm botDirected khớp
   for (const faq of FAQ) {
-    if (faq.patterns.some(p => p.test(q))) return faq.answer
+    if (!faq.patterns.some(p => p.test(q))) continue
+    if (faq.botDirected) {
+      if (agri === undefined) {
+        const t = q.toLowerCase()
+        agri = mentionsAgri(t, new Set(t.split(/[^\p{L}\p{N}]+/u).filter(Boolean)))
+      }
+      if (agri) continue // có nội dung nông nghiệp → là câu hỏi thật, để RAG trả lời
+    }
+    return faq.answer
   }
   return null
 }
