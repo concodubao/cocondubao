@@ -25,7 +25,7 @@ vi.mock('@google/genai', () => ({
   }),
 }))
 
-const { askRAG, checkFAQ, looksOffTopic, contextualizeQuery, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache, buildQaContent, extractCuratedAnswer } =
+const { askRAG, checkFAQ, looksOffTopic, isWrongRefusal, contextualizeQuery, getAnswerCache, setAnswerCache, getSemanticCache, _clearAnswerCache, buildQaContent, extractCuratedAnswer } =
   await import('../src/services/rag.js')
 
 const fakeVector = () => ({ embeddings: [{ values: new Array(1536).fill(0.01) }] })
@@ -81,6 +81,20 @@ describe('looksOffTopic — phát hiện câu lạc đề (bảo thủ)', () => 
   it('câu nông nghiệp thật / câu trung tính → false', () => {
     expect(looksOffTopic('rầy nâu trị sao')).toBe(false)
     expect(looksOffTopic('câu hỏi mơ hồ chung chung')).toBe(false)
+  })
+})
+
+describe('isWrongRefusal — LLM từ chối "lạc đề" nhầm câu nông nghiệp', () => {
+  const REFUSAL = 'Dạ xin lỗi bác, Cò Con chỉ là trợ lý nông nghiệp nên không rành chuyện này ạ.'
+  it('câu có từ khoá nông nghiệp + LLM từ chối → true (chuyển kỹ sư)', () => {
+    expect(isWrongRefusal(REFUSAL, 'Lúa bị đổ ngã cần xử lý gì?')).toBe(true)
+  })
+  it('câu lạc đề thật + LLM từ chối → false (từ chối là đúng)', () => {
+    expect(isWrongRefusal(REFUSAL, 'tối nay đội nào đá bóng vậy')).toBe(false)
+  })
+  it('câu trả lời bình thường → false', () => {
+    expect(isWrongRefusal('Bác rút nước cho ruộng khô nghen.', 'Lúa bị đổ ngã cần xử lý gì?')).toBe(false)
+    expect(isWrongRefusal('', 'lúa')).toBe(false)
   })
 })
 

@@ -393,12 +393,25 @@ const AGRI_PHRASES = ['hoa màu', 'đạo ôn', 'lem lép', 'vàng lá', 'thán 
 // để không chặn nhầm câu lạc đề. Nghĩa hoa quả dựa vào 'trái' + tên trái cụ thể.
 const AGRI_WORDS = new Set(['lúa', 'gạo', 'nếp', 'mạ', 'sạ', 'gieo', 'cấy', 'rau', 'cải', 'dưa', 'bắp', 'ngô', 'khoai', 'sắn', 'đậu', 'cây', 'trồng', 'trái', 'vườn', 'ruộng', 'rẫy', 'nương', 'sâu', 'bệnh', 'rầy', 'nấm', 'cỏ', 'đốm', 'phân', 'bón', 'đạm', 'lân', 'kali', 'npk', 'thuốc', 'giống', 'đất', 'phèn', 'mặn', 'tưới', 'mùa', 'vụ', 'nông', 'tôm', 'cá', 'gà', 'vịt', 'heo', 'lợn', 'bò', 'nuôi', 'ao', 'chuồng', 'xoài', 'cam', 'bưởi', 'nhãn', 'mít'])
 
+function mentionsAgri(t, tokens) {
+  return AGRI_PHRASES.some(p => t.includes(p)) || [...AGRI_WORDS].some(w => tokens.has(w))
+}
+
 export function looksOffTopic(question) {
   const t = (question || '').toLowerCase()
   const tokens = new Set(t.split(/[^\p{L}\p{N}]+/u).filter(Boolean))
   const hasOff  = OFFTOPIC_PHRASES.some(p => t.includes(p)) || [...OFFTOPIC_WORDS].some(w => tokens.has(w))
-  const hasAgri = AGRI_PHRASES.some(p => t.includes(p))     || [...AGRI_WORDS].some(w => tokens.has(w))
-  return hasOff && !hasAgri
+  return hasOff && !mentionsAgri(t, tokens)
+}
+
+// LLM đôi khi vẫn dùng mẫu từ chối "lạc đề" cho câu nông nghiệp thật mà tài liệu không
+// phủ (vd "lúa bị đổ ngã"), bất chấp SYSTEM_PROMPT cấm. Câu hỏi có từ khoá nông nghiệp
+// mà LLM từ chối kiểu đó → coi là lỗ hổng tri thức: chuyển kỹ sư, KHÔNG trả, KHÔNG cache.
+const LLM_REFUSAL_RE = /chỉ là trợ lý nông nghiệp nên không rành/i
+export function isWrongRefusal(answer, question) {
+  if (!LLM_REFUSAL_RE.test(answer || '')) return false
+  const t = (question || '').toLowerCase()
+  return mentionsAgri(t, new Set(t.split(/[^\p{L}\p{N}]+/u).filter(Boolean)))
 }
 
 // Câu từ chối lịch sự (giống văn phong SYSTEM_PROMPT). Dùng source 'faq' để frontend
@@ -501,6 +514,11 @@ async function searchChunks(queryEmbedding, cropType) {
 // message content null, nông dân thấy bong bóng trống. Chuyển kỹ sư cho chắc.
 function emptyAnswerFallback() {
   console.warn('[RAG] LLM trả về rỗng → chuyển kỹ sư')
+  return { answer: null, confidence: 0, needEngineer: true, source: 'rag', chunksFound: 0 }
+}
+
+function wrongRefusalFallback(question) {
+  console.warn(`[RAG] LLM từ chối "lạc đề" cho câu nông nghiệp "${question.slice(0, 50)}" → chuyển kỹ sư`)
   return { answer: null, confidence: 0, needEngineer: true, source: 'rag', chunksFound: 0 }
 }
 
@@ -609,6 +627,7 @@ export async function askRAG(question, cropType = null, history = []) {
       const contents = buildMessages(context, question, history, true)
       const response = await invokeLLM(contents)
       if (!response.content?.trim()) return emptyAnswerFallback()
+      if (isWrongRefusal(response.content, question)) return wrongRefusalFallback(question)
       // Không cache low-confidence answers
       return {
         answer:       response.content,
@@ -628,6 +647,7 @@ export async function askRAG(question, cropType = null, history = []) {
     const contents = buildMessages(context, question, history, false)
     const response = await invokeLLM(contents)
     if (!response.content?.trim()) return emptyAnswerFallback()
+    if (isWrongRefusal(response.content, question)) return wrongRefusalFallback(question)
 
     const result = {
       answer:       response.content,
