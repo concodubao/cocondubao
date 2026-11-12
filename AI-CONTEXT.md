@@ -54,6 +54,13 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 
 ## 4. Trạng thái hiện tại của codebase
 
+### Rà toàn bộ codebase — ghi nhận N1–N25, đã sửa N1 + N2 (2026-11-12, Claude)
+Chi tiết N1–N25 trong IMPROVEMENTS.md (kèm SQL kiểm). Bốn mục nặng nhất:
+- **N1 (ĐÃ SỬA, chưa commit)** `checkFAQ` nuốt câu hỏi nông nghiệp thật ("Hiện tại lúa…", "Chào Cò Con, lúa…", "… có đúng không?") → trả câu xã giao. Gotcha: `\b` của regex JS không dùng được với tiếng Việt — FAQ giờ dùng `faqWhole`/`faqHas` (ranh giới `\p{L}\p{N}`); thêm pattern FAQ mới thì dùng 2 helper này, đừng viết regex trần. `FOLLOWUP_RE` vẫn còn lỗi `\b` (N19).
+- **N2 (ĐÃ SỬA, chưa commit)** Thông báo đặt lịch trễ 7 tiếng (chuỗi `datetime-local` không múi giờ, server UTC). Giờ từ client không có múi giờ phải qua `parseScheduleAt()` (push.js) — mặc định UTC+7.
+- **N3** `messages_source_check` trong migration không cho các `source` mà code đang ghi, và insert câu trả lời không kiểm lỗi → CHƯA biết prod đang ở trạng thái nào (truy vấn prod bị chặn trong phiên rà).
+- **N4** "Lỗ hổng tri thức" + tab "Tin cậy thấp" luôn rỗng; `ragRate` bị thổi phồng.
+
 ### Render đã chạy + sửa luồng đăng nhập (2026-11-12, Claude)
 - **Backend LIVE trên Render**: `https://cocon-backend.onrender.com` (`/health` ok). Vercel đã trỏ `VITE_API_URL` sang Render + `VITE_VAPID_PUBLIC_KEY` mới. Secret đã rotate: Google key, `JWT_SECRET`, cặp VAPID (tạo mới 2026-11-12); legacy JWT keys của Supabase đã tắt (key lộ trong git trả 401).
 - **Còn của user**: thu hồi Sentry auth token (từng bị dán nhầm vào `SENTRY_DSN` → in ra log Render); tắt Railway hoặc `RUN_SCHEDULERS=false`; xoá Google key cũ.
