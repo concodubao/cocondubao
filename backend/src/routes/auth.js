@@ -292,12 +292,12 @@ router.post('/login-phone', async (req, res) => {
 
   const lockKey = `phone:${normalized}`
   const lockMin = lockMinutesLeft(lockKey)
-  if (lockMin > 0) return res.status(429).json({ error: `Nhập sai mã PIN nhiều lần. Thử lại sau ${lockMin} phút, hoặc dùng "Quên mã PIN".` })
+  if (lockMin > 0) return res.status(429).json({ error: `Nhập sai mã PIN nhiều lần. Thử lại sau ${lockMin} phút, hoặc nhờ quản trị viên đặt lại mã PIN.` })
 
   try {
     const { data: user } = await supabase.from('users').select('*').eq('phone', normalized).single()
-    if (!user) return res.status(401).json({ error: 'Số điện thoại chưa đăng ký.' })
-    if (!user.password_hash) return res.status(401).json({ error: 'Tài khoản chưa đặt mã PIN. Hãy dùng "Quên mã PIN" để đặt lại.' })
+    if (!user) return res.status(401).json({ error: 'Số điện thoại chưa đăng ký. Bấm "Đăng ký" để tạo tài khoản.' })
+    if (!user.password_hash) return res.status(401).json({ error: 'Tài khoản chưa có mã PIN. Nhờ quản trị viên đặt lại mã PIN giúp bạn.' })
 
     const valid = await bcrypt.compare(String(password), user.password_hash)
     if (!valid) {

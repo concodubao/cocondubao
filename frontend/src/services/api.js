@@ -23,7 +23,9 @@ api.interceptors.response.use(
       const stored = JSON.parse(localStorage.getItem('cocon-auth') || '{}')
       const current = stored?.state?.token
       const sent = String(err.config?.headers?.Authorization || '').replace(/^Bearer\s+/, '')
-      if (!current || !sent || sent === current) {
+      // Request KHÔNG mang token (đăng nhập/đăng ký sai PIN → 401) không phải "hết phiên":
+      // trước đây vẫn tải lại /login nên thông báo "Mã PIN không đúng" không bao giờ hiện.
+      if (sent && (!current || sent === current)) {
         localStorage.removeItem('cocon-auth')
         // Dọn cache API + push của phiên vừa hết (máy dùng chung) TRƯỚC khi rời trang
         await cleanupAfterSessionEnd()

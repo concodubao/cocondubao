@@ -54,6 +54,15 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 
 ## 4. Trạng thái hiện tại của codebase
 
+### Render đã chạy + sửa luồng đăng nhập (2026-11-12, Claude)
+- **Backend LIVE trên Render**: `https://cocon-backend.onrender.com` (`/health` ok). Vercel đã trỏ `VITE_API_URL` sang Render + `VITE_VAPID_PUBLIC_KEY` mới. Secret đã rotate: Google key, `JWT_SECRET`, cặp VAPID (tạo mới 2026-11-12); legacy JWT keys của Supabase đã tắt (key lộ trong git trả 401).
+- **Còn của user**: thu hồi Sentry auth token (từng bị dán nhầm vào `SENTRY_DSN` → in ra log Render); tắt Railway hoặc `RUN_SCHEDULERS=false`; xoá Google key cũ.
+- **Luồng đăng nhập/đăng ký** (`Login.jsx`, `api.js`, `auth.js`):
+  - Lỗi gốc: interceptor 401 coi cả request KHÔNG mang token (đăng nhập sai PIN) là hết phiên → tải lại `/login`, thông báo lỗi không bao giờ hiện. Nay chỉ kết thúc phiên khi request có gửi token.
+  - Nông dân: chỉ SĐT (ô chỉ nhận số) + PIN 6 số. Bỏ lựa chọn "mật khẩu chữ tài khoản cũ" (DB không còn nông dân nào cần; ai còn thì admin "Đặt lại PIN"). Đăng ký có nhập lại PIN + nút hiện/ẩn mã.
+  - Ô đồng ý điều khoản chỉ hỏi lúc ĐĂNG KÝ, không chặn đăng nhập. Kỹ sư/admin: email + mật khẩu ≥ 8 ký tự (giữ nguyên, không hạ xuống PIN).
+- **RAG**: LLM vẫn có lúc dùng mẫu từ chối "lạc đề" cho câu nông nghiệp tài liệu không phủ (vd "lúa bị đổ ngã") rồi bị cache → thêm `isWrongRefusal()`: câu có từ khoá nông nghiệp mà LLM từ chối → chuyển kỹ sư, không cache. Kho tri thức CHƯA có bài về lúa đổ ngã.
+
 ### ⚠️ Chuyển backend sang Render (2026-11-01, Claude)
 - User quyết định dùng **Render** (có thể quay lại Railway làm dự phòng). Đã thêm `backend/Dockerfile`, `backend/.dockerignore`, `render.yaml` (Singapore, free, healthcheck `/health`), biến `RUN_SCHEDULERS` (máy dự phòng = `false`). Hướng dẫn deploy + rotate secret + failover: OPERATIONS.md mục 0/0b.
 - **Railway bị sự cố lộ biến môi trường 2026-10-21** → mọi secret từng đặt trên Railway coi như lộ: rotate hết trước khi deploy Render (Google key tạo mới trong CÙNG project để giữ quyền gemini-2.5-*).

@@ -39,7 +39,7 @@ function StepRole({ onNext }) {
 }
 
 // ─── Ô nhập 6 chữ số (dùng cho cả PIN lẫn OTP). mask=true → che như mật khẩu ──
-function DigitBoxes({ value, onChange, autoFocus = true, mask = false }) {
+function DigitBoxes({ value, onChange, autoFocus = true, mask = false, onEnter }) {
   // 6 ref tường minh — không gọi useRef trong vòng lặp (rules-of-hooks)
   const r0 = useRef(null), r1 = useRef(null), r2 = useRef(null)
   const r3 = useRef(null), r4 = useRef(null), r5 = useRef(null)
@@ -57,7 +57,8 @@ function DigitBoxes({ value, onChange, autoFocus = true, mask = false }) {
     if (i < 5) refs[i + 1].current?.focus()
   }
   function handleKeyDown(i, e) {
-    if (e.key === 'Backspace') {
+    if (e.key === 'Enter') onEnter?.()
+    else if (e.key === 'Backspace') {
       if (digits[i]) { const n = digits.slice(); n[i] = ''; onChange(n.join('')) }
       else if (i > 0) refs[i - 1].current?.focus()
     } else if (e.key === 'ArrowLeft'  && i > 0) refs[i - 1].current?.focus()
@@ -93,39 +94,55 @@ const PRIMARY_BTN =
   'flex items-center justify-center gap-2 shadow-lg active:scale-95 ' +
   'disabled:opacity-60 disabled:cursor-not-allowed transition-all'
 
-// ─── Nông dân: SĐT + PIN (Đăng nhập / Đăng ký) ──────────────
-function StepPhonePin({ agreed }) {
+// Trang đích sau đăng nhập theo vai trò (tài khoản staff có SĐT cũng về đúng chỗ)
+function landingFor(user, isNewUser) {
+  if (isNewUser) return '/profile?onboard=true'
+  return user.role === 'admin' ? '/admin' : user.role === 'engineer' ? '/engineer/queue' : '/home'
+}
+
+// SĐT di động VN: 10 số bắt đầu bằng 0 (03x–09x), hoặc dạng 84xxxxxxxxx
+const PHONE_RE = /^(0|84)[3-9]\d{8}$/
+
+// ─── Nông dân: SĐT + PIN 6 số (Đăng nhập / Đăng ký) — chỉ nhập số ─────────────
+function StepPhonePin() {
   const [mode,     setMode]     = useState('login') // 'login' | 'register'
   const [phone,    setPhone]    = useState('')
   const [pin,      setPin]      = useState('')
-  const [legacy,   setLegacy]   = useState(false) // đăng nhập bằng mật khẩu chữ (tài khoản cũ)
-  const [textPass, setTextPass] = useState('')
+  const [pin2,     setPin2]     = useState('')   // nhập lại PIN khi đăng ký
+  const [showPin,  setShowPin]  = useState(false)
+  const [agreed,   setAgreed]   = useState(false) // chỉ cần khi ĐĂNG KÝ
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
   const { setUser, setToken }   = useAuthStore()
   const phoneRef = useRef(null)
   useEffect(() => { phoneRef.current?.focus() }, [])
 
+  const isRegister = mode === 'register'
+
+  function switchMode(m) {
+    setMode(m); setError(''); setPin(''); setPin2('')
+  }
+
   async function submit() {
-    const p = phone.trim()
-    if (!p) return setError('Vui lòng nhập số điện thoại.')
-    const useLegacy = mode === 'login' && legacy
-    if (useLegacy) {
-      if (!textPass) return setError('Vui lòng nhập mật khẩu.')
-    } else if (pin.length !== 6) {
-      return setError('Mã PIN gồm 6 chữ số.')
+    if (loading) return
+    if (!phone) return setError('Vui lòng nhập số điện thoại.')
+    if (!PHONE_RE.test(phone)) return setError('Số điện thoại chưa đúng. Nhập đủ 10 số, ví dụ 0912345678.')
+    if (pin.length !== 6) return setError('Mã PIN gồm đúng 6 chữ số.')
+    if (isRegister) {
+      if (pin2 !== pin) return setError('Mã PIN nhập lại chưa khớp.')
+      if (!agreed)      return setError('Bạn cần đánh dấu đồng ý với Điều khoản & Chính sách bảo mật để đăng ký.')
     }
     setError(''); setLoading(true)
     try {
-      const res = mode === 'register'
-        ? await authAPI.registerPhone(p, pin)
-        : await authAPI.loginPhone(p, useLegacy ? textPass : pin)
+      const res = isRegister
+        ? await authAPI.registerPhone(phone, pin)
+        : await authAPI.loginPhone(phone, pin)
       const { token, user, isNewUser } = res.data
       await clearApiCache() // không để cache API của tài khoản trước lẫn vào phiên mới
       setToken(token); setUser(user)
-      window.location.href = isNewUser ? '/profile?onboard=true' : '/home'
+      window.location.href = landingFor(user, isNewUser)
     } catch (err) {
-      setError(err.response?.data?.error || 'Không thực hiện được. Thử lại nhé.')
+      setError(err.response?.data?.error || 'Không kết nối được máy chủ. Thử lại nhé.')
       setLoading(false)
     }
   }
@@ -135,7 +152,7 @@ function StepPhonePin({ agreed }) {
       {/* Tabs Đăng nhập / Đăng ký */}
       <div className="flex bg-[#fdf8f5] border border-[#f0e0d0] rounded-full p-1">
         {[['login', 'Đăng nhập'], ['register', 'Đăng ký']].map(([m, label]) => (
-          <button key={m} onClick={() => { setMode(m); setError('') }}
+          <button key={m} onClick={() => switchMode(m)}
             className="flex-1 h-10 rounded-full text-[15px] font-bold transition-all"
             style={{ background: mode === m ? '#4B230A' : 'transparent', color: mode === m ? '#fff' : '#7a6358' }}>
             {label}
@@ -147,54 +164,71 @@ function StepPhonePin({ agreed }) {
         <label className="text-[16px] font-bold text-[#0b1c30]" htmlFor="pp-phone">Số điện thoại</label>
         <div className="relative">
           <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-[#7a6358]">call</span>
-          <input ref={phoneRef} id="pp-phone" type="tel" inputMode="numeric" autoComplete="tel"
-            placeholder="Nhập số điện thoại"
-            value={phone} onChange={e => setPhone(e.target.value)}
+          <input ref={phoneRef} id="pp-phone" type="tel" inputMode="numeric" pattern="[0-9]*" autoComplete="tel"
+            placeholder="Ví dụ: 0912345678" maxLength={11}
+            value={phone}
+            onChange={e => { setPhone(e.target.value.replace(/\D/g, '').slice(0, 11)); setError('') }}
+            onKeyDown={e => e.key === 'Enter' && submit()}
             className="w-full h-[54px] pl-12 pr-4 bg-white border-2 border-[#d4b8a8] rounded-2xl
                        text-[18px] font-bold placeholder:font-normal focus:border-[#4B230A] transition-colors" />
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-[16px] font-bold text-[#0b1c30]">
-          {mode === 'register' ? 'Tạo mã PIN (6 số)' : (legacy ? 'Mật khẩu (tài khoản cũ)' : 'Mã PIN (6 số)')}
-        </label>
-        {mode === 'login' && legacy ? (
-          <PasswordInput autoComplete="current-password" placeholder="Nhập mật khẩu cũ" autoFocus
-            value={textPass} onChange={e => setTextPass(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && submit()}
-            className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
-        ) : (
-          <DigitBoxes value={pin} onChange={setPin} autoFocus={false} mask />
-        )}
-        {mode === 'register' && (
-          <p className="text-[12.5px] text-[#7a6358] text-center">Nhớ kỹ mã PIN này để đăng nhập lần sau nhé.</p>
-        )}
-        {mode === 'login' && (
-          <button type="button" onClick={() => { setLegacy(v => !v); setError('') }}
-            className="block mx-auto text-[13px] text-[#4B230A] font-semibold pt-1">
-            {legacy ? 'Dùng mã PIN 6 số' : 'Tài khoản cũ dùng mật khẩu chữ?'}
+        <div className="flex items-center justify-between">
+          <label className="text-[16px] font-bold text-[#0b1c30]">
+            {isRegister ? 'Tạo mã PIN (6 số)' : 'Mã PIN (6 số)'}
+          </label>
+          <button type="button" onClick={() => setShowPin(v => !v)}
+            className="flex items-center gap-1 text-[13px] text-[#4B230A] font-semibold">
+            <span className="material-symbols-outlined text-[18px]">{showPin ? 'visibility_off' : 'visibility'}</span>
+            {showPin ? 'Ẩn mã' : 'Hiện mã'}
           </button>
-        )}
+        </div>
+        <DigitBoxes value={pin} onChange={v => { setPin(v); setError('') }} autoFocus={false} mask={!showPin} onEnter={submit} />
       </div>
+
+      {isRegister && (
+        <div className="space-y-2">
+          <label className="text-[16px] font-bold text-[#0b1c30]">Nhập lại mã PIN</label>
+          <DigitBoxes value={pin2} onChange={v => { setPin2(v); setError('') }} autoFocus={false} mask={!showPin} onEnter={submit} />
+          <p className="text-[12.5px] text-[#7a6358] text-center">Nhớ kỹ mã PIN này để đăng nhập lần sau nhé.</p>
+        </div>
+      )}
+
+      {/* Đồng ý điều khoản: chỉ hỏi MỘT lần lúc đăng ký, không hỏi lại mỗi lần đăng nhập */}
+      {isRegister && (
+        <div className="flex items-start gap-2 px-1">
+          <input type="checkbox" id="consent" checked={agreed}
+            onChange={e => { setAgreed(e.target.checked); setError('') }}
+            className="mt-0.5 w-5 h-5 accent-[#4B230A] cursor-pointer shrink-0" />
+          <label htmlFor="consent" className="text-[#7a6358] text-[13px] cursor-pointer leading-snug">
+            Tôi đồng ý với việc Cò Con thu thập số điện thoại, ảnh, giọng nói và vị trí theo{' '}
+            <Link to="/policies" className="text-[#4B230A] font-semibold underline">Điều khoản & Chính sách bảo mật</Link>
+          </label>
+        </div>
+      )}
 
       {error && <ErrorBox msg={error} />}
 
-      <button onClick={submit} disabled={loading || !agreed} className={PRIMARY_BTN}>
+      <button onClick={submit} disabled={loading} className={PRIMARY_BTN}>
         {loading
           ? <><Spinner /> Đang xử lý...</>
-          : <>{mode === 'register' ? 'Đăng ký' : 'Đăng nhập'}<span className="material-symbols-outlined">arrow_forward</span></>}
+          : <>{isRegister ? 'Đăng ký' : 'Đăng nhập'}<span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
 
       <p className="text-center text-[13px] text-[#7a6358] leading-relaxed px-2">
-        Quên mã PIN? Nhờ kỹ sư hoặc quản trị viên ở xã đặt lại giúp bạn.
+        {isRegister
+          ? <>Đã có tài khoản? <button type="button" onClick={() => switchMode('login')} className="text-[#4B230A] font-bold underline">Đăng nhập</button></>
+          : <>Chưa có tài khoản? <button type="button" onClick={() => switchMode('register')} className="text-[#4B230A] font-bold underline">Đăng ký</button><br />
+              Quên mã PIN? Nhờ quản trị viên ở xã đặt lại giúp bạn.</>}
       </p>
     </div>
   )
 }
 
 // ─── Email/Password — login (kỹ sư & admin) ─────────────────
-function StepEmailPassword({ agreed }) {
+function StepEmailPassword() {
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
@@ -202,19 +236,19 @@ function StepEmailPassword({ agreed }) {
   const { setUser, setToken }   = useAuthStore()
 
   async function handleLogin() {
-    if (!email || !password) return setError('Vui lòng nhập đầy đủ.')
+    if (loading) return
+    const mail = email.trim()
+    if (!mail || !password) return setError('Vui lòng nhập email và mật khẩu.')
+    if (!/^\S+@\S+\.\S+$/.test(mail)) return setError('Email chưa đúng định dạng.')
     setError(''); setLoading(true)
     try {
-      const res = await authAPI.loginEmail(email, password)
+      const res = await authAPI.loginEmail(mail, password)
       const { token, user, isNewUser } = res.data
       await clearApiCache() // không để cache API của tài khoản trước lẫn vào phiên mới
       setToken(token); setUser(user)
-      window.location.href = isNewUser ? '/profile?onboard=true'
-        : user.role === 'admin'    ? '/admin'
-        : user.role === 'engineer' ? '/engineer/queue'
-        : '/home'
+      window.location.href = landingFor(user, isNewUser)
     } catch (err) {
-      setError(err.response?.data?.error || 'Đăng nhập thất bại.')
+      setError(err.response?.data?.error || 'Không kết nối được máy chủ. Thử lại nhé.')
       setLoading(false)
     }
   }
@@ -242,7 +276,7 @@ function StepEmailPassword({ agreed }) {
           className="w-full h-[54px] px-4 bg-white border-2 border-[#d4b8a8] rounded-2xl text-[18px]" />
       </div>
       {error && <ErrorBox msg={error} />}
-      <button onClick={handleLogin} disabled={loading || !agreed} className={PRIMARY_BTN}>
+      <button onClick={handleLogin} disabled={loading} className={PRIMARY_BTN}>
         {loading ? <><Spinner /> Đang đăng nhập...</> : <><span>Đăng nhập</span><span className="material-symbols-outlined">arrow_forward</span></>}
       </button>
     </div>
@@ -264,8 +298,7 @@ function Spinner() {
 
 // ─── Main ───────────────────────────────────────────────────
 export default function Login() {
-  const [step, setStep] = useState('role') // 'role' | 'phone-pin' | 'email' | 'forgot'
-  const [agreed, setAgreed] = useState(false)
+  const [step, setStep] = useState('role') // 'role' | 'phone-pin' | 'email'
   const { token } = useAuthStore()
   if (token) return <Navigate to="/home" replace />
 
@@ -305,24 +338,12 @@ export default function Login() {
         )}
 
         {step === 'role'      && <StepRole onNext={r => setStep(r === 'farmer' ? 'phone-pin' : 'email')} />}
-        {step === 'phone-pin' && <StepPhonePin agreed={agreed} />}
-        {step === 'email'     && <StepEmailPassword agreed={agreed} />}
+        {step === 'phone-pin' && <StepPhonePin />}
+        {step === 'email'     && <StepEmailPassword />}
 
-        {step !== 'role' && (
-          <div className="flex items-start gap-2 mt-6 mb-2 px-1">
-            <input 
-              type="checkbox" 
-              id="consent" 
-              checked={agreed} 
-              onChange={e => setAgreed(e.target.checked)}
-              className="mt-1 w-4 h-4 accent-[#4B230A] cursor-pointer"
-            />
-            <label htmlFor="consent" className="text-[#7a6358] text-[13px] cursor-pointer leading-tight">
-              Tôi đồng ý với việc Cò Con thu thập số điện thoại, ảnh, giọng nói và vị trí theo{' '}
-              <Link to="/policies" className="text-[#4B230A] font-semibold underline">Điều khoản & Chính sách bảo mật</Link>
-            </label>
-          </div>
-        )}
+        <p className="text-center text-[12.5px] text-[#7a6358] mt-6 mb-2">
+          <Link to="/policies" className="text-[#4B230A] font-semibold underline">Điều khoản & Chính sách bảo mật</Link>
+        </p>
       </div>
       </div>
 
