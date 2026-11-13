@@ -182,7 +182,7 @@ Còn lại (thấp, có chủ ý chưa làm): race login đọc hash cũ trùng 
 - ⬜ **Scale** — Redis + leader-election scheduler + billing Gemini + index pgvector (trần 1 replica). (H15 cron cũng cần leader-election khi >1 replica.)
 - ✅ **Realtime engineer queue** — ĐÃ VERIFY là no-op (2026-06-29): client chỉ có anon key (app dùng JWT tự ký, không Supabase Auth → `auth.uid()`=NULL), `engineer_queue` bật RLS **không có policy nào** → Realtime bị RLS chặn SELECT → 0 event. Cả 3 subscription (Queue/Dashboard/WaitEngineer) đều chết. **Đã thay bằng polling:** Queue 20s + pause khi tab ẩn; Dashboard đã sẵn React Query 30s (gỡ realtime chết); WaitEngineer poll `getMessages` 12s phát hiện message `role:'engineer'` mới → tự nhảy về chat. Gỡ helper chết `subscribeEngineerQueue`. (Không mở RLS `USING(true)` vì lộ câu hỏi nông dân cho anon key.)
 
-## Đợt 2026-11-12 (rà toàn bộ codebase — Claude) — ghi nhận N1–N25, mới sửa N1 + N2
+## Đợt 2026-11-12 (rà toàn bộ codebase — Claude) — ghi nhận N1–N25, ĐÃ SỬA gần hết (xem "Còn mở" ngay dưới)
 
 **Đã sửa (2026-11-12, Claude; chưa commit/deploy):**
 - **N1** — `checkFAQ` viết lại (`rag.js`): lời xã giao chỉ khớp khi CẢ câu là xã giao (`faqWhole`); câu hỏi về Cò Con phải gọi tên Cò Con/bạn hoặc đứng một mình và bị bỏ qua nếu có từ khoá nông nghiệp (`botDirected`); ranh giới từ bằng `\p{L}\p{N}` thay `\b`; chuẩn hoá NFC. +5 test (`rag.test.js`). Hệ quả cần biết: câu tán gẫu không khớp FAQ và không có từ khoá lạc đề giờ đi vào RAG (có thể tới hàng đợi kỹ sư) thay vì nhận câu chào — chấp nhận, vì nuốt câu hỏi thật tệ hơn.
@@ -194,6 +194,39 @@ Còn lại (thấp, có chủ ý chưa làm): race login đọc hash cũ trùng 
 - **N24 (phần reload)** — `main.jsx`: `controllerchange` chỉ reload khi trước đó ĐÃ có SW điều khiển (cập nhật thật); lần đầu mở app không reload nữa (trước đây xoá chữ/câu hỏi người mới đang gõ).
 - Công cụ quay demo: `frontend/demo/record-demo.mjs` (Playwright + Chrome cài sẵn; người dùng tự đăng nhập, script không đụng mật khẩu; output `frontend/demo/out/`, đã gitignore).
 - Backend 188 pass.
+
+**Đã sửa (2026-11-13, Claude — đợt "sửa hết"; backend 198 pass, frontend lint 0 / 12 test / build OK):**
+- **N4** — `ragRate` = câu có căn cứ (similarity ≥ 0.7) / mọi câu kỹ thuật, kể cả câu phải chuyển kỹ sư, bỏ FAQ; "lỗ hổng tri thức" + tab "Tin cậy thấp" lấy cả `role='system'` (trước luôn rỗng); Dashboard gắn nhãn "Chuyển kỹ sư".
+- **N5** — ĐÓNG, không phải lỗi: SQL trên prod cho RPC trả 113/113 chunk.
+- **N6** — `/push/subscribe`: endpoint mới chép cài đặt gần nhất của user (giờ yên tĩnh, loại, lọc cây); máy dùng chung không thừa hưởng cài đặt người trước. Không cần migration.
+- **N7** — nháp thời tiết: dedup theo mọi trạng thái; admin "bỏ" thì đổi `region` `wx:` → `wxx:` thay vì xoá (không tạo lại), tự dọn khi qua ngày.
+- **N8a** — scheduler + duyệt nháp: nhận việc nguyên tử (`UPDATE … WHERE sent_at IS NULL`) TRƯỚC khi gửi → hết gửi trùng.
+- **N9** — sửa câu trả lời kỹ sư: tìm message cũ bằng so nội dung ở JS (không nhét vào URL); lưu trữ QA cũ sai + xoá cache.
+- **N10** — b: chặn PIN dễ đoán (`isWeakPin`); c: `reset-pin` xoá khoá dò (`services/loginLockout.js`); d (một phần): staff đăng nhập bằng PIN nhận token 7 ngày; e: `reset-pin` không còn mở khoá (400 nếu đang khoá); f: chặn admin cuối tự xoá; g: OTP tắt trừ khi `OTP_ENABLED=true` (giữ code); h: poller denylist phân trang.
+- **N11 (một phần)** — `TRUST_PROXY_HOPS` (env) + log `[NET] … clientIpMatches=` một lần. **Cần user đọc log Render** rồi đặt số hop nếu `false`.
+- **N12** — bước embed câu hỏi dùng chung trần retry 30s với LLM; retry cả 503.
+- **N13** — trả lời ảnh dùng `SYSTEM_PROMPT`, tắt thinking, đếm quota, `confidence: null` (hết gán cứng 0.9).
+- **N14** — payload push cắt gọn (tiêu đề 100, nội dung 300 ký tự; DB giữ đủ); `/push/send` kiểm loại, cây, độ dài, ảnh https.
+- **N15** — Workbox `api-cache` khớp `*.onrender.com` + `*.railway.app`.
+- **N16** — frontend xử lý `engineerQueued:false` (không báo "đã gửi kỹ sư" sai); gỡ hậu tố `_dbcached`.
+- **N17** — tự xoá tài khoản: null `image_url` của bài đăng, xoá ảnh có phân trang.
+- **N18** — `fetchAllRows()` (`services/dbUtil.js`) cho thống kê admin, xuất CSV, danh sách thiết bị push, poller auth; lịch sử chat xếp mới-nhất-trước nên phần bị cắt là phiên cũ.
+- **N19** — `splitOffTopic`: bỏ cụm lạc đề trước khi tìm từ khoá nông nghiệp ("cá độ", "mùa giải", "đất nền"…); `FOLLOWUP_RE` dùng ranh giới unicode ("thế/thì" giờ khớp, trừ "thế nào…").
+- **N20** — quota monitor đếm theo từng model, có cả vision + STT.
+- **N21** — `fail500()`: không trả `error.message` của DB cho client nữa.
+- **N22** — rate-limit chat chỉ đếm lượt ghi (GET không đếm).
+- **N23** — bỏ SĐT khỏi `Sentry.setUser`; Chính sách nêu đủ bên thứ ba + tự xoá tài khoản.
+- **N24 (phần lớn)** — `maxOutputTokens` 512 → 768 + không cache câu bị cắt; dọn `answer_cache` hết hạn; `report-error` kiểm lỗi; QA soạn tay ≤ 20k ký tự; `test-embed` đưa key qua header; `/login` đưa staff về đúng trang; `algorithms` ghim ở limiter; like bấm đúp không lỗi; ảnh mồ côi khi đăng bài lỗi được dọn.
+- **N25** — CLAUDE.md, `.env.example` cập nhật.
+- `npm audit fix` frontend: dependency production 0 lỗ (còn 11 mức thấp/vừa ở công cụ build, cần `--force`).
+
+**Còn mở sau đợt này:**
+- **Việc của user (SQL):** áp `20261025000000_security_hardening.sql` (lỗ `users_self` VẪN MỞ trên prod — xác nhận 2026-11-12) và `20261113000000_messages_source_check.sql`; chạy truy vấn kiểm `auth.users`.
+- **N8b** — Render free ngủ → job nền dừng; thông báo tới hạn lúc ngủ gửi khi thức, rơi vào giờ yên tĩnh thì bị bỏ. Cần gói always-on hoặc ping giữ thức (không sửa bằng code được).
+- **N10a** — cố ý GIỮ thông báo "số chưa đăng ký" (nông dân lớn tuổi cần chỉ dẫn rõ); đã giảm rủi ro bằng chặn PIN yếu.
+- **N10d** — tài khoản staff vẫn đăng nhập được bằng SĐT + PIN 6 số (chặn hẳn sẽ khoá những người được nâng quyền từ nông dân → cần quyết định + cấp email trước).
+- **N24 còn lại** — `user-scalable=no`; icon manifest `/icon.png`; `engineer_queue.message_id` chưa unique (cần migration).
+- **L14** — ảnh sâu bệnh vẫn ở bucket public.
 
 Đọc toàn bộ backend (routes, services, middleware, migrations, deploy) + các luồng chính frontend. Backend test 174 pass, `npm audit`: backend 0, frontend 1 high (`follow-redirects`, chỉ dùng ở Node, `npm audit fix`). Cột "Kiểm": **chạy** = đã chạy code thật để xác nhận; **đọc** = suy ra từ code; **chưa** = cần truy vấn DB/production (truy vấn prod bị chặn trong phiên này, SQL kiểm ở cuối bảng).
 

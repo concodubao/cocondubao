@@ -54,12 +54,24 @@ Hiện dùng **`@google/genai` ^2.10.0** (SDK hợp nhất MỚI của Google), 
 
 ## 4. Trạng thái hiện tại của codebase
 
-### Rà toàn bộ codebase — ghi nhận N1–N25, đã sửa N1 + N2 (2026-11-12, Claude)
+### Đợt "sửa hết" N4–N25 (2026-11-13, Claude)
+Chi tiết + phần còn mở trong IMPROVEMENTS.md. Gotcha mới cho AI làm sau:
+- **Lỗi 500**: dùng `fail500(res, err, '<KHU VỰC>')` (`services/dbUtil.js`), đừng trả `error.message` cho client.
+- **Truy vấn có thể > 1000 dòng**: bọc bằng `fetchAllRows(() => query.order(...))` — PostgREST cắt âm thầm ở 1000.
+- **Khoá dò PIN / PIN yếu** nằm ở `services/loginLockout.js` (không còn trong routes/auth.js).
+- **OTP** tắt mặc định (`OTP_ENABLED=true` mới bật) — code vẫn giữ nguyên.
+- **Nháp thời tiết bị bỏ** = đổi `region` sang `wxx:…`, KHÔNG xoá dòng.
+- **Gửi thông báo đặt lịch / duyệt nháp**: phải "nhận việc" bằng `UPDATE … WHERE sent_at IS NULL … select` trước khi `dispatchNotification`.
+- **Vision**: `confidence: null`; mọi thống kê phải chịu được confidence null.
+- **Test backend trên máy này**: chạy `cd <gốc repo> && cd backend && npm test`. Mở shell thẳng trong `backend` với ổ đĩa viết thường (`c:/…`) làm vitest không khớp mock → mọi file lỗi "supabaseUrl is required".
+- **Việc user còn nợ**: áp 2 migration (`20261025000000` — lỗ `users_self` vẫn mở trên prod; `20261113000000`), đọc log `[NET]` trên Render để chỉnh `TRUST_PROXY_HOPS`.
+
+### Rà toàn bộ codebase — ghi nhận N1–N25 (2026-11-12, Claude)
 Chi tiết N1–N25 trong IMPROVEMENTS.md (kèm SQL kiểm). Bốn mục nặng nhất:
-- **N1 (ĐÃ SỬA, chưa commit)** `checkFAQ` nuốt câu hỏi nông nghiệp thật ("Hiện tại lúa…", "Chào Cò Con, lúa…", "… có đúng không?") → trả câu xã giao. Gotcha: `\b` của regex JS không dùng được với tiếng Việt — FAQ giờ dùng `faqWhole`/`faqHas` (ranh giới `\p{L}\p{N}`); thêm pattern FAQ mới thì dùng 2 helper này, đừng viết regex trần. `FOLLOWUP_RE` vẫn còn lỗi `\b` (N19).
-- **N2 (ĐÃ SỬA, chưa commit)** Thông báo đặt lịch trễ 7 tiếng (chuỗi `datetime-local` không múi giờ, server UTC). Giờ từ client không có múi giờ phải qua `parseScheduleAt()` (push.js) — mặc định UTC+7.
+- **N1 (ĐÃ SỬA)** `checkFAQ` nuốt câu hỏi nông nghiệp thật ("Hiện tại lúa…", "Chào Cò Con, lúa…", "… có đúng không?") → trả câu xã giao. Gotcha: `\b` của regex JS không dùng được với tiếng Việt — FAQ giờ dùng `faqWhole`/`faqHas` (ranh giới `\p{L}\p{N}`); thêm pattern FAQ mới thì dùng 2 helper này, đừng viết regex trần. `FOLLOWUP_RE` cũng đã chuyển sang ranh giới unicode (N19).
+- **N2 (ĐÃ SỬA)** Thông báo đặt lịch trễ 7 tiếng (chuỗi `datetime-local` không múi giờ, server UTC). Giờ từ client không có múi giờ phải qua `parseScheduleAt()` (push.js) — mặc định UTC+7.
 - **N3 (ĐÃ SỬA 2026-11-13, xác nhận trên prod)** prod còn `messages_source_check` → mọi câu trả lời source ngoài rag/llm/engineer (faq, qa_direct, *_cached…) KHÔNG được lưu. Giờ lưu câu trả lời phải qua `insertAnswerMessage()` (chat.js) — gặp CHECK thì lưu lại với source=null. Migration `20261113000000` gỡ constraint (user áp psql). Cùng đợt: `main.jsx` không reload ở lần đầu SW claim (N24).
-- **N4** "Lỗ hổng tri thức" + tab "Tin cậy thấp" luôn rỗng; `ragRate` bị thổi phồng.
+- **N4 (ĐÃ SỬA)** "Lỗ hổng tri thức" + tab "Tin cậy thấp" luôn rỗng; `ragRate` bị thổi phồng.
 
 ### Render đã chạy + sửa luồng đăng nhập (2026-11-12, Claude)
 - **Backend LIVE trên Render**: `https://cocon-backend.onrender.com` (`/health` ok). Vercel đã trỏ `VITE_API_URL` sang Render + `VITE_VAPID_PUBLIC_KEY` mới. Secret đã rotate: Google key, `JWT_SECRET`, cặp VAPID (tạo mới 2026-11-12); legacy JWT keys của Supabase đã tắt (key lộ trong git trả 401).
