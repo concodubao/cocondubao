@@ -404,3 +404,34 @@ describe('QA biên soạn & cache có lịch sử', () => {
     expect(getAnswerCache(q, null)).toBeTruthy()
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+// N19 (2026-11-13): từ khoá nông nghiệp nằm BÊN TRONG cụm lạc đề ("cá" trong "cá độ")
+// và \b không hiểu chữ có dấu ("thế …", "thì …" không bao giờ là câu nối).
+describe('lạc đề / câu nối — ranh giới từ tiếng Việt', () => {
+  it('"cá độ", "cá cược", "mùa giải" là lạc đề dù chứa từ nông nghiệp', () => {
+    expect(looksOffTopic('cá độ bóng đá hôm nay')).toBe(true)
+    expect(looksOffTopic('tỉ lệ cá cược world cup')).toBe(true)
+    expect(looksOffTopic('mùa giải ngoại hạng năm nay ai vô địch')).toBe(true)
+    // có nội dung nông nghiệp thật ngoài cụm lạc đề → KHÔNG từ chối
+    expect(looksOffTopic('xem bóng đá xong ra thăm lúa thấy rầy nâu nhiều quá')).toBe(false)
+    expect(looksOffTopic('nuôi cá tra bị lở loét trị sao')).toBe(false)
+  })
+
+  it('LLM từ chối ĐÚNG câu lạc đề thì không đẩy sang kỹ sư', () => {
+    const refusal = 'Dạ xin lỗi bác, Cò Con chỉ là trợ lý nông nghiệp nên không rành chuyện này ạ.'
+    expect(isWrongRefusal(refusal, 'cá độ bóng đá ở đâu')).toBe(false)
+    expect(isWrongRefusal(refusal, 'bệnh tiểu đường uống thuốc gì')).toBe(false)
+    expect(isWrongRefusal(refusal, 'mua đất nền ở Sóc Trăng giá bao nhiêu')).toBe(false)
+    // câu nông nghiệp thật bị từ chối nhầm → vẫn chuyển kỹ sư
+    expect(isWrongRefusal(refusal, 'lúa bị đổ ngã phải làm sao')).toBe(true)
+    expect(isWrongRefusal(refusal, 'cây bị bệnh gì mà lá xoăn')).toBe(true)
+  })
+
+  it('"thế …" / "thì …" được nhận là câu nối; "thế nào là …" thì không', () => {
+    const hist = [{ role: 'user', content: 'lúa bị rầy nâu phun thuốc gì' }]
+    expect(contextualizeQuery('thế đạo ôn trị bằng thuốc nào vậy', hist)).toContain('rầy nâu')
+    expect(contextualizeQuery('thì bệnh đạo ôn trị bằng thuốc nào', hist)).toContain('rầy nâu')
+    expect(contextualizeQuery('thế nào là bệnh đạo ôn trên lúa', hist)).toBe('thế nào là bệnh đạo ôn trên lúa')
+  })
+})

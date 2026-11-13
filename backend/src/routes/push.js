@@ -12,6 +12,14 @@ import sharp     from 'sharp'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
 import { sendPush, dispatchNotification } from '../services/notifications.js'
+import { DRAFT_PREFIX, dismissedRegion } from '../services/weatherAlerts.js'
+import { fail500 } from '../services/dbUtil.js'
+
+const VALID_CROPS       = ['rice', 'veggie', 'fruit', 'other']
+const VALID_NOTIF_TYPES = ['alert', 'promotion', 'weather']
+const MAX_NOTIF_TITLE   = 120
+const MAX_NOTIF_BODY    = 2000
+const SETTING_COLS      = 'notif_types, quiet_start, quiet_end, crops_filter'
 
 const router = express.Router()
 
@@ -68,21 +76,38 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
     // sẽ spam mỗi lần chuyển trang. Đã TỪNG có endpoint nào (kể cả đã tắt) → không
     // welcome: đăng xuất giờ tắt subscription, nếu chỉ xét active thì mỗi lần đăng nhập
     // lại đều nhận welcome.
-    const { data: userActive } = await supabase
+    const { data: userSubs } = await supabase
       .from('push_subscriptions')
-      .select('endpoint')
+      .select(`endpoint, ${SETTING_COLS}`)
       .eq('user_id', req.user.userId)
-      .limit(1)
-    const isFirstForUser = !userActive?.length
+      .order('created_at', { ascending: false })
+      .limit(20)
+    const isFirstForUser = !userSubs?.length
+
+    // Cài đặt thông báo (giờ yên tĩnh, loại, lọc cây) nằm trên từng dòng endpoint. Endpoint
+    // đổi liên tục (đăng xuất/đăng nhập, trình duyệt xoay endpoint, đổi khoá VAPID) → dòng
+    // mới trước đây nhận mặc định của DB, cài đặt của nông dân âm thầm mất. Giờ:
+    //  - endpoint này đã là của user → giữ nguyên cài đặt của chính nó;
+    //  - endpoint mới (hoặc máy dùng chung vừa đổi người) → chép cài đặt gần nhất của user,
+    //    chưa có thì về mặc định (không thừa hưởng cài đặt của người dùng trước trên máy).
+    const row = {
+      user_id:  req.user.userId,
+      endpoint: subscription.endpoint,
+      keys:     subscription.keys,
+      active:   true,
+    }
+    const alreadyMine = (userSubs || []).some(s => s.endpoint === subscription.endpoint)
+    if (!alreadyMine) {
+      const last = userSubs?.[0]
+      row.notif_types  = last?.notif_types  ?? VALID_NOTIF_TYPES
+      row.quiet_start  = last ? last.quiet_start : '22:00:00'
+      row.quiet_end    = last ? last.quiet_end   : '06:00:00'
+      row.crops_filter = last?.crops_filter ?? []
+    }
 
     const { error } = await supabase
       .from('push_subscriptions')
-      .upsert({
-        user_id:  req.user.userId,
-        endpoint: subscription.endpoint,
-        keys:     subscription.keys,
-        active:   true,
-      }, { onConflict: 'endpoint' })
+      .upsert(row, { onConflict: 'endpoint' })
 
     if (error) {
       console.error('[PUSH] supabase upsert error:', error)
@@ -103,7 +128,7 @@ router.post('/subscribe', verifyJWT, async (req, res) => {
     res.json({ success: true })
   } catch (err) {
     console.error('[PUSH] subscribe error:', err.message, err.code)
-    res.status(500).json({ error: 'Không đăng ký được thông báo: ' + err.message })
+    res.status(500).json({ error: 'Không đăng ký được thông báo. Thử lại nhé.' })
   }
 })
 
@@ -149,7 +174,7 @@ router.post('/upload-image', verifyJWT, requireRole('admin'),
       res.json({ url: data.publicUrl })
     } catch (err) {
       console.error('[PUSH] upload-image error:', err.message)
-      res.status(500).json({ error: 'Upload ảnh thất bại: ' + err.message })
+      res.status(500).json({ error: 'Upload ảnh thất bại. Thử lại nhé.' })
     }
   }
 )
@@ -178,8 +203,16 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
     scheduleAt,
   } = req.body
 
-  if (!title?.trim() || !body?.trim()) {
+  if (typeof title !== 'string' || typeof body !== 'string' || !title.trim() || !body.trim()) {
     return res.status(400).json({ error: 'Tiêu đề và nội dung không được để trống.' })
+  }
+  if (title.trim().length > MAX_NOTIF_TITLE) return res.status(400).json({ error: `Tiêu đề tối đa ${MAX_NOTIF_TITLE} ký tự.` })
+  if (body.trim().length > MAX_NOTIF_BODY)   return res.status(400).json({ error: `Nội dung tối đa ${MAX_NOTIF_BODY} ký tự.` })
+  if (!VALID_NOTIF_TYPES.includes(type))     return res.status(400).json({ error: 'Loại thông báo không hợp lệ.' })
+  if (!Array.isArray(cropTags))              return res.status(400).json({ error: 'Bộ lọc cây trồng không hợp lệ.' })
+  // Ảnh minh hoạ hiện trên máy nông dân và trong push → chỉ nhận đường dẫn https
+  if (imageUrl != null && imageUrl !== '' && !(typeof imageUrl === 'string' && /^https:\/\//i.test(imageUrl) && imageUrl.length <= 1000)) {
+    return res.status(400).json({ error: 'Đường dẫn ảnh không hợp lệ.' })
   }
 
   // Chuẩn hoá thời điểm đặt lịch (nếu có)
@@ -199,7 +232,7 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
         body:         body.trim(),
         type,
         image_url:    imageUrl || null,
-        crop_tags:    cropTags,
+        crop_tags:    cropTags.filter(c => VALID_CROPS.includes(c)),
         created_by:   req.user.userId,
         scheduled_at: scheduledAt,
         sent_at:      scheduledAt ? null : new Date().toISOString(),
@@ -238,7 +271,7 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
 
   } catch (err) {
     console.error('[PUSH] send error:', err)
-    res.status(500).json({ error: 'Gửi thông báo thất bại: ' + err.message })
+    res.status(500).json({ error: 'Gửi thông báo thất bại. Thử lại nhé.' })
   }
 })
 
@@ -254,7 +287,7 @@ router.get('/scheduled', verifyJWT, requireRole('admin'), async (req, res) => {
     if (error) throw error
     res.json({ scheduled: data || [] })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -270,7 +303,7 @@ router.delete('/scheduled/:id', verifyJWT, requireRole('admin'), async (req, res
     if (error) throw error
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -288,11 +321,12 @@ router.get('/drafts', verifyJWT, requireRole('admin'), async (req, res) => {
       .is('created_by', null)
       .is('sent_at', null)
       .is('scheduled_at', null)
+      .like('region', `${DRAFT_PREFIX}%`) // không hiện nháp admin đã bỏ (wxx:…)
       .order('created_at', { ascending: false })
     if (error) throw error
     res.json({ drafts: data || [] })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -307,16 +341,21 @@ router.post('/drafts/:id/approve', verifyJWT, requireRole('admin'), async (req, 
     if (!notif) return res.status(404).json({ error: 'Không tìm thấy bản nháp.' })
     if (notif.sent_at) return res.status(400).json({ error: 'Bản nháp này đã được gửi.' })
 
-    // Đánh dấu admin đã duyệt + đã gửi trước khi dispatch (tránh gửi trùng)
-    await supabase
+    // Đánh dấu đã duyệt + đã gửi TRƯỚC khi dispatch, có điều kiện sent_at IS NULL: bấm đúp
+    // hoặc 2 admin cùng duyệt thì chỉ 1 request trúng dòng → không gửi trùng.
+    const { data: claimed, error: claimErr } = await supabase
       .from('notifications')
       .update({ sent_at: new Date().toISOString(), created_by: req.user.userId })
       .eq('id', req.params.id)
+      .is('sent_at', null)
+      .select('id')
+    if (claimErr) throw claimErr
+    if (!claimed?.length) return res.status(400).json({ error: 'Bản nháp này đã được gửi.' })
 
     const stats = await dispatchNotification(notif)
     res.json({ success: true, sent: stats.sent, total: stats.total })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -324,14 +363,19 @@ router.post('/drafts/:id/approve', verifyJWT, requireRole('admin'), async (req, 
 router.delete('/drafts/:id', verifyJWT, requireRole('admin'), async (req, res) => {
   try {
     const { data: notif } = await supabase
-      .from('notifications').select('id, sent_at').eq('id', req.params.id).single()
+      .from('notifications').select('id, sent_at, region').eq('id', req.params.id).single()
     if (!notif) return res.status(404).json({ error: 'Không tìm thấy bản nháp.' })
     if (notif.sent_at) return res.status(400).json({ error: 'Đã gửi, không thể bỏ.' })
-    const { error } = await supabase.from('notifications').delete().eq('id', req.params.id)
+    // Nháp cảnh báo thời tiết: KHÔNG xoá mà đánh dấu "đã bỏ" (đổi tiền tố region), nếu
+    // không lượt quét thời tiết kế tiếp sẽ tạo lại đúng nháp vừa bỏ.
+    const isWeatherDraft = typeof notif.region === 'string' && notif.region.startsWith(DRAFT_PREFIX)
+    const { error } = isWeatherDraft
+      ? await supabase.from('notifications').update({ region: dismissedRegion(notif.region) }).eq('id', req.params.id)
+      : await supabase.from('notifications').delete().eq('id', req.params.id)
     if (error) throw error
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -361,7 +405,7 @@ router.get('/notifications/settings', verifyJWT, async (req, res) => {
       cropsFilter: data?.crops_filter ?? [],
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -387,7 +431,7 @@ router.get('/notifications/item/:id', verifyJWT, async (req, res) => {
 
     res.json({ notification: { ...notif, read_at: read?.read_at || null, is_read: !!read?.read_at } })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -442,24 +486,25 @@ router.get('/notifications/:userId', verifyJWT, async (req, res) => {
 
     res.json({ notifications: result })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
 // PATCH /notifications/:id/read
 router.patch('/notifications/:id/read', verifyJWT, async (req, res) => {
   try {
-    await supabase
+    const { error } = await supabase
       .from('notification_reads')
       .upsert({
         notification_id: req.params.id,
         user_id:         req.user.userId,
         read_at:         new Date().toISOString(),
       }, { onConflict: 'notification_id,user_id' })
+    if (error) throw error
 
     res.json({ success: true })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 
@@ -483,10 +528,12 @@ router.patch('/notifications/settings', verifyJWT, async (req, res) => {
     if (quietEnd    !== undefined && !isTime(quietEnd))    return res.status(400).json({ error: 'Giờ kết thúc không hợp lệ.' })
 
     const updates = {}
-    if (notifTypes)            updates.notif_types  = notifTypes
-    if (cropsFilter)           updates.crops_filter = cropsFilter.filter(c => ['rice', 'veggie', 'fruit', 'other'].includes(c))
+    if (notifTypes)            updates.notif_types  = notifTypes.filter(t => VALID_NOTIF_TYPES.includes(t))
+    if (cropsFilter)           updates.crops_filter = cropsFilter.filter(c => VALID_CROPS.includes(c))
     if (quietStart !== undefined) updates.quiet_start = quietStart || null
     if (quietEnd   !== undefined) updates.quiet_end   = quietEnd   || null
+
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'Không có cài đặt nào để lưu.' })
 
     const { data, error } = await supabase
       .from('push_subscriptions')
@@ -506,7 +553,7 @@ router.patch('/notifications/settings', verifyJWT, async (req, res) => {
 
     res.json({ success: true, updatedDevices: data.length })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'PUSH')
   }
 })
 

@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import { supabase } from '../services/supabase.js'
 import * as Sentry from '@sentry/node'
+import { fetchAllRows } from '../services/dbUtil.js'
 
 // ─── Denylist tài khoản bị khoá (in-memory) ──────────────────────────────────
 // JWT sống 7–30 ngày nên không thể chỉ tin payload: admin khoá tài khoản phải có
@@ -53,10 +54,13 @@ export function setUserRole(userId, role) {
 // Nạp lại danh sách userId bị khoá + vai trò staff từ DB (gọi khi boot + định kỳ).
 export async function refreshInactiveUsers() {
   try {
-    const { data, error } = await supabase
+    // Phân trang: tài khoản tự xoá cũng là is_active=false nên số dòng chỉ tăng dần. Quá
+    // 1000 dòng mà không phân trang thì clear() + nạp thiếu sẽ MỞ LẠI người đang bị khoá.
+    const { data, error } = await fetchAllRows(() => supabase
       .from('users')
       .select('id')
       .eq('is_active', false)
+      .order('id', { ascending: true }))
     // Mỗi khối độc lập: 1 truy vấn lỗi KHÔNG được làm bỏ qua các khối sau.
     if (error) console.warn('[AUTH] refresh inactive users failed:', error.message)
     else {
@@ -68,10 +72,11 @@ export async function refreshInactiveUsers() {
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await fetchAllRows(() => supabase
       .from('users')
       .select('id, role')
       .in('role', STAFF_ROLES)
+      .order('id', { ascending: true }))
     if (error) console.warn('[AUTH] refresh staff roles failed:', error.message)
     else {
       _staffRoles.clear()

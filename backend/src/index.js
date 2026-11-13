@@ -37,9 +37,24 @@ if (process.env.JWT_SECRET.length < 32) {
 
 const app = express()
 
-// Railway chạy sau reverse proxy → tin 1 hop để req.ip là IP thật của client
-// (cần cho rate-limit theo IP chính xác).
-app.set('trust proxy', 1)
+// Chạy sau reverse proxy → phải tin đúng SỐ HOP để req.ip là IP thật của client (cần cho
+// rate-limit theo IP). Railway = 1 hop. Render đứng sau Cloudflare nên có thể là 2: nếu
+// tin thiếu hop, req.ip là IP của proxy → cả xã chung 1 bucket đăng nhập 30 lần/phút.
+// Xem dòng log [NET] lúc có request đầu tiên rồi đặt TRUST_PROXY_HOPS cho khớp.
+const TRUST_PROXY_HOPS = Math.max(1, parseInt(process.env.TRUST_PROXY_HOPS || '1', 10) || 1)
+app.set('trust proxy', TRUST_PROXY_HOPS)
+
+// Log MỘT lần (không ghi địa chỉ IP): số hop trong X-Forwarded-For và req.ip có trùng
+// phần tử đầu (client thật) không. "clientIpMatches=false" → tăng TRUST_PROXY_HOPS.
+let _netLogged = false
+app.use((req, _res, next) => {
+  if (!_netLogged && req.path.startsWith('/api/')) {
+    _netLogged = true
+    const chain = String(req.headers['x-forwarded-for'] || '').split(',').map(x => x.trim()).filter(Boolean)
+    console.log(`[NET] x-forwarded-for hops=${chain.length} | TRUST_PROXY_HOPS=${TRUST_PROXY_HOPS} | clientIpMatches=${chain.length ? req.ip === chain[0] : 'n/a'}`)
+  }
+  next()
+})
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 // Chat limiter khoá theo userId (đã đăng nhập) thay vì IP: cả xã dùng chung 4G/NAT
@@ -50,7 +65,7 @@ function userOrIpKey(req) {
   const h = req.headers.authorization
   if (h?.startsWith('Bearer ')) {
     try {
-      const p = jwt.verify(h.split(' ')[1], process.env.JWT_SECRET)
+      const p = jwt.verify(h.split(' ')[1], process.env.JWT_SECRET, { algorithms: ['HS256'] })
       if (p?.userId) return `user:${p.userId}`
     } catch { /* token lỗi → khoá theo IP */ }
   }
@@ -64,6 +79,9 @@ const chatLimiter = rateLimit({
   standardHeaders:  true,
   legacyHeaders:    false,
   keyGenerator:     userOrIpKey,
+  // Chỉ đếm lượt GHI (hỏi, ghi âm, phản hồi…). Trước đây đếm cả GET: màn chờ kỹ sư poll
+  // 5 lần/phút + mở lịch sử/đã lưu là nông dân dính "hỏi quá nhiều" dù chưa hỏi câu nào.
+  skip:             (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS',
   message:          { error: 'Bạn hỏi quá nhiều rồi, thử lại sau 1 phút nhé.' },
 })
 

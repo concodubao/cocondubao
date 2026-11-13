@@ -5,6 +5,17 @@
 
 import webpush      from 'web-push'
 import { supabase } from './supabase.js'
+import { fetchAllRows } from './dbUtil.js'
+
+// Web Push giới hạn ~4KB/payload (đã mã hoá). Tiêu đề/nội dung dài (tiếng Việt 2–3 byte/ký
+// tự) vượt ngưỡng thì push service từ chối → MỌI thiết bị "gửi lỗi". Thông báo đẩy chỉ là
+// lời nhắc; nội dung đầy đủ nằm trong app (DB giữ nguyên) nên cắt gọn ở đây.
+const PUSH_TITLE_MAX = 100
+const PUSH_BODY_MAX  = 300
+const clip = (text, max) => {
+  const t = String(text || '')
+  return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t
+}
 
 // ─── Gửi push tới 1 subscription, đánh dấu inactive nếu hết hạn (410) ────────
 export async function sendPush(subscription, payload) {
@@ -48,10 +59,12 @@ export function isQuietHour(quietStart, quietEnd) {
 // notif: { id, title, body, type, image_url, crop_tags }
 // Trả về { sent, failed, total } để route/scheduler báo cáo.
 export async function dispatchNotification(notif) {
-  const { data: subscriptions } = await supabase
+  // Phân trang: quá 1000 thiết bị thì 1 truy vấn bị cắt âm thầm → phần còn lại không nhận push
+  const { data: subscriptions } = await fetchAllRows(() => supabase
     .from('push_subscriptions')
     .select('endpoint, keys, user_id, notif_types, quiet_start, quiet_end, crops_filter')
     .eq('active', true)
+    .order('endpoint', { ascending: true }))
 
   if (!subscriptions?.length) return { sent: 0, failed: 0, total: 0 }
 
@@ -87,8 +100,8 @@ export async function dispatchNotification(notif) {
   }
 
   const payload = {
-    title:   notif.title,
-    body:    notif.body,
+    title:   clip(notif.title, PUSH_TITLE_MAX),
+    body:    clip(notif.body, PUSH_BODY_MAX),
     image:   notif.image_url || null,
     url:     '/notifications',
     notifId: notif.id,
@@ -125,11 +138,19 @@ export async function processScheduledNotifications() {
 
     for (const notif of due) {
       try {
-        const stats = await dispatchNotification(notif)
-        await supabase
+        // NHẬN VIỆC trước khi gửi (nguyên tử: chỉ 1 nơi cập nhật được dòng còn sent_at NULL).
+        // Trước đây gửi xong mới ghi sent_at: ghi lỗi / process sập giữa chừng / 2 máy cùng
+        // chạy scheduler → thông báo bị gửi lại mỗi 60 giây.
+        const { data: claimed, error: claimErr } = await supabase
           .from('notifications')
           .update({ sent_at: new Date().toISOString() })
           .eq('id', notif.id)
+          .is('sent_at', null)
+          .select('id')
+        if (claimErr) { console.warn(`[CRON] nhận notif ${notif.id} lỗi:`, claimErr.message); continue }
+        if (!claimed?.length) continue // nơi khác đã gửi
+
+        const stats = await dispatchNotification(notif)
         console.log(`[CRON] đã gửi notif đặt lịch ${notif.id} → ${stats.sent}/${stats.total} thiết bị`)
       } catch (e) {
         console.warn(`[CRON] gửi notif ${notif.id} lỗi:`, e.message)

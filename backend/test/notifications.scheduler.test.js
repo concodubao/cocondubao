@@ -136,13 +136,30 @@ describe('processScheduledNotifications', () => {
   it('gửi notif tới hạn rồi đánh dấu sent_at', async () => {
     sb.enqueue(
       { data: [{ id: 'n1', title: 'T', body: 'B', type: 'alert', image_url: null, crop_tags: [] }], error: null }, // due
+      { data: [{ id: 'n1' }], error: null }, // claim: update sent_at WHERE sent_at IS NULL
       { data: [{ endpoint: 'e1', keys: {}, user_id: 'u1', notif_types: ['alert'], quiet_start: null, quiet_end: null }], error: null }, // subs
-      { error: null }, // update sent_at
     )
 
     await processScheduledNotifications()
 
     expect(sendNotification).toHaveBeenCalledTimes(1)
+  })
+
+  it('notif đã bị nơi khác nhận (claim trúng 0 dòng) → KHÔNG gửi trùng', async () => {
+    sb.enqueue(
+      { data: [{ id: 'n1', title: 'T', body: 'B', type: 'alert', image_url: null, crop_tags: [] }], error: null }, // due
+      { data: [], error: null }, // claim trúng 0 dòng
+    )
+    await processScheduledNotifications()
+    expect(sendNotification).not.toHaveBeenCalled()
+  })
+
+  it('cắt gọn nội dung dài trong payload push (giới hạn ~4KB của Web Push)', async () => {
+    sb.enqueue({ data: [{ endpoint: 'e1', keys: {}, user_id: 'u1', notif_types: ['alert'], quiet_start: null, quiet_end: null }], error: null })
+    await dispatchNotification({ id: 'n1', title: 'T', body: 'ạ'.repeat(5000), type: 'alert', crop_tags: [] })
+    const payload = sendNotification.mock.calls.at(-1)[1]
+    expect(Buffer.byteLength(payload)).toBeLessThan(3000)
+    expect(JSON.parse(payload).body.endsWith('…')).toBe(true)
   })
 
   it('không có notif tới hạn → không gửi gì', async () => {

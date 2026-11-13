@@ -2,7 +2,9 @@ import express  from 'express'
 import multer   from 'multer'
 import sharp    from 'sharp'
 import { verifyJWT }       from '../middleware/auth.js'
-import { askRAG }          from '../services/rag.js'
+import { askRAG, SYSTEM_PROMPT, ANSWER_MODEL } from '../services/rag.js'
+import { incrementGeminiUsage } from '../services/quotaMonitor.js'
+import { fail500 }         from '../services/dbUtil.js'
 import { notifyEngineer }  from '../services/webpush.js'
 import { supabase }        from '../services/supabase.js'
 
@@ -233,16 +235,25 @@ async function analyzeImageWithGemini(imageBuffer, question) {
 
     // gemini-2.5-flash (đa phương thức, còn free tier). LƯU Ý: model này CHUNG bucket
     // quota với LLM trả lời RAG → bật billing Gemini mới là cách triệt để.
+    // Dùng CHUNG giọng + nguyên tắc với câu trả lời chữ (SYSTEM_PROMPT: không bịa, không
+    // chắc thì nói thật, câu lạc đề thì từ chối) và tắt thinking như RAG — trước đây ảnh
+    // đi đường riêng: prompt khác, thinking bật (ăn token trả lời), không tính vào quota.
     const base64Image = imageBuffer.toString('base64')
+    incrementGeminiUsage(ANSWER_MODEL)
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: ANSWER_MODEL,
       contents: [
         { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
-        `Bạn là chuyên gia nông nghiệp. Hãy phân tích ảnh cây trồng này và trả lời câu hỏi sau bằng tiếng Việt miền Nam, ngắn gọn dễ hiểu:\n\n${question}\n\nNếu ảnh không liên quan đến cây trồng, hãy nói rõ.`
+        `Bà con gửi kèm ảnh cây trồng. Hãy nhìn ảnh và trả lời câu hỏi sau:\n\n${question}\n\nNếu ảnh mờ, thiếu sáng hoặc không đủ để chắc bệnh, hãy nói rõ là không chắc và nhờ chụp lại cho rõ hơn. Nếu ảnh không liên quan đến cây trồng, vật nuôi, hãy nói rõ.`
       ],
-      config: { maxOutputTokens: 2048 },
+      config: {
+        systemInstruction: SYSTEM_PROMPT,
+        temperature: 0.2,
+        maxOutputTokens: 1024,
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     })
-    return result.text.trim()
+    return (result.text || '').trim() || null
   } catch (err) {
     // Vẫn trả null để fallback mềm sang RAG (nông dân vẫn nhận được câu trả lời
     // dựa trên text). Nếu RAG cũng dính quota, handler ngoài sẽ trả 429 thân thiện.
@@ -306,7 +317,9 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
       if (visionAnswer && !visionLooksUncertain(visionAnswer)) {
         result = {
           answer:       visionAnswer,
-          confidence:   0.9,
+          // Không có độ tương đồng nào để đo (ảnh không qua kho tri thức) → KHÔNG bịa số.
+          // Trước đây gán cứng 0.9: thống kê admin tính nhầm thành "RAG trả lời tốt".
+          confidence:   null,
           needEngineer: false,
           source:       'vision',
           chunksFound:  0,
@@ -391,6 +404,7 @@ router.post('/stt-fallback', verifyJWT, uploadAudio.single('audio'), async (req,
 
     // gemini-1.5-flash đã bị Google gỡ (404) → dùng 2.5-flash-lite (nhận audio,
     // không thinking, bucket quota riêng với LLM trả lời).
+    incrementGeminiUsage('gemini-2.5-flash-lite')
     const result = await ai.models.generateContent({
       model: 'gemini-2.5-flash-lite',
       contents: [
@@ -483,14 +497,16 @@ router.post('/report-error', verifyJWT, async (req, res) => {
       .limit(1)
     if (dup?.length) return res.json({ success: true, already: true })
 
-    await supabase.from('ai_error_reports').insert({
+    const { error: insErr } = await supabase.from('ai_error_reports').insert({
       message_id: messageId,
       user_id:    req.user.userId,
       error_type: errorType,
       note:       typeof note === 'string' ? (note.trim().slice(0, 500) || null) : null,
     })
+    if (insErr) throw insErr // trước đây bỏ qua lỗi → báo "đã gửi" dù không lưu được
     res.json({ success: true })
   } catch (err) {
+    console.error('[CHAT] /report-error error:', err?.message || err)
     res.status(500).json({ error: 'Không gửi được báo lỗi.' })
   }
 })
@@ -656,7 +672,7 @@ router.get('/sessions/:userId', verifyJWT, async (req, res) => {
     .order('created_at', { ascending: false })
     .limit(30)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'CHAT sessions')
 
   // preview = câu hỏi ĐẦU TIÊN của nông dân; searchText = gom MỌI nội dung (hỏi +
   // trả lời) để tìm sâu trong lịch sử, không chỉ khớp preview.
@@ -668,11 +684,14 @@ router.get('/sessions/:userId', verifyJWT, async (req, res) => {
       .from('messages')
       .select('session_id, role, content')
       .in('session_id', sessionIds)
-      .order('created_at', { ascending: true })
+      // MỚI NHẤT trước: PostgREST cắt ở 1000 dòng, xếp tăng dần thì phần bị cắt là các
+      // phiên MỚI NHẤT (mất preview + tìm kiếm đúng chỗ nông dân hay xem). Giờ cắt phần cũ.
+      .order('created_at', { ascending: false })
 
     for (const m of msgs || []) {
-      if (m.role === 'user' && !previews[m.session_id]) previews[m.session_id] = m.content
-      if (m.content) searchTexts[m.session_id] = (searchTexts[m.session_id] || '') + ' ' + m.content
+      // duyệt từ mới → cũ: ghi đè liên tục để còn lại câu hỏi ĐẦU TIÊN của phiên
+      if (m.role === 'user') previews[m.session_id] = m.content
+      if (m.content) searchTexts[m.session_id] = m.content + ' ' + (searchTexts[m.session_id] || '')
     }
   }
 
@@ -728,7 +747,7 @@ router.get('/messages/:sessionId', verifyJWT, async (req, res) => {
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true })
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'CHAT messages')
   res.json({ messages: data })
 })
 

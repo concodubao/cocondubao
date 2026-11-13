@@ -5,6 +5,7 @@ import rateLimit   from 'express-rate-limit'
 import { createClient } from '@supabase/supabase-js'
 import { supabase }     from '../services/supabase.js'
 import { verifyJWT, requireRole, setUserRole, markInactive, revokeTokens } from '../middleware/auth.js'
+import { lockMinutesLeft, recordFail, clearFail, isWeakPin, WEAK_PIN_MSG } from '../services/loginLockout.js'
 
 const router = express.Router()
 
@@ -33,6 +34,7 @@ function validateSecret(secret, role) {
   if (!secret || typeof secret !== 'string') return role === 'farmer' ? 'Vui lòng nhập mã PIN.' : 'Vui lòng nhập mật khẩu.'
   if (role === 'farmer') {
     if (!/^\d{6}$/.test(secret)) return 'Mã PIN phải gồm đúng 6 chữ số.'
+    if (isWeakPin(secret)) return WEAK_PIN_MSG
   } else if (secret.length < 8) {
     return 'Mật khẩu cần ít nhất 8 ký tự.'
   }
@@ -61,45 +63,20 @@ function serverError(res, where, err) {
   return res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại sau.' })
 }
 
-// ─── Khoá chống dò mật khẩu (in-memory; backstop cùng rate-limit theo IP) ─────
-// PIN 6 số (1 triệu tổ hợp) nên cần chặn dò: sai 5 lần/1 tài khoản → khoá 10 phút.
-// Dùng chung cho đăng nhập email (tài khoản staff/admin — đích giá trị nhất),
-// key dạng 'phone:<sđt>' / 'email:<email>'.
-const MAX_ATTEMPTS = 5
-const LOCK_MS      = 10 * 60 * 1000
-const FAIL_WINDOW  = 30 * 60 * 1000  // lần sai cũ hơn 30 phút thì quên (đếm lại từ 0)
-const MAX_TRACKED  = 10_000          // trần bộ nhớ: dò hàng loạt số không làm phình Map
-const _loginAttempts = new Map() // key → { count, lockedUntil, lastFail }
-
-function lockMinutesLeft(key) {
-  const a = _loginAttempts.get(key)
-  if (a?.lockedUntil && Date.now() < a.lockedUntil) {
-    return Math.ceil((a.lockedUntil - Date.now()) / 60000)
-  }
-  return 0
-}
-function recordFail(key) {
-  const now = Date.now()
-  let a = _loginAttempts.get(key)
-  if (!a || (now - a.lastFail > FAIL_WINDOW && now >= a.lockedUntil)) a = { count: 0, lockedUntil: 0, lastFail: 0 }
-  a.count += 1
-  a.lastFail = now
-  if (a.count >= MAX_ATTEMPTS) { a.lockedUntil = now + LOCK_MS; a.count = 0 }
-  _loginAttempts.delete(key) // set lại để key vừa sai nằm cuối thứ tự chèn
-  _loginAttempts.set(key, a)
-  if (_loginAttempts.size > MAX_TRACKED) {
-    // Bỏ entry cũ nhất không còn đang khoá
-    for (const [k, v] of _loginAttempts) {
-      if (now >= v.lockedUntil) { _loginAttempts.delete(k); break }
-    }
-  }
-}
-function clearFail(key) { _loginAttempts.delete(key) }
+// Khoá chống dò mật khẩu/PIN + chặn PIN dễ đoán: xem services/loginLockout.js
 
 const MAX_NAME = 100
 
+// OTP qua SMS (Supabase Auth + Twilio) hiện KHÔNG được giao diện dùng (nông dân đăng nhập
+// SĐT + PIN). Để mở thì ai cũng bắn được SMS tốn tiền tới số bất kỳ (SMS pumping) và tạo
+// phiên Supabase Auth. Giữ nguyên code (sẽ đổi nhà cung cấp sau), chỉ bật khi OTP_ENABLED=true.
+function requireOtpEnabled(req, res, next) {
+  if (process.env.OTP_ENABLED === 'true') return next()
+  return res.status(404).json({ error: 'Đăng nhập bằng mã OTP hiện chưa hỗ trợ. Vui lòng dùng số điện thoại và mã PIN.' })
+}
+
 // ─── POST /auth/request-otp ───────────────────────────────────────────────────
-router.post('/request-otp', otpLimiter, async (req, res) => {
+router.post('/request-otp', requireOtpEnabled, otpLimiter, async (req, res) => {
   const { phone } = req.body
   if (!phone) return res.status(400).json({ error: 'Vui lòng nhập số điện thoại.' })
 
@@ -114,7 +91,7 @@ router.post('/request-otp', otpLimiter, async (req, res) => {
     if (error.message.includes('rate') || error.status === 429) {
       return res.status(429).json({ error: 'Vui lòng chờ trước khi gửi lại OTP.' })
     }
-    return res.status(400).json({ error: 'Không gửi được OTP: ' + error.message })
+    return res.status(400).json({ error: 'Không gửi được mã OTP. Vui lòng thử lại sau.' })
   }
 
   console.log(`[AUTH] OTP gửi qua Twilio đến ${normalized}`)
@@ -129,7 +106,7 @@ router.post('/request-otp', otpLimiter, async (req, res) => {
 })
 
 // ─── POST /auth/verify-otp ────────────────────────────────────────────────────
-router.post('/verify-otp', otpLimiter, async (req, res) => {
+router.post('/verify-otp', requireOtpEnabled, otpLimiter, async (req, res) => {
   const { phone, otp } = req.body
   if (!phone || !otp) return res.status(400).json({ error: 'Thiếu số điện thoại hoặc OTP.' })
 
@@ -250,6 +227,7 @@ router.post('/register-phone', async (req, res) => {
   const normalized = normalizePhone(phone)
   if (!isValidPhone(normalized))   return res.status(400).json({ error: 'Số điện thoại không hợp lệ.' })
   if (!/^\d{6}$/.test(password))    return res.status(400).json({ error: 'Mã PIN phải gồm đúng 6 chữ số.' })
+  if (isWeakPin(password))         return res.status(400).json({ error: WEAK_PIN_MSG })
 
   try {
     const { data: existing } = await supabase.from('users').select('id, password_hash, is_active').eq('phone', normalized).single()
@@ -307,9 +285,10 @@ router.post('/login-phone', async (req, res) => {
     if (!user.is_active) return res.status(403).json({ error: 'Tài khoản đã bị khoá.' })
 
     clearFail(lockKey)
+    // Tài khoản staff (nông dân được nâng quyền) đăng nhập bằng PIN: token ngắn như login-email
     const token = jwt.sign(
       { userId: user.id, phone: user.phone, role: user.role, name: user.name },
-      process.env.JWT_SECRET, { expiresIn: '30d' }
+      process.env.JWT_SECRET, { expiresIn: user.role === 'farmer' ? '30d' : '7d' }
     )
     res.json({
       success: true, token,
@@ -382,6 +361,15 @@ router.patch('/change-password', verifyJWT, async (req, res) => {
 // cũ về (nhà mạng có thể cấp lại số cho người khác).
 router.delete('/account', verifyJWT, async (req, res) => {
   try {
+    // Admin cuối cùng tự xoá = không còn ai quản trị (PATCH /admin/users/:id chặn tự
+    // khoá/hạ quyền nhưng đường này trước đây lọt).
+    if (req.user.role === 'admin') {
+      const { count, error: cErr } = await supabase.from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', 'admin').eq('is_active', true).neq('id', req.user.userId)
+      if (cErr) throw cErr
+      if (!count) return res.status(400).json({ error: 'Bạn là quản trị viên duy nhất. Hãy tạo thêm một quản trị viên khác trước khi xoá tài khoản này.' })
+    }
     const { error } = await supabase.from('users')
       .update({ is_active: false, name: null, village: null, crops: [], phone: null, email: null, password_hash: null })
       .eq('id', req.user.userId)
@@ -396,14 +384,21 @@ router.delete('/account', verifyJWT, async (req, res) => {
     // được qua URL cũ và khỏi rác bucket. Best-effort — lỗi không chặn xóa account.
     for (const folder of [`pest-images/${req.user.userId}`, `community/${req.user.userId}`]) {
       try {
-        const { data: files } = await supabase.storage.from('images').list(folder)
-        if (files?.length) {
+        // list() mặc định chỉ 100 file → lặp tới khi hết (tối đa 2000 file/thư mục)
+        for (let round = 0; round < 20; round++) {
+          const { data: files } = await supabase.storage.from('images').list(folder, { limit: 100 })
+          if (!files?.length) break
           await supabase.storage.from('images').remove(files.map(f => `${folder}/${f.name}`))
+          if (files.length < 100) break
         }
       } catch (e) {
         console.warn('[AUTH] dọn ảnh khi xóa account lỗi:', e.message)
       }
     }
+
+    // File ảnh đã xoá → gỡ đường dẫn khỏi bài đăng/tin nhắn để không hiện ảnh vỡ
+    await supabase.from('posts').update({ image_url: null })
+      .eq('user_id', req.user.userId).not('image_url', 'is', null)
 
     res.json({ success: true })
   } catch (err) {
@@ -435,6 +430,7 @@ router.patch('/profile', verifyJWT, async (req, res) => {
     if (typeof name === 'string' && name.trim()) updates.name = name.trim().slice(0, MAX_NAME)
     if (village !== undefined) updates.village = String(village ?? '').trim().slice(0, MAX_NAME)
     if (Array.isArray(crops)) updates.crops   = crops.filter(c => VALID_CROPS.includes(c))
+    if (!Object.keys(updates).length) return res.status(400).json({ error: 'Không có thông tin nào để cập nhật.' })
 
     const { data: user, error } = await supabase
       .from('users').update(updates).eq('id', req.user.userId)

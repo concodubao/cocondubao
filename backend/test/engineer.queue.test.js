@@ -285,7 +285,7 @@ describe('PATCH /engineer/queue/:id/answer — sửa câu đã trả lời = ghi
         },
         error: null,
       },
-      { data: [{ id: 'pm1' }], error: null }, // tìm message engineer cũ theo nội dung
+      { data: [{ id: 'other', content: 'Câu khác' }, { id: 'pm1', content: 'Câu trả lời cũ' }], error: null }, // message engineer của phiên → so nội dung ở JS
       { data: null, error: null },            // update message (ghi đè)
       { data: null, error: null },            // update engineer_queue
     )

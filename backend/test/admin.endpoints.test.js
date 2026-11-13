@@ -177,12 +177,19 @@ describe('PATCH /admin/users/:id/reset-pin — chỉ cho nông dân', () => {
 
   it('200 + trả PIN 6 số cho nông dân', async () => {
     sb.enqueue(
-      { data: { role: 'farmer' }, error: null },                              // target lookup
+      { data: { role: 'farmer', is_active: true, phone: '+84900000000' }, error: null }, // target lookup
       { data: { id: 'f1', phone: '+84900000000', name: 'Chú Ba', role: 'farmer' }, error: null }, // update result
     )
     const res = await request(app).patch('/api/v1/admin/users/f1/reset-pin').set(admin())
     expect(res.status).toBe(200)
     expect(res.body.pin).toMatch(/^\d{6}$/)
+  })
+
+  it('400 khi tài khoản đang bị khoá — đặt lại PIN không được tự mở khoá', async () => {
+    sb.enqueue({ data: { role: 'farmer', is_active: false, phone: '+84900000000' }, error: null })
+    const res = await request(app).patch('/api/v1/admin/users/f1/reset-pin').set(admin())
+    expect(res.status).toBe(400)
+    expect(res.body.pin).toBeUndefined()
   })
 })
 

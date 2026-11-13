@@ -79,7 +79,10 @@ const EMBED_MODEL  = 'gemini-embedding-001'
 const EMBED_DIMS   = 1536
 const REQ_DELAY    = 700  // ms giữa mỗi request
 
-export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
+// opts.deadline (ms epoch): trần thời gian cho đường CHAT. Không có trần thì 1 câu hỏi dính
+// 429 ở bước embed có thể chờ "retry in 40s" × 5 lần — client (timeout 45s) đã bỏ đi từ lâu
+// mà request vẫn chạy ngầm. Duyệt tài liệu (nền) không truyền deadline → vẫn kiên nhẫn retry.
+export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT', opts = {}) {
   const key = process.env.GOOGLE_API_KEY
   if (!key) throw new Error('GOOGLE_API_KEY chưa được set')
 
@@ -87,7 +90,7 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
 
   async function embedOne(text, attempt = 0) {
     try {
-      incrementGeminiUsage()
+      incrementGeminiUsage(EMBED_MODEL)
       const result = await ai.models.embedContent({
         model: EMBED_MODEL,
         contents: text,
@@ -99,13 +102,20 @@ export async function embedTexts(texts, taskType = 'RETRIEVAL_DOCUMENT') {
       if (!result.embeddings?.[0]?.values?.length) throw new Error('Embedding trả về rỗng')
       return result.embeddings[0].values
     } catch (e) {
-      const is429 = e.message?.includes('429') || e.message?.includes('RESOURCE_EXHAUSTED')
-      if (is429 && attempt < 5) {
-        const retryMatch = e.message?.match(/retry in (\d+\.?\d*)s/)
+      const m = e.message || ''
+      // 429 (quota) lẫn 503 (quá tải tạm thời) đều đáng thử lại — giống invokeLLM
+      const retryable = m.includes('429') || m.includes('RESOURCE_EXHAUSTED')
+        || m.includes('503') || m.includes('UNAVAILABLE') || m.toLowerCase().includes('overloaded')
+      if (retryable && attempt < 5) {
+        const retryMatch = m.match(/retry in (\d+\.?\d*)s/)
         const wait = retryMatch
           ? Math.ceil(parseFloat(retryMatch[1])) * 1000 + 1000
           : 1000 * Math.min(30, 2 ** attempt)
-        console.warn(`[RAG] 429 — chờ ${wait / 1000}s (attempt ${attempt + 1})`)
+        if (opts.deadline && Date.now() + wait > opts.deadline) {
+          console.warn(`[RAG] embed 429/503 — cần chờ ${wait / 1000}s, vượt ngân sách retry → bỏ`)
+          throw e
+        }
+        console.warn(`[RAG] embed 429/503 — chờ ${wait / 1000}s (attempt ${attempt + 1})`)
         await new Promise(r => setTimeout(r, wait))
         return embedOne(text, attempt + 1)
       }
@@ -132,7 +142,7 @@ function getAIClient() {
   return _aiClient
 }
 
-const SYSTEM_PROMPT = `Bạn là Cò Con, trợ lý nông nghiệp AI của nông dân xã Trường Khánh, Sóc Trăng.
+export const SYSTEM_PROMPT = `Bạn là Cò Con, trợ lý nông nghiệp AI của nông dân xã Trường Khánh, Sóc Trăng.
 
 Nguyên tắc trả lời:
 - Dùng tiếng Việt miền Nam, gần gũi như người thân nói chuyện
@@ -219,7 +229,19 @@ async function dbGetCache(key) {
   }
 }
 
+// Dòng hết hạn không ai xoá (chỉ bị xoá khi kho tri thức đổi) → bảng phình dần theo số
+// câu hỏi khác nhau. Dọn tối đa 1 lần/giờ, fire-and-forget.
+let _lastCachePurge = 0
+function purgeExpiredCache() {
+  if (Date.now() - _lastCachePurge < CACHE_TTL) return
+  _lastCachePurge = Date.now()
+  try {
+    supabase.from(CACHE_TABLE).delete().lt('expires_at', new Date().toISOString()).then(() => {}, () => {})
+  } catch { /* cache chỉ là tối ưu */ }
+}
+
 function dbSetCache(key, cropType, question, result) {
+  purgeExpiredCache()
   // fire-and-forget — không await, không chặn câu trả lời. try/catch bọc cả phần
   // đồng bộ (vd môi trường test from() trả undefined → .upsert ném lỗi ngay).
   try {
@@ -270,22 +292,29 @@ export function getSemanticCache(embedding, cropType) {
 // 40s" → chờ hết thì client đã bỏ đi, request vẫn chạy ngầm tốn quota. Vượt ngân
 // sách thì ném lỗi luôn để route trả 429 thân thiện ("chờ 1 phút rồi hỏi lại").
 const LLM_RETRY_BUDGET_MS = 30_000
+export const ANSWER_MODEL = 'gemini-2.5-flash'
+// "Tối đa 200 từ" tiếng Việt có dấu ≈ 400–600 token → 512 cũ hay cắt cụt câu trả lời dài.
+export const ANSWER_MAX_TOKENS = 768
 
 async function invokeLLM(contents, attempt = 0, deadline = Date.now() + LLM_RETRY_BUDGET_MS) {
   try {
     const ai = getAIClient()
-    incrementGeminiUsage()
+    incrementGeminiUsage(ANSWER_MODEL)
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: ANSWER_MODEL,
       contents,
       config: {
         systemInstruction: SYSTEM_PROMPT,
         temperature: 0.2,
-        maxOutputTokens: 512,
+        maxOutputTokens: ANSWER_MAX_TOKENS,
         thinkingConfig: { thinkingBudget: 0 }
       }
     })
-    return { content: result.text }
+    // Hết token giữa chừng → câu trả lời bị cắt cụt (vd mất bước cuối/liều lượng).
+    // Vẫn trả cho nông dân (còn hơn không) nhưng KHÔNG được cache bản cụt đó.
+    const truncated = result.candidates?.[0]?.finishReason === 'MAX_TOKENS'
+    if (truncated) console.warn('[RAG] câu trả lời chạm maxOutputTokens → không cache')
+    return { content: result.text, truncated }
   } catch (err) {
     const msg = err.message || ''
     // Retry khi 429 (quota) HOẶC 503 (high demand/overloaded — quá tải tạm thời phía Google)
@@ -444,7 +473,7 @@ export function checkFAQ(question) {
 //   đã có chunk khớp (câu nông nghiệp thật luôn có từ khoá nông nghiệp → AGRI chặn).
 // Tách token theo ranh giới KHÔNG-phải-chữ-cái/số (unicode \p{L}\p{N}) — \b của
 // regex không dùng được vì chữ có dấu tiếng Việt (đ, ĩ, ố...) không phải word-char ASCII.
-const OFFTOPIC_PHRASES = ['bóng đá', 'đá banh', 'đá bóng', 'world cup', 'ngoại hạng', 'champions league', 'cầu thủ', 'đội tuyển', 'tỉ số', 'tỷ số', 'bóng rổ', 'cầu lông', 'ca sĩ', 'diễn viên', 'nghệ sĩ', 'bộ phim', 'phim ảnh', 'bài hát', 'ca nhạc', 'hoa hậu', 'lô đề', 'số đề', 'xổ số', 'cá độ', 'cá cược', 'đánh bài', 'chứng khoán', 'tiền ảo', 'tiền điện tử', 'bầu cử', 'tổng thống', 'biểu tình', 'người yêu', 'bạn gái', 'bạn trai', 'tỏ tình', 'chia tay', 'điện thoại', 'máy tính', 'chơi game', 'liên quân', 'liên minh', 'thần tượng']
+const OFFTOPIC_PHRASES = ['bóng đá', 'đá banh', 'đá bóng', 'world cup', 'ngoại hạng', 'champions league', 'cầu thủ', 'đội tuyển', 'tỉ số', 'tỷ số', 'bóng rổ', 'cầu lông', 'ca sĩ', 'diễn viên', 'nghệ sĩ', 'bộ phim', 'phim ảnh', 'bài hát', 'ca nhạc', 'hoa hậu', 'lô đề', 'số đề', 'xổ số', 'cá độ', 'cá cược', 'đánh bài', 'chứng khoán', 'tiền ảo', 'tiền điện tử', 'bầu cử', 'tổng thống', 'biểu tình', 'người yêu', 'bạn gái', 'bạn trai', 'tỏ tình', 'chia tay', 'điện thoại', 'máy tính', 'chơi game', 'liên quân', 'liên minh', 'thần tượng', 'mùa giải', 'tiểu đường', 'huyết áp', 'đất nền']
 const OFFTOPIC_WORDS = new Set(['idol', 'game', 'gameshow', 'casino', 'bitcoin', 'iphone', 'laptop', 'facebook', 'tiktok', 'crush', 'mv', 'c1'])
 const AGRI_PHRASES = ['hoa màu', 'đạo ôn', 'lem lép', 'vàng lá', 'thán thư', 'trừ sâu', 'diệt cỏ', 'canh tác', 'chăn nuôi', 'thanh long', 'sầu riêng', 'chôm chôm', 'thu hoạch']
 // Lưu ý: cố tình BỎ các token quá mơ hồ trùng từ đời thường (vd 'quả' trong "kết quả")
@@ -455,11 +484,21 @@ function mentionsAgri(t, tokens) {
   return AGRI_PHRASES.some(p => t.includes(p)) || [...AGRI_WORDS].some(w => tokens.has(w))
 }
 
+// Tách câu thành { hasOff, rest, tokens }: `rest` là câu đã BỎ các cụm lạc đề. Phải xét từ
+// khoá nông nghiệp trên phần còn lại, nếu không "cá độ"/"cá cược" (chứa "cá"), "mùa giải"
+// (chứa "mùa"), "đất nền" (chứa "đất")… luôn bị coi là câu nông nghiệp.
+function splitOffTopic(question) {
+  const t = (question || '').toLowerCase().normalize('NFC')
+  let rest = t
+  for (const p of OFFTOPIC_PHRASES) if (rest.includes(p)) rest = rest.split(p).join(' ')
+  const tokens = new Set(rest.split(/[^\p{L}\p{N}]+/u).filter(Boolean))
+  const hasOff = rest !== t || [...OFFTOPIC_WORDS].some(w => tokens.has(w))
+  return { hasOff, rest, tokens }
+}
+
 export function looksOffTopic(question) {
-  const t = (question || '').toLowerCase()
-  const tokens = new Set(t.split(/[^\p{L}\p{N}]+/u).filter(Boolean))
-  const hasOff  = OFFTOPIC_PHRASES.some(p => t.includes(p)) || [...OFFTOPIC_WORDS].some(w => tokens.has(w))
-  return hasOff && !mentionsAgri(t, tokens)
+  const { hasOff, rest, tokens } = splitOffTopic(question)
+  return hasOff && !mentionsAgri(rest, tokens)
 }
 
 // LLM đôi khi vẫn dùng mẫu từ chối "lạc đề" cho câu nông nghiệp thật mà tài liệu không
@@ -468,8 +507,11 @@ export function looksOffTopic(question) {
 const LLM_REFUSAL_RE = /chỉ là trợ lý nông nghiệp nên không rành/i
 export function isWrongRefusal(answer, question) {
   if (!LLM_REFUSAL_RE.test(answer || '')) return false
-  const t = (question || '').toLowerCase()
-  return mentionsAgri(t, new Set(t.split(/[^\p{L}\p{N}]+/u).filter(Boolean)))
+  // Bỏ cụm lạc đề trước khi tìm từ khoá nông nghiệp: LLM từ chối ĐÚNG câu "cá độ bóng đá",
+  // "bệnh tiểu đường uống thuốc gì" thì không được đẩy sang kỹ sư.
+  const { hasOff, rest, tokens } = splitOffTopic(question)
+  if (hasOff && !mentionsAgri(rest.replace(/bệnh|thuốc/g, ' '), new Set([...tokens].filter(w => w !== 'bệnh' && w !== 'thuốc')))) return false
+  return mentionsAgri(rest, tokens)
 }
 
 // Câu từ chối lịch sự (giống văn phong SYSTEM_PROMPT). Dùng source 'faq' để frontend
@@ -483,7 +525,9 @@ const OFFTOPIC_DECLINE =
 // mất chủ đề câu trước → pgvector kéo chunk sai → trả lời lạc đề. Heuristic: câu
 // bắt đầu bằng từ nối / kết thúc "thì sao" / quá ngắn → ghép câu hỏi NÔNG DÂN có
 // nội dung gần nhất vào trước khi embed. Chỉ ảnh hưởng retrieval, KHÔNG tốn quota.
-const FOLLOWUP_RE = /^(còn|vậy|thế|thì|ngoài ra|thêm|cách khác|còn cách|vậy còn|thế còn|còn gì|còn nữa)\b/i
+// Ranh giới từ bằng \p{L}\p{N} (cờ u): \b của JS không hiểu chữ có dấu nên "thế …", "thì …"
+// trước đây KHÔNG BAO GIỜ khớp. "thế nào …" là câu hỏi độc lập ("thế nào là đạo ôn") → loại.
+const FOLLOWUP_RE = /^(còn|vậy|thế(?!\s+nào)|thì|ngoài ra|thêm|cách khác|còn cách|vậy còn|thế còn|còn gì|còn nữa)(?![\p{L}\p{N}])/iu
 
 function lastTopicQuestion(history) {
   for (let i = history.length - 1; i >= 0; i--) {
@@ -500,7 +544,7 @@ export function contextualizeQuery(question, history = []) {
   const q = (question || '').trim()
   const looksFollowUp =
     FOLLOWUP_RE.test(q) ||
-    /\bthì (sao|làm sao|làm gì|thế nào)\b/i.test(q) ||
+    /(?<![\p{L}\p{N}])thì (sao|làm sao|làm gì|thế nào)(?![\p{L}\p{N}])/iu.test(q) ||
     q.split(/\s+/).length <= 2
   if (!looksFollowUp) return question
   const topic = lastTopicQuestion(history)
@@ -620,7 +664,9 @@ export async function askRAG(question, cropType = null, history = []) {
     }
 
     // BƯỚC 1: Embed câu hỏi (đã ghép ngữ cảnh nếu là câu nối) thành vector 1536 chiều
-    const [queryEmbedding] = await embedTexts([retrievalQuery], 'RETRIEVAL_QUERY')
+    // Một ngân sách retry chung cho cả embed lẫn LLM của request này
+    const deadline = startTime + LLM_RETRY_BUDGET_MS
+    const [queryEmbedding] = await embedTexts([retrievalQuery], 'RETRIEVAL_QUERY', { deadline })
 
     // BƯỚC 1.5: Semantic cache — câu hỏi cùng ý dù diễn đạt khác → trả thẳng cache,
     // bỏ qua pgvector + LLM (tiết kiệm quota Gemini).
@@ -683,7 +729,7 @@ export async function askRAG(question, cropType = null, history = []) {
       // Có chunk nhưng không đủ tin → thử LLM với context hạn chế, kèm cảnh báo
       const context  = chunks.slice(0, 2).map((c, i) => `[Tài liệu ${i+1}]\n${c.chunk_text}`).join('\n\n')
       const contents = buildMessages(context, question, history, true)
-      const response = await invokeLLM(contents)
+      const response = await invokeLLM(contents, 0, deadline)
       if (!response.content?.trim()) return emptyAnswerFallback()
       if (isWrongRefusal(response.content, question)) return wrongRefusalFallback(question)
       // Không cache low-confidence answers
@@ -703,7 +749,7 @@ export async function askRAG(question, cropType = null, history = []) {
 
     // BƯỚC 5: Gọi Gemini sinh câu trả lời (với retry tự động nếu 429)
     const contents = buildMessages(context, question, history, false)
-    const response = await invokeLLM(contents)
+    const response = await invokeLLM(contents, 0, deadline)
     if (!response.content?.trim()) return emptyAnswerFallback()
     if (isWrongRefusal(response.content, question)) return wrongRefusalFallback(question)
 
@@ -720,7 +766,7 @@ export async function askRAG(question, cropType = null, history = []) {
     // cây + câu hỏi) mà buildMessages đưa 10 tin gần nhất của phiên vào prompt → câu
     // trả lời mang dấu vết hội thoại riêng (có thể cả thông tin cá nhân hoặc nội dung
     // bị "mớm") sẽ bị phát cho người khác. Đọc cache vẫn được (bản ghi luôn sạch lịch sử).
-    if (!isFollowUp && !history.length) {
+    if (!isFollowUp && !history.length && !response.truncated) {
       setAnswerCache(question, cropType, result, queryEmbedding)
       dbSetCache(cacheKey, cropType, question, result)
     }

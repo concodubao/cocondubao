@@ -5,6 +5,7 @@ import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { embedAndStoreDoc, invalidateAnswerCaches, buildQaContent } from '../services/rag.js'
 import { notifyFarmer }           from '../services/webpush.js'
 import { supabase }               from '../services/supabase.js'
+import { fail500 }                from '../services/dbUtil.js'
 
 const router = express.Router()
 
@@ -41,6 +42,8 @@ const MAX_DOCX_INFLATED = 30 * 1024 * 1024 // tổng dung lượng bung tối đ
 // trong heap → giới hạn riêng, chặt hơn. 400k ký tự chữ (MAX_DOC_CHARS) hiếm khi cần >8MB XML.
 const MAX_DOCX_XML_PART = 8 * 1024 * 1024
 export const MAX_DOC_CHARS = 400_000        // ~400 chunk embed — đủ cho tài liệu kỹ thuật dài
+// 1 cặp Hỏi–Đáp soạn tay: body JSON cho tới 1MB, không chặn thì vượt cả MAX_DOC_CHARS.
+export const MAX_QA_CHARS  = 20_000
 
 const DOCX_TOO_LARGE = 'File DOCX quá lớn khi giải nén.'
 const DOCX_BROKEN    = 'File DOCX hỏng hoặc không đúng định dạng.'
@@ -122,7 +125,7 @@ router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
   if (!key) return res.json({ error: 'GOOGLE_API_KEY chưa được set' })
 
   try {
-    const listRes  = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=100`)
+    const listRes  = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=100', { headers: { 'x-goog-api-key': key } })
     const listData = await listRes.json()
 
     const embeddingModels = (listData.models || [])
@@ -133,10 +136,10 @@ router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
     if (embeddingModels.length > 0) {
       const shortName = embeddingModels[0].name.replace('models/', '')
       const embedRes  = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${shortName}:embedContent?key=${key}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${shortName}:embedContent`,
         {
           method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
           body:    JSON.stringify({ content: { parts: [{ text: 'test' }] } }),
         }
       )
@@ -157,7 +160,7 @@ router.get('/test-embed', verifyJWT, requireRole('admin'), async (req, res) => {
       listError:       listData.error?.message ?? null,
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'ENGINEER')
   }
 })
 
@@ -197,7 +200,7 @@ router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, re
     .order('created_at', { ascending: true })
     .range(Number(offset), Number(offset) + Number(limit) - 1)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ENGINEER')
 
   const queue = (data || []).map(item => ({
     ...item,
@@ -244,7 +247,7 @@ router.patch('/queue/:id/take', verifyJWT, requireRole('engineer', 'admin'), asy
     .eq('status', 'pending')
     .select()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ENGINEER')
 
   if (!data?.length) {
     // 0 hàng bị update = không tồn tại hoặc đã bị nhận
@@ -299,16 +302,20 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
     // câu cũ để đúng message kể cả khi 1 phiên có nhiều lần escalate.
     let overwritten = false
     if (isEditing && queueItem.answer) {
-      const { data: prev } = await supabase
+      // So nội dung ở JS: trước đây .eq('content', <câu cũ>) nhét cả câu trả lời (có thể
+      // vài nghìn ký tự tiếng Việt) vào URL → quá giới hạn URL là truy vấn lỗi, code tưởng
+      // "không có câu cũ" rồi chèn thêm câu thứ hai.
+      const { data: engMsgs } = await supabase
         .from('messages')
-        .select('id')
+        .select('id, content')
         .eq('session_id', sessionId)
         .eq('role', 'engineer')
-        .eq('content', queueItem.answer)
         .order('created_at', { ascending: false })
-        .limit(1)
-      if (prev?.length) {
-        await supabase.from('messages').update({ content: newAnswer }).eq('id', prev[0].id)
+        .limit(50)
+      const prev = (engMsgs || []).find(m => m.content === queueItem.answer)
+      if (prev) {
+        const { error: upErr } = await supabase.from('messages').update({ content: newAnswer }).eq('id', prev.id)
+        if (upErr) throw upErr
         overwritten = true
       }
     }
@@ -337,6 +344,30 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
       ...(queueItem.assigned_to ? {} : { assigned_to: req.user.userId }),
     }).eq('id', id)
     if (qErr) throw qErr
+
+    // Sửa câu trả lời đã từng "thêm vào tri thức": tài liệu QA cũ (câu trả lời SAI vừa bị
+    // sửa) trước đây vẫn nằm đó ở trạng thái approved và tiếp tục được trả thẳng cho nông
+    // dân (qa_direct). Lưu trữ nó + xoá cache; tick lại "Tin cậy" sẽ tạo QA mới bên dưới.
+    if (isEditing && question && queueItem.answer && queueItem.answer !== newAnswer) {
+      try {
+        const oldContent = buildQaContent(question, queueItem.answer)
+        const { data: oldDocs } = await supabase
+          .from('knowledge_docs')
+          .select('id, content')
+          .eq('source', 'engineer_answer')
+          .eq('title', `QA: ${question.slice(0, 60)}`)
+          .in('status', ['approved', 'embedding', 'draft'])
+        const staleIds = (oldDocs || []).filter(d => d.content === oldContent).map(d => d.id)
+        if (staleIds.length) {
+          await supabase.from('knowledge_docs')
+            .update({ status: 'archived', updated_at: new Date().toISOString() })
+            .in('id', staleIds)
+          invalidateAnswerCaches()
+        }
+      } catch (e) {
+        console.warn('[ENGINEER] lưu trữ QA cũ lỗi:', e.message)
+      }
+    }
 
     // Nếu đánh dấu "Tin cậy" → tự thêm vào kho tri thức và embed luôn
     if (addToKnowledge && question) {
@@ -400,7 +431,7 @@ router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (
   }
 
   const { error } = await supabase.from('engineer_queue').delete().eq('id', id)
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ENGINEER')
 
   // Báo nông dân: câu hỏi đã chuyển kỹ sư trước đó nhưng không được trả lời. Nếu
   // im lặng, nông dân vẫn thấy "kỹ sư sẽ trả lời trong 24h" và chờ mãi không có gì.
@@ -467,7 +498,7 @@ router.get('/history', verifyJWT, requireRole('engineer', 'admin'), async (req, 
   query = query.range(Number(offset), Number(offset) + Number(limit) - 1)
 
   const { data, error, count } = await query
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ENGINEER')
 
   res.json({ history: data || [], total: count ?? (data?.length || 0) })
 })
@@ -558,7 +589,7 @@ router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
 
     if (error) {
       console.error('[KNOWLEDGE] supabase insert error:', error)
-      return res.status(500).json({ error: 'Lỗi lưu DB: ' + error.message })
+      return res.status(500).json({ error: 'Không lưu được tài liệu. Thử lại nhé.' })
     }
 
     res.json({
@@ -568,7 +599,7 @@ router.post('/upload', verifyJWT, requireRole('engineer', 'admin'),
         title:           doc.title,
         status:          doc.status,
         charCount:       content.length,
-        estimatedChunks: Math.ceil(content.length / 500),
+        estimatedChunks: Math.ceil(content.length / 1000), // chunkSize = 1000 (rag.js)
       },
     })
   }
@@ -582,6 +613,9 @@ router.post('/qa', verifyJWT, requireRole('engineer', 'admin'), async (req, res)
   const { question, answer, cropTags } = req.body
   if (!question?.trim() || !answer?.trim()) {
     return res.status(400).json({ error: 'Cần nhập cả câu hỏi và câu trả lời.' })
+  }
+  if (question.length + answer.length > MAX_QA_CHARS) {
+    return res.status(413).json({ error: `Cặp Hỏi–Đáp quá dài (tối đa ${MAX_QA_CHARS / 1000}k ký tự). Tài liệu dài hãy tải lên dạng file.` })
   }
   const tags = Array.isArray(cropTags) ? cropTags.filter(c => VALID_CROPS.includes(c)) : []
 
@@ -629,7 +663,7 @@ router.get('/docs', verifyJWT, requireRole('engineer', 'admin'), async (req, res
   if (VALID_CROPS.includes(crop)) query = query.contains('crop_tags', [crop])
 
   const { data, error } = await query
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ENGINEER')
 
   const docs = (data || []).map(d => ({
     ...d,
@@ -695,7 +729,7 @@ router.patch('/:id/approve', verifyJWT, requireRole('engineer', 'admin'), async 
 
   } catch (err) {
     console.error('[KNOWLEDGE] approve error:', err)
-    res.status(500).json({ error: 'Không thể embed tài liệu: ' + err.message })
+    res.status(500).json({ error: 'Không thể embed tài liệu. Thử lại nhé.' })
   }
 })
 
@@ -706,7 +740,7 @@ router.patch('/:id/archive', verifyJWT, requireRole('engineer', 'admin'), async 
     .update({ status: 'archived', updated_at: new Date().toISOString() })
     .eq('id', req.params.id)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ENGINEER')
   // Tài liệu bị gỡ (thường vì sai) → câu trả lời đã cache từ nó cũng phải bỏ
   invalidateAnswerCaches()
   res.json({ success: true })
@@ -732,7 +766,7 @@ router.delete('/:id', verifyJWT, requireRole('engineer', 'admin'), async (req, r
   await supabase.from('knowledge_chunks').delete().eq('doc_id', id)
 
   const { error } = await supabase.from('knowledge_docs').delete().eq('id', id)
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ENGINEER')
 
   res.json({ success: true })
 })

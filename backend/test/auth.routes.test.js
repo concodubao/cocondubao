@@ -42,7 +42,7 @@ beforeEach(() => { sb.reset() })
 describe('POST /auth/register-phone — không cho chiếm tài khoản có sẵn', () => {
   it('409 khi số đã có tài khoản chưa đặt PIN (không ghi đè, không cấp token)', async () => {
     sb.enqueue({ data: { id: 'u-victim', password_hash: null, is_active: true }, error: null })
-    const res = await request(app).post('/auth/register-phone').send({ phone: '0912345678', password: '111111' })
+    const res = await request(app).post('/auth/register-phone').send({ phone: '0912345678', password: '482917' })
     expect(res.status).toBe(409)
     expect(res.body.token).toBeUndefined()
     expect(sb.calls.some(([t, m]) => t === 'users' && m === 'update')).toBe(false)
@@ -50,7 +50,7 @@ describe('POST /auth/register-phone — không cho chiếm tài khoản có sẵ
 
   it('400 khi số đã có PIN', async () => {
     sb.enqueue({ data: { id: 'u1', password_hash: 'h', is_active: true }, error: null })
-    const res = await request(app).post('/auth/register-phone').send({ phone: '0912345678', password: '111111' })
+    const res = await request(app).post('/auth/register-phone').send({ phone: '0912345678', password: '482917' })
     expect(res.status).toBe(400)
   })
 
@@ -59,7 +59,7 @@ describe('POST /auth/register-phone — không cho chiếm tài khoản có sẵ
       { data: null, error: null },
       { data: { id: 'u-new', phone: '+84912345678', role: 'farmer', name: null }, error: null },
     )
-    const res = await request(app).post('/auth/register-phone').send({ phone: '0912345678', password: '111111' })
+    const res = await request(app).post('/auth/register-phone').send({ phone: '0912345678', password: '482917' })
     expect(res.status).toBe(200)
     expect(jwt.verify(res.body.token, SECRET).userId).toBe('u-new')
   })
@@ -67,7 +67,7 @@ describe('POST /auth/register-phone — không cho chiếm tài khoản có sẵ
 
 describe('phone không phải chuỗi → 400 thay vì unhandled rejection', () => {
   it.each(['/auth/login-phone', '/auth/register-phone'])('%s với phone = số', async (path) => {
-    const res = await request(app).post(path).send({ phone: 912345678, password: '111111' })
+    const res = await request(app).post(path).send({ phone: 912345678, password: '482917' })
     expect(res.status).toBe(400)
   })
 })
@@ -98,5 +98,35 @@ describe('asyncErrors — reject của handler async tới error handler JSON', 
     const r = await request(a).get('/falsy')
     expect(r.status).toBe(500)
     expect(r.body.leaked).toBeUndefined()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+describe('N10 (2026-11-13) — PIN dễ đoán, OTP tắt mặc định', () => {
+  it('isWeakPin bắt các PIN phổ biến, không bắt PIN bình thường', async () => {
+    const { isWeakPin } = await import('../src/services/loginLockout.js')
+    for (const p of ['000000', '111111', '123456', '654321', '012345', '121212', '123123', '112233']) expect(isWeakPin(p), p).toBe(true)
+    for (const p of ['482917', '260295', '135790', '908172']) expect(isWeakPin(p), p).toBe(false)
+  })
+
+  it('register-phone từ chối PIN dễ đoán (400) trước khi đụng DB', async () => {
+    const res = await request(app).post('/auth/register-phone').send({ phone: '0912345678', password: '123456' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/dễ đoán/)
+    expect(sb.calls.length).toBe(0)
+  })
+
+  it('request-otp / verify-otp trả 404 khi chưa bật OTP_ENABLED', async () => {
+    delete process.env.OTP_ENABLED
+    expect((await request(app).post('/auth/request-otp').send({ phone: '0912345678' })).status).toBe(404)
+    expect((await request(app).post('/auth/verify-otp').send({ phone: '0912345678', otp: '123456' })).status).toBe(404)
+  })
+
+  it('đặt lại PIN xoá khoá dò PIN của số đó', async () => {
+    const { recordFail, lockMinutesLeft, clearFail } = await import('../src/services/loginLockout.js')
+    for (let i = 0; i < 5; i++) recordFail('phone:+84911111111')
+    expect(lockMinutesLeft('phone:+84911111111')).toBeGreaterThan(0)
+    clearFail('phone:+84911111111')
+    expect(lockMinutesLeft('phone:+84911111111')).toBe(0)
   })
 })

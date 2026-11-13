@@ -128,10 +128,15 @@ describe('verifyJWT — vai trò staff đã đổi', () => {
   // DB: eng1 vẫn là engineer; admin1 đã bị hạ xuống farmer (không còn trong danh sách staff)
   beforeAll(async () => {
     const result = (q) => ({ data: q === 'staff' ? [{ id: 'eng1', role: 'engineer' }] : [], error: null })
+    // builder thenable: poller giờ gọi thêm .order().range() (phân trang)
+    const builder = (kind) => {
+      const b = { order: () => b, range: () => b, then: (ok, fail) => Promise.resolve(result(kind)).then(ok, fail) }
+      return b
+    }
     sb.from = () => ({
       select: () => ({
-        eq: () => Promise.resolve(result('inactive')),
-        in: () => Promise.resolve(result('staff')),
+        eq: () => builder('inactive'),
+        in: () => builder('staff'),
       }),
     })
     await refreshInactiveUsers()

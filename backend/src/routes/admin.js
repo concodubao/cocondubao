@@ -11,9 +11,12 @@ import bcrypt  from 'bcrypt'
 import { randomInt } from 'node:crypto'
 import { verifyJWT, requireRole, markInactive, markActive, setUserRole, revokeTokens } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
+import { clearFail } from '../services/loginLockout.js'
+import { fetchAllRows, fail500 } from '../services/dbUtil.js'
 import { embedAndStoreDoc, buildQaContent } from '../services/rag.js'
 
 const router = express.Router()
+const MAX_QA_CHARS = 20_000 // 1 cặp Hỏi–Đáp soạn tay (khớp routes/engineer.js)
 
 // limit/offset từ query: chặn NaN (PostgREST lỗi) và limit khổng lồ (kéo cả bảng).
 function pageParams(q, defLimit = 50, maxLimit = 200) {
@@ -109,22 +112,29 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
         .in('status', ['pending', 'in_progress']).lt('created_at', since24h),
     ])
 
-    const { data: confData } = await supabase
+    // Tỉ lệ AI tự trả lời được (7 ngày) = câu trả lời CÓ CĂN CỨ từ kho tri thức (similarity
+    // ≥ 0.7) / MỌI câu hỏi kỹ thuật. Trước đây: mẫu số bỏ hẳn câu phải chuyển kỹ sư (lưu
+    // role='system') còn tử số tính cả câu chào FAQ (1.0), câu từ chối lạc đề (1.0) và trả
+    // lời ảnh (gán cứng 0.9) → con số luôn đẹp bất kể kho tri thức thiếu hay đủ.
+    const since7d = new Date(Date.now() - 7 * 86400000).toISOString()
+    const { data: confData } = await fetchAllRows(() => supabase
       .from('messages')
-      .select('confidence')
-      .eq('role', 'assistant')
+      .select('role, confidence, source')
+      .in('role', ['assistant', 'system'])
       .not('confidence', 'is', null)
-      .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
+      .gte('created_at', since7d)
+      .order('created_at', { ascending: true }))
 
-    const ragAnswered = (confData || []).filter(m => m.confidence >= 0.7).length
-    const ragTotal    = (confData || []).length
+    const technical   = (confData || []).filter(m => !(m.source || '').startsWith('faq'))
+    const ragAnswered = technical.filter(m => m.role === 'assistant' && m.confidence >= 0.7).length
+    const ragTotal    = technical.length
     const ragRate     = ragTotal > 0 ? Math.round(ragAnswered / ragTotal * 100) : 0
 
-    const { data: sessionsByDay } = await supabase
+    const { data: sessionsByDay } = await fetchAllRows(() => supabase
       .from('chat_sessions')
       .select('created_at')
-      .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
-      .order('created_at', { ascending: true })
+      .gte('created_at', since7d)
+      .order('created_at', { ascending: true }))
 
     const dayMap = {}
     for (let i = 6; i >= 0; i--) {
@@ -152,10 +162,11 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
     }
 
     // Top cây trồng được hỏi nhiều nhất (30 ngày)
-    const { data: cropRows } = await supabase
+    const { data: cropRows } = await fetchAllRows(() => supabase
       .from('chat_sessions')
       .select('crop_type')
       .gte('created_at', since30d)
+      .order('created_at', { ascending: true }))
 
     const CROP_LABEL = { rice: 'Lúa', veggie: 'Rau màu', fruit: 'Cây ăn trái', other: 'Khác' }
     const cropCount = {}
@@ -182,21 +193,24 @@ router.get('/stats', verifyJWT, requireRole('admin'), async (req, res) => {
       sessionsByDay: Object.entries(dayMap).map(([date, count]) => ({ date, count })),
     })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'ADMIN stats')
   }
 })
 
-// ── GET /admin/knowledge-gaps — câu hỏi AI tự trả lời nhưng confidence thấp ────
-// (Không qua kỹ sư, không bị báo lỗi → "lỗ hổng âm thầm" admin nên bổ sung tài liệu)
+// ── GET /admin/knowledge-gaps — câu hỏi kho tri thức CHƯA phủ ─────────────────
+// Gồm: câu AI phải chuyển kỹ sư (không có tài liệu khớp — lưu role='system', confidence
+// < 0.5) và câu AI trả lời dè dặt (0.5–0.7). Trước đây lọc role='assistant' AND
+// confidence < 0.5 — tổ hợp KHÔNG BAO GIỜ tồn tại (dưới 0.5 luôn lưu role='system') nên
+// mục này luôn rỗng.
 router.get('/knowledge-gaps', verifyJWT, requireRole('admin'), async (req, res) => {
   try {
     const since = new Date(Date.now() - 30 * 86400000).toISOString()
     const { data: weak } = await supabase
       .from('messages')
-      .select('content, confidence, session_id, created_at')
-      .eq('role', 'assistant')
+      .select('role, content, confidence, session_id, created_at')
+      .in('role', ['assistant', 'system'])
       .not('confidence', 'is', null)
-      .lt('confidence', 0.5)
+      .lt('confidence', 0.7)
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(15)
@@ -219,6 +233,7 @@ router.get('/knowledge-gaps', verifyJWT, requireRole('admin'), async (req, res) 
       return {
         question:   before.length ? before[before.length - 1].content : null,
         confidence: a.confidence,
+        escalated:  a.role === 'system', // true = AI không trả lời được, đã chuyển kỹ sư
         created_at: a.created_at,
       }
     }).filter(g => g.question)
@@ -264,7 +279,9 @@ router.get('/ai-review', verifyJWT, requireRole('admin', 'engineer'), async (req
       let q = supabase
         .from('messages')
         .select('id, content, confidence, source, session_id, created_at')
-        .eq('role', 'assistant')
+        // "Tin cậy thấp" (< 0.5) chỉ tồn tại ở câu đã chuyển kỹ sư (role='system') → phải
+        // gộp cả role đó, nếu không tab này luôn rỗng.
+        .in('role', filter === 'low' ? ['assistant', 'system'] : ['assistant'])
         .not('confidence', 'is', null)
         .gte('created_at', since)
         .order('created_at', { ascending: false })
@@ -321,6 +338,7 @@ router.post('/knowledge-qa', verifyJWT, requireRole('admin', 'engineer'), async 
   if (!question?.trim() || !answer?.trim()) {
     return res.status(400).json({ error: 'Cần cả câu hỏi và câu trả lời đúng.' })
   }
+  if (question.length + answer.length > MAX_QA_CHARS) return res.status(413).json({ error: 'Cặp Hỏi–Đáp quá dài.' })
   try {
     const { data: doc, error } = await supabase
       .from('knowledge_docs')
@@ -361,7 +379,7 @@ router.get('/users', verifyJWT, requireRole('admin'), async (req, res) => {
   }
 
   const { data, error } = await query
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ADMIN')
   res.json({ users: data })
 })
 
@@ -373,14 +391,17 @@ router.get('/sentry-test', verifyJWT, requireRole('admin'), () => {
 // ── GET /admin/users/export — xuất danh sách user ra CSV (báo cáo cho xã) ──────
 router.get('/users/export', verifyJWT, requireRole('admin'), async (req, res) => {
   const { role } = req.query
-  let query = supabase
-    .from('users')
-    .select('name, phone, email, role, village, crops, is_active, created_at')
-    .order('created_at', { ascending: false })
-  if (role) query = query.eq('role', role)
-
-  const { data, error } = await query
-  if (error) return res.status(500).json({ error: error.message })
+  // Phân trang: 1 truy vấn bị cắt âm thầm ở 1000 dòng → file báo cáo cho xã thiếu người.
+  const { data, error } = await fetchAllRows(() => {
+    let query = supabase
+      .from('users')
+      .select('name, phone, email, role, village, crops, is_active, created_at')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+    if (['farmer', 'engineer', 'admin'].includes(role)) query = query.eq('role', role)
+    return query
+  })
+  if (error) return fail500(res, error, 'ADMIN export')
 
   const ROLE = { farmer: 'Nông dân', engineer: 'Kỹ sư', admin: 'Admin' }
   // Bọc trường có dấu phẩy/ngoặc kép/xuống dòng để CSV không vỡ cột; đồng thời
@@ -480,7 +501,7 @@ router.patch('/users/:id', verifyJWT, requireRole('admin'), async (req, res) => 
     .select('id, phone, email, role, name, is_active')
     .single()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ADMIN')
 
   // Cập nhật denylist để khoá/mở khoá có hiệu lực tức thì (không chờ poller 60s)
   if (updates.is_active === false) markInactive(req.params.id)
@@ -507,22 +528,30 @@ router.patch('/users/:id/reset-pin', verifyJWT, requireRole('admin'), async (req
     // Chỉ đặt lại PIN cho nông dân (đăng nhập bằng SĐT + PIN). Engineer/admin dùng
     // email + mật khẩu nên reset thành PIN 6 số là sai luồng.
     const { data: target } = await supabase
-      .from('users').select('role').eq('id', req.params.id).single()
+      .from('users').select('role, is_active, phone').eq('id', req.params.id).single()
     if (!target) return res.status(404).json({ error: 'Không tìm thấy người dùng.' })
     if (target.role !== 'farmer') {
       return res.status(400).json({ error: 'Chỉ đặt lại PIN cho tài khoản nông dân.' })
+    }
+    // Trước đây đặt lại PIN kèm is_active:true → âm thầm MỞ KHOÁ tài khoản đang bị khoá
+    // (hoặc hồi sinh tài khoản đã tự xoá). Mở khoá là thao tác riêng, có nhật ký riêng.
+    if (target.is_active === false) {
+      return res.status(400).json({ error: 'Tài khoản đang bị khoá. Hãy mở khoá trước rồi mới đặt lại mã PIN.' })
+    }
+    if (!target.phone) {
+      return res.status(400).json({ error: 'Tài khoản này không còn số điện thoại nên không đăng nhập bằng PIN được.' })
     }
 
     const pin  = String(randomInt(100000, 1000000)) // PIN 6 số, CSPRNG (không dùng Math.random)
     const hash = await bcrypt.hash(pin, 10)
     const { data, error } = await supabase
       .from('users')
-      .update({ password_hash: hash, is_active: true })
+      .update({ password_hash: hash })
       .eq('id', req.params.id)
       .select('id, phone, name, role')
       .single()
     if (error) throw error
-    markActive(req.params.id) // reset-pin đặt is_active:true → bỏ khỏi denylist
+    clearFail(`phone:${target.phone}`) // đang bị khoá dò PIN thì PIN mới phải dùng được ngay
     // PIN mới → mọi phiên đăng nhập bằng PIN cũ (kể cả của kẻ đã biết PIN cũ) hết hiệu lực
     await revokeTokens(req.params.id)
     logAudit(req, 'reset_pin', data, 'Đặt lại mã PIN')
@@ -552,7 +581,7 @@ router.get('/ai-errors', verifyJWT, requireRole('admin'), async (req, res) => {
   if (reviewed === 'false') query = query.is('reviewed_by', null)
 
   const { data, error } = await query
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ADMIN')
 
   // Gắn câu hỏi gốc (user message ngay trước câu trả lời bị báo lỗi) để admin có ngữ cảnh khi biên soạn lại
   const errors = data || []
@@ -585,6 +614,7 @@ router.post('/ai-errors/:id/to-knowledge', verifyJWT, requireRole('admin'), asyn
   if (!question?.trim() || !answer?.trim()) {
     return res.status(400).json({ error: 'Cần cả câu hỏi và câu trả lời đúng.' })
   }
+  if (question.length + answer.length > MAX_QA_CHARS) return res.status(413).json({ error: 'Cặp Hỏi–Đáp quá dài.' })
 
   try {
     const { data: doc, error } = await supabase
@@ -620,7 +650,7 @@ router.patch('/ai-errors/:id', verifyJWT, requireRole('admin'), async (req, res)
     .update({ reviewed_by: req.user.userId })
     .eq('id', req.params.id)
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'ADMIN')
   res.json({ success: true })
 })
 

@@ -22,6 +22,12 @@ const TH = {
   coldMin:   18,  // °C → rét (hiếm ở Sóc Trăng)
 }
 
+// Nháp bị admin BỎ không xoá hẳn mà đổi tiền tố region wx: → wxx: (không cần migration):
+// vẫn còn dấu vết để khỏi tạo lại, và tự được dọn khi qua ngày (cleanupStaleDrafts).
+export const DRAFT_PREFIX     = 'wx:'
+export const DISMISSED_PREFIX = 'wxx:'
+export const dismissedRegion  = (region) => DISMISSED_PREFIX + String(region).slice(DRAFT_PREFIX.length)
+
 async function fetchDailyForecast() {
   const params = new URLSearchParams({
     latitude:   LAT,
@@ -30,7 +36,7 @@ async function fetchDailyForecast() {
     timezone:   'Asia/Ho_Chi_Minh',
     forecast_days: '2',
   })
-  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+  const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { signal: AbortSignal.timeout(15_000) })
   if (!res.ok) throw new Error(`Open-Meteo ${res.status}`)
   const data = await res.json()
   return data.daily
@@ -107,7 +113,7 @@ async function cleanupStaleDrafts() {
     .is('created_by', null)
     .is('sent_at', null)
     .is('scheduled_at', null)
-    .like('region', 'wx:%')
+    .like('region', 'wx%:%') // cả nháp đang chờ (wx:) lẫn nháp admin đã bỏ (wxx:)
 
   const staleIds = (data || []).filter(d => {
     const date = d.region?.split(':')[2]  // wx:<kind>:<YYYY-MM-DD>
@@ -126,16 +132,17 @@ async function createDraftIfAbsent(alert) {
   // Khoá dedup gồm cả NGÀY → mỗi ngày dự báo có draft riêng, không bị draft cũ
   // (ngày khác) chặn việc tạo cảnh báo cho ngày mới.
   const regionKey = `wx:${alert.kind}:${alert.date}`
+  // Xét MỌI trạng thái của cảnh báo (loại + ngày) này: đang chờ, admin đã duyệt & gửi
+  // (region giữ nguyên), hoặc admin đã bỏ (region đổi thành wxx:…, xem DISMISSED_PREFIX).
+  // Trước đây chỉ xét nháp đang chờ → admin duyệt/bỏ xong, lượt quét sau (6h, và MỖI lần
+  // server khởi động) tạo lại đúng nháp đó → rất dễ gửi trùng cho bà con.
   const { data: existing } = await supabase
     .from('notifications')
     .select('id')
     .eq('type', 'weather')
-    .eq('region', regionKey)
-    .is('created_by', null)
-    .is('sent_at', null)
-    .is('scheduled_at', null)
+    .in('region', [regionKey, dismissedRegion(regionKey)])
     .limit(1)
-  if (existing?.length) return false // đã có draft cùng loại đang chờ → bỏ qua
+  if (existing?.length) return false // đã có (chờ duyệt / đã gửi / đã bỏ) → không tạo lại
 
   const { error } = await supabase.from('notifications').insert({
     title:      alert.title,

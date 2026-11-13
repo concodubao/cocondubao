@@ -13,6 +13,7 @@ import sharp   from 'sharp'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase }  from '../services/supabase.js'
 import { notifyFarmer } from '../services/webpush.js'
+import { fail500 } from '../services/dbUtil.js'
 
 const router = express.Router()
 
@@ -55,7 +56,7 @@ router.get('/feed', verifyJWT, async (req, res) => {
   if (VALID_CROPS.includes(crop)) query = query.contains('crop_tags', [crop])
 
   const { data: posts, error } = await query
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'COMMUNITY')
 
   // Bài user hiện tại đã like (để hiển thị trạng thái nút) — chỉ trong trang này,
   // không kéo toàn bộ lịch sử like của user mỗi lần tải feed.
@@ -147,7 +148,8 @@ router.post('/posts', verifyJWT,
         const { data } = supabase.storage.from('images').getPublicUrl(fileName)
         imageUrl = data.publicUrl
       } catch (err) {
-        return res.status(500).json({ error: 'Upload ảnh thất bại: ' + err.message })
+        console.error('[COMMUNITY] upload ảnh lỗi:', err?.message || err)
+        return res.status(500).json({ error: 'Upload ảnh thất bại. Thử lại nhé.' })
       }
     }
 
@@ -170,7 +172,12 @@ router.post('/posts', verifyJWT,
       `)
       .single()
 
-    if (error) return res.status(500).json({ error: error.message })
+    if (error) {
+      // Bài không lưu được thì ảnh vừa tải lên thành rác trong bucket → dọn luôn
+      const orphan = storagePathFromUrl(imageUrl)
+      if (orphan) supabase.storage.from('images').remove([orphan]).catch(() => {})
+      return fail500(res, error, 'COMMUNITY')
+    }
 
     res.json({ post: { ...post, likeCount: 0, commentCount: 0, likedByMe: false } })
   }
@@ -187,7 +194,7 @@ router.delete('/posts/:id', verifyJWT, async (req, res) => {
   }
 
   const { error } = await supabase.from('posts').delete().eq('id', req.params.id)
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'COMMUNITY')
 
   // Xóa luôn ảnh trong storage để khỏi rác bucket (best-effort, không chặn response)
   const path = storagePathFromUrl(post.image_url)
@@ -217,7 +224,7 @@ async function createReport(targetType, req, res) {
     reason:      typeof reason === 'string' ? (reason.trim().slice(0, 300) || null) : null,
   })
   // 23505 = trùng unique → đã báo cáo rồi, coi như thành công (idempotent)
-  if (error && error.code !== '23505') return res.status(500).json({ error: error.message })
+  if (error && error.code !== '23505') return fail500(res, error, 'COMMUNITY')
   res.json({ success: true, already: error?.code === '23505' })
 }
 router.post('/posts/:id/report',    verifyJWT, (req, res) => createReport('post', req, res))
@@ -242,7 +249,8 @@ router.post('/posts/:id/like', verifyJWT, async (req, res) => {
   } else {
     const { error } = await supabase.from('post_likes')
       .insert({ post_id: postId, user_id: userId })
-    if (error) return res.status(500).json({ error: error.message })
+    // 23505 = bấm đúp, lượt thích đã có sẵn → coi như thành công
+    if (error && error.code !== '23505') return fail500(res, error, 'COMMUNITY')
     res.json({ liked: true })
   }
 })
@@ -258,7 +266,7 @@ router.get('/posts/:id/comments', verifyJWT, async (req, res) => {
     .eq('post_id', req.params.id)
     .order('created_at', { ascending: true })
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'COMMUNITY')
   res.json({ comments: data || [] })
 })
 
@@ -277,7 +285,7 @@ router.post('/posts/:id/comments', verifyJWT, async (req, res) => {
     `)
     .single()
 
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'COMMUNITY')
 
   // Báo cho chủ bài có bình luận mới (bỏ qua khi tự bình luận bài của mình)
   const { data: post } = await supabase.from('posts').select('user_id').eq('id', req.params.id).single()
@@ -303,7 +311,7 @@ router.delete('/comments/:id', verifyJWT, async (req, res) => {
   }
 
   const { error } = await supabase.from('comments').delete().eq('id', req.params.id)
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'COMMUNITY')
 
   // Dọn báo cáo liên quan tới bình luận này
   supabase.from('content_reports').delete()
@@ -360,7 +368,7 @@ router.get('/reports', verifyJWT, requireRole('admin'), async (req, res) => {
 
     res.json({ reports: result })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    fail500(res, err, 'COMMUNITY')
   }
 })
 
@@ -373,7 +381,7 @@ router.patch('/reports/dismiss', verifyJWT, requireRole('admin'), async (req, re
   const { error } = await supabase.from('content_reports')
     .update({ status: 'dismissed', reviewed_by: req.user.userId, reviewed_at: new Date().toISOString() })
     .eq('target_type', targetType).eq('target_id', targetId).eq('status', 'pending')
-  if (error) return res.status(500).json({ error: error.message })
+  if (error) return fail500(res, error, 'COMMUNITY')
   res.json({ success: true })
 })
 
