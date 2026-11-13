@@ -110,7 +110,7 @@ export default function TestAI() {
         {messages.map(msg => {
           const isUser   = msg.role === 'user'
           const isSystem = msg.role === 'system'
-          const baseSource = (msg.source || '').replace(/_(sem)?cached$/, '')
+          const baseSource = (msg.source || '').replace(/_(sem|db)?cached$/, '')
           const isCurated  = baseSource === 'engineer' || baseSource === 'qa_direct'
           return (
             <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 4, marginBottom: 12 }}>

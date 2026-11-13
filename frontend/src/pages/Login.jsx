@@ -299,8 +299,9 @@ function Spinner() {
 // ─── Main ───────────────────────────────────────────────────
 export default function Login() {
   const [step, setStep] = useState('role') // 'role' | 'phone-pin' | 'email'
-  const { token } = useAuthStore()
-  if (token) return <Navigate to="/home" replace />
+  const { token, user } = useAuthStore()
+  // staff đã đăng nhập mà mở /login thì về trang của mình, không rớt vào trang nông dân
+  if (token) return <Navigate to={user ? landingFor(user, false) : '/home'} replace />
 
   const HERO = {
     role:         { title: 'Cò Con Dự Báo', sub: 'Trợ lý nông nghiệp của bà con' },

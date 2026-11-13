@@ -26,8 +26,8 @@ export default function AIResult() {
   const isHighConf    = confidence >= 0.85
   const isMidConf     = confidence >= 0.7 && confidence < 0.85
 
-  // Nguồn có thể kèm hậu tố cache (_cached/_semcached) → bỏ để xét đúng loại.
-  const baseSource = (source || '').replace(/_(sem)?cached$/, '')
+  // Nguồn có thể kèm hậu tố cache (_cached/_semcached/_dbcached) → bỏ để xét đúng loại.
+  const baseSource = (source || '').replace(/_(sem|db)?cached$/, '')
   // qa_direct = câu trả lời do kỹ sư biên soạn, phục vụ thẳng → coi như "kỹ sư".
   const isCurated  = baseSource === 'engineer' || baseSource === 'qa_direct'
   // Hiện độ tin cậy cho mọi câu AI (rag/vision...) kể cả bản cache — trước đây chỉ

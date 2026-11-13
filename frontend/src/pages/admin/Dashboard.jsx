@@ -157,12 +157,12 @@ function KnowledgeGapsSection({ navigate }) {
   return (
     <div style={s.card}>
       <div style={s.cardHead}>
-        <span style={s.cardTitle}>AI trả lời yếu gần đây</span>
+        <span style={s.cardTitle}>Câu hỏi kho tri thức chưa phủ</span>
         <button onClick={() => navigate('/engineer/knowledge')} style={s.viewAllBtn}>
           Bổ sung tài liệu <ChevronRight size={13} strokeWidth={2} />
         </button>
       </div>
-      <p style={s.cardSub}>Câu hỏi AI trả lời với độ tin cậy thấp — nên thêm tài liệu để cải thiện.</p>
+      <p style={s.cardSub}>Câu AI phải chuyển kỹ sư hoặc trả lời dè dặt vì thiếu tài liệu — nên bổ sung vào kho tri thức.</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {gaps.map((g, i) => (
           <div key={i} style={s.gapRow}>
@@ -170,7 +170,7 @@ function KnowledgeGapsSection({ navigate }) {
               {g.question}
             </p>
             <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: '#ef4444', background: '#fef2f2', padding: '2px 8px', borderRadius: 99 }}>
-              {Math.round(g.confidence * 100)}%
+              {g.escalated ? 'Chuyển kỹ sư' : `${Math.round(g.confidence * 100)}%`}
             </span>
           </div>
         ))}

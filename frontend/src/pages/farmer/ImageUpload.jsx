@@ -43,7 +43,11 @@ export default function ImageUpload() {
       formData.append('cropType', user.crops?.[0] || '')
       const res = await chatAPI.askWithImage(formData)
       const d   = res.data
-      if (d.needEngineer) navigate('/chat/waiting', { state: { sessionId: d.sessionId, messageId: d.messageId } })
+      if (d.needEngineer && d.engineerQueued === false) {
+        // không vào được hàng đợi kỹ sư → nói thật, đừng báo "đã gửi cho kỹ sư"
+        setError('Cò Con chưa trả lời được câu này và cũng chưa gửi được cho kỹ sư. Bạn thử gửi lại sau ít phút nhé.')
+      }
+      else if (d.needEngineer) navigate('/chat/waiting', { state: { sessionId: d.sessionId, messageId: d.messageId } })
       else navigate('/chat', { state: { sessionId: d.sessionId, newAnswer: d.answer } })
     } catch (err) {
       setError(err.response?.data?.error

@@ -11,7 +11,8 @@ export const useAuthStore = create(
       setUser: (user) => {
         set({ user })
         if (user) {
-          Sentry.setUser({ id: user.id, phone: user.phone, role: user.role })
+          // Chỉ id + vai trò: SĐT là dữ liệu cá nhân, không cần cho việc dò lỗi
+          Sentry.setUser({ id: user.id, role: user.role })
         } else {
           Sentry.setUser(null)
         }

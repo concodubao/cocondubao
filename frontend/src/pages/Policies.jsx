@@ -27,7 +27,7 @@ const PRIVACY = [
     h: 'Chia sẻ với bên thứ ba',
     items: [
       'Cò Con **không bán** thông tin của bạn cho bất kỳ ai.',
-      'Một số dịch vụ kỹ thuật giúp app hoạt động: lưu trữ dữ liệu (Supabase), trợ lý AI (Google Gemini), gửi mã OTP (nhà mạng/Twilio), dữ liệu thời tiết (Open-Meteo).',
+      'Một số dịch vụ kỹ thuật giúp app hoạt động: lưu trữ dữ liệu (Supabase), máy chủ (Render, Vercel), trợ lý AI (Google Gemini — câu hỏi, ảnh và giọng nói bạn gửi được chuyển tới đây để xử lý), thông báo đẩy (dịch vụ của trình duyệt: Google, Apple, Mozilla), ghi nhận lỗi kỹ thuật (Sentry — không kèm số điện thoại), dữ liệu thời tiết (Open-Meteo).',
       '**Khi nào kỹ sư xem câu hỏi:** chỉ những câu được **chuyển cho kỹ sư** (câu khó AI chưa trả lời được) mới được kỹ sư xem để trả lời. Các cuộc trò chuyện khác không bị xem tự do.',
       'Đội ngũ cũng rà soát câu trả lời của AI (không kèm danh tính của bạn) để cải thiện chất lượng.',
     ],
@@ -43,7 +43,7 @@ const PRIVACY = [
     h: 'Quyền của bạn',
     items: [
       'Xem và chỉnh sửa thông tin cá nhân bất cứ lúc nào trong mục **Hồ sơ cá nhân**.',
-      'Yêu cầu xoá tài khoản và dữ liệu cá nhân bằng cách liên hệ email bên dưới.',
+      'Tự xoá tài khoản bất cứ lúc nào trong mục **Hồ sơ cá nhân** (xoá tên, số điện thoại, ảnh đã gửi), hoặc liên hệ email bên dưới để được hỗ trợ.',
       'Tắt nhận thông báo bất cứ lúc nào trong **Cài đặt thông báo**.',
     ],
   },

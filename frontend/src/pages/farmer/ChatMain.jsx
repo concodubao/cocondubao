@@ -63,9 +63,10 @@ function MessageBubble({ msg, onReport, onSpeak, onEscalate, escalated, speaking
   const isUser         = msg.role === 'user'
   const isSystem       = msg.role === 'system'
   const isThisSpeaking = speakingMsgId === msg.id
-  // Bỏ hậu tố cache để xét đúng loại nguồn (đồng bộ với màn AIResult). qa_direct
+  // Bỏ hậu tố cache (_cached / _semcached / _dbcached — khớp rag.js) để xét đúng loại
+  // nguồn (đồng bộ với màn AIResult). qa_direct
   // là câu kỹ sư biên soạn → coi như "kỹ sư", không gắn disclaimer thừa.
-  const baseSource     = (msg.source || '').replace(/_(sem)?cached$/, '')
+  const baseSource     = (msg.source || '').replace(/_(sem|db)?cached$/, '')
   const isCurated      = baseSource === 'engineer' || baseSource === 'qa_direct'
 
   return (
@@ -313,6 +314,15 @@ export default function ChatMain() {
       })
       if (!sessionId) setSessionId(res.data.sessionId)
       if (res.data.needEngineer) {
+        // engineerQueued=false: backend KHÔNG đưa được câu hỏi vào hàng đợi. Trước đây vẫn
+        // chuyển sang màn "Đã gửi cho kỹ sư!" → nông dân chờ 24 giờ một câu không ai thấy.
+        if (res.data.engineerQueued === false) {
+          setMessages(prev => [...prev, {
+            id: Date.now() + 1, role: 'system',
+            content: 'Cò Con chưa trả lời được câu này và cũng chưa gửi được cho kỹ sư. Bạn thử gửi lại sau ít phút nhé.', created_at: new Date().toISOString(),
+          }])
+          return
+        }
         navigate('/chat/waiting', { state: { sessionId: res.data.sessionId, messageId: res.data.messageId } })
         return
       }

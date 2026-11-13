@@ -35,7 +35,9 @@ export default defineConfig({
           {
             // API: NetworkFirst — online lấy mới; offline/sóng yếu rơi về bản cache
             // gần nhất sau 4s thay vì treo. Giữ 1 ngày để nông dân đọc lại offline.
-            urlPattern: /^https:\/\/.*\.railway\.app\/.*/i,
+            // Khớp host backend: Render (hiện tại) + Railway (máy dự phòng). Trước đây
+            // chỉ khớp *.railway.app → từ khi chuyển sang Render cache này không còn chạy.
+            urlPattern: /^https:\/\/[^/]+\.(onrender\.com|railway\.app)\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
