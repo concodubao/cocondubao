@@ -24,9 +24,13 @@ if ('serviceWorker' in navigator) {
   // reload thật → bản vá mới không tới máy người dùng. SW (workbox autoUpdate +
   // skipWaiting + clientsClaim) khi cập nhật sẽ chiếm quyền → 'controllerchange' →
   // reload 1 lần để nạp code mới. Cờ `refreshing` chặn lặp reload.
+  // Lần ĐẦU mở app (chưa có SW điều khiển trang) clientsClaim cũng bắn 'controllerchange'
+  // → trước đây reload ngay giữa lúc người mới đang gõ/hỏi, mất câu hỏi. Trang đó đã chạy
+  // code mới nhất rồi nên chỉ reload khi THAY một SW cũ (cập nhật thật).
+  const hadController = !!navigator.serviceWorker.controller
   let refreshing = false
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return
+    if (!hadController || refreshing) return
     refreshing = true
     window.location.reload()
   })

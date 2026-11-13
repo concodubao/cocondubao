@@ -226,3 +226,44 @@ describe('GET /chat/messages/:sessionId — staff chỉ đọc phiên đã escal
     expect(res.body.messages).toHaveLength(1)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Bug 2026-11-13: CHECK messages_source_check cũ chặn 'qa_direct', 'faq', '*_cached'…
+// → câu trả lời không được lưu (mất lịch sử, hỏng "Hỏi lại kỹ sư").
+describe('insertAnswerMessage — không làm mất câu trả lời khi DB chặn source', () => {
+  const row = { session_id: 's1', role: 'assistant', content: 'đáp', confidence: 0.9, source: 'qa_direct_semcached' }
+
+  it('lưu bình thường → trả id', async () => {
+    const { insertAnswerMessage } = await import('../src/routes/chat.js')
+    sb.enqueue({ data: { id: 'a1' }, error: null })
+    expect(await insertAnswerMessage(row)).toEqual({ id: 'a1' })
+  })
+
+  it('vi phạm CHECK (23514) → lưu lại với source=null, vẫn trả id', async () => {
+    const { insertAnswerMessage } = await import('../src/routes/chat.js')
+    sb.enqueue(
+      { data: null, error: { code: '23514', message: 'violates check constraint "messages_source_check"' } },
+      { data: { id: 'a2' }, error: null },
+    )
+    expect(await insertAnswerMessage(row)).toEqual({ id: 'a2' })
+  })
+
+  it('lỗi khác → null (không ném)', async () => {
+    const { insertAnswerMessage } = await import('../src/routes/chat.js')
+    sb.enqueue({ data: null, error: { code: '08006', message: 'connection failure' } })
+    expect(await insertAnswerMessage(row)).toBeNull()
+  })
+
+  it('/ask trả messageId kể cả khi lần lưu đầu bị CHECK chặn', async () => {
+    sb.enqueue(
+      { data: { id: 'sess1' }, error: null },                                   // tạo session
+      { data: { id: 'u1' }, error: null },                                      // lưu câu hỏi
+      { data: null, error: { code: '23514', message: 'check' } },               // lưu đáp: bị chặn
+      { data: { id: 'a3' }, error: null },                                      // lưu lại source=null
+    )
+    const res = await request(app).post('/api/v1/chat/ask')
+      .set(auth(tok('farmer1', 'farmer'))).send({ text: 'Lúa bị đạo ôn lá?' })
+    expect(res.status).toBe(200)
+    expect(res.body.messageId).toBe('a3')
+  })
+})

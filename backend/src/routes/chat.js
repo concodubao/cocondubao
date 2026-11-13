@@ -76,6 +76,27 @@ async function getOrCreateSession(userId, cropType, sessionId) {
   return data.id
 }
 
+// ─── Helper: lưu câu trả lời (assistant/system) ─────────────────────────────
+// DB cũ có CHECK messages_source_check chỉ nhận 'rag'|'llm'|'engineer', trong khi
+// pipeline trả cả 'faq', 'qa_direct', 'rag_low_conf', 'vision*', và hậu tố '_cached'/
+// '_dbcached'/'_semcached'. Trước đây lỗi insert bị bỏ qua → câu trả lời KHÔNG được lưu
+// (mất khỏi lịch sử; "Hỏi lại kỹ sư"/"Báo lỗi"/"Lưu" hỏng vì không có messageId).
+// Migration 20261113000000 gỡ CHECK; tới khi áp xong thì vi phạm CHECK (23514) → lưu
+// lại với source = null để câu trả lời vẫn còn.
+export async function insertAnswerMessage(row) {
+  const first = await supabase.from('messages').insert(row).select('id').single()
+  if (!first.error) return first.data
+  if (first.error.code === '23514' && row.source != null) {
+    console.warn(`[CHAT] messages.source "${row.source}" bị CHECK chặn → lưu với source=null (cần áp migration 20261113000000)`)
+    const retry = await supabase.from('messages').insert({ ...row, source: null }).select('id').single()
+    if (!retry.error) return retry.data
+    console.error('[CHAT] lưu câu trả lời thất bại (lần 2):', retry.error.message)
+    return null
+  }
+  console.error('[CHAT] lưu câu trả lời thất bại:', first.error.message)
+  return null
+}
+
 // ─── Helper: lấy lịch sử hội thoại gần nhất trong session ───────────────────
 async function getRecentHistory(sessionId, limit = 10) {
   if (!sessionId) return []
@@ -167,17 +188,13 @@ router.post('/ask', verifyJWT, async (req, res) => {
       ? 'Câu hỏi của bạn đã được chuyển cho kỹ sư nông nghiệp. Kỹ sư sẽ trả lời trong vòng 24 giờ.'
       : result.answer
 
-    const { data: answerMsg } = await supabase
-      .from('messages')
-      .insert({
-        session_id: sid,
-        role:       result.needEngineer ? 'system' : 'assistant',
-        content:    answerContent,
-        confidence: result.confidence,
-        source:     result.source,
-      })
-      .select('id')
-      .single()
+    const answerMsg = await insertAnswerMessage({
+      session_id: sid,
+      role:       result.needEngineer ? 'system' : 'assistant',
+      content:    answerContent,
+      confidence: result.confidence,
+      source:     result.source,
+    })
 
     let engineerQueued = false
     if (result.needEngineer && userMsg) {
@@ -329,17 +346,13 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
       ? 'Ảnh và câu hỏi của bạn đã được gửi cho kỹ sư. Kỹ sư sẽ xem ảnh và trả lời trong 24 giờ.'
       : result.answer
 
-    const { data: answerMsg } = await supabase
-      .from('messages')
-      .insert({
-        session_id: sid,
-        role:       result.needEngineer ? 'system' : 'assistant',
-        content:    answerContent,
-        confidence: result.confidence,
-        source:     result.source,
-      })
-      .select('id')
-      .single()
+    const answerMsg = await insertAnswerMessage({
+      session_id: sid,
+      role:       result.needEngineer ? 'system' : 'assistant',
+      content:    answerContent,
+      confidence: result.confidence,
+      source:     result.source,
+    })
 
     let engineerQueued = false
     if (result.needEngineer && userMsg) {
