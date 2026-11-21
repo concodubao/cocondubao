@@ -21,9 +21,9 @@
 
 - Giống kỹ sư: chọn **"Kỹ sư / Admin"** → đăng nhập bằng **email + mật khẩu**.
 - Admin vào thẳng **Dashboard**.
-- Menu admin đầy đủ: **Dashboard · Quản lý user · Gửi thông báo · Báo lỗi AI · Báo cáo cộng đồng · Soát chất lượng AI · Kho tri thức · Test AI · Thời tiết**.
+- Menu admin: **Dashboard · Quản lý user · Gửi thông báo · Báo lỗi AI · Báo cáo cộng đồng · Soát chất lượng AI · Kho tri thức · Test AI · Thời tiết**. Mở **Nhật ký thao tác** từ Dashboard.
 
-`[Ảnh: Dashboard admin]`
+![Dashboard admin](images/huong-dan/admin-dashboard.png)
 
 ---
 
@@ -49,7 +49,7 @@ Tab **Kỹ sư** hiện **số đang chờ duyệt** trong ngoặc (vd "Kỹ sư
 **Việc thường làm:**
 
 - **Tạo tài khoản kỹ sư/admin**: bấm **"Tạo kỹ sư"** → chọn vai trò (**Kỹ sư / Quản trị viên**) → nhập **họ tên** (tuỳ chọn), **email** + **mật khẩu** (≥ 8 ký tự, bắt buộc) → **Tạo**. Tài khoản tạo kiểu này dùng được ngay.
-- **Phê duyệt kỹ sư**: kỹ sư **tự đăng ký** ở trạng thái chờ (thẻ mờ) → bấm **"Phê duyệt kỹ sư"** mới đăng nhập được.
+- **Phê duyệt kỹ sư**: nếu danh sách có tài khoản kỹ sư đang chờ duyệt, bấm **"Phê duyệt kỹ sư"**. Màn hình đăng nhập hiện không hỗ trợ nhân sự tự đăng ký; admin tạo tài khoản mới.
 - **Khóa / Mở khóa** tài khoản (thẻ bị khóa hiện mờ). Khóa = người đó không đăng nhập được nữa.
 - **Đổi vai trò** (Nông dân ↔ Kỹ sư ↔ Admin) qua ô chọn — **có hỏi xác nhận**.
 - **Đặt lại PIN cho nông dân** (chỉ tài khoản nông dân có SĐT): bấm **"Đặt lại PIN"** → xác nhận → hiện **mã PIN mới** → bấm vào ô để **copy** → đọc/gửi cho nông dân. **PIN cũ hết hiệu lực ngay**; nông dân tự đổi lại trong Hồ sơ.
@@ -58,7 +58,7 @@ Tab **Kỹ sư** hiện **số đang chờ duyệt** trong ngoặc (vd "Kỹ sư
 
 > *Lưu ý: với chính tài khoản của mình, bạn **không** thấy nút Khóa/Đổi vai trò — chỉ hiện dòng "Tài khoản của bạn — không thể tự khóa hoặc đổi vai trò". Đây là cơ chế chống tự khóa nhầm.*
 
-`[Ảnh: màn hình Quản lý user]`
+![Quản lý người dùng (số điện thoại/email đã được che)](images/huong-dan/admin-users.png)
 
 ---
 
@@ -74,7 +74,7 @@ Vào **Gửi thông báo / Soạn thông báo**. Trên cùng có **Preview** c�
 3. **Ảnh minh hoạ** (không bắt buộc): **"Tải ảnh từ máy"** hoặc **dán link ảnh**. Có thể **Gỡ ảnh** để đổi.
 4. **Gửi cho nông dân trồng** (lọc theo cây):
    - **Không chọn cây** = gửi cho **tất cả** nông dân.
-   - Chọn 1+ cây = chỉ gửi cho nông dân trồng cây đó (vd cảnh báo **sâu lúa** → chỉ chọn **Lúa**). Dòng dưới xác nhận "→ Đang gửi cho: ...".
+   - Chọn 1+ cây = nhắm theo cây trồng của người nhận (vd cảnh báo **sâu lúa** → chỉ chọn **Lúa**). Dòng dưới xác nhận "→ Đang gửi cho: ...". Thiết bị chưa chọn cây vẫn có thể nhận tin; bộ lọc cây riêng của thiết bị được ưu tiên nếu có.
 5. **Thời gian gửi**:
    - Để trống = **Gửi ngay**.
    - Chọn ngày giờ (không cho chọn quá khứ) = **Lên lịch gửi**.
@@ -86,7 +86,7 @@ Vào **Gửi thông báo / Soạn thông báo**. Trên cùng có **Preview** c�
 
 **Gợi ý cảnh báo thời tiết tự động:** hệ thống tự phát hiện thời tiết xấu từ dự báo và tạo **bản nháp** ở mục **"🌦️ Gợi ý cảnh báo thời tiết"**. Admin xem rồi bấm **"Gửi cho nông dân"** hoặc **"Bỏ"**.
 
-> Lưu ý: nông dân chỉ nhận nếu họ **bật thông báo** + cho phép quyền trình duyệt; tin còn tôn trọng **khung giờ không làm phiền** của từng người. Vì vậy "X / Y thiết bị" thường nhỏ hơn tổng số nông dân — là bình thường.
+> Lưu ý: nông dân chỉ nhận nếu họ **bật thông báo** + cho phép quyền trình duyệt; tin đẩy còn lọc theo loại tin, cây và **khung giờ không làm phiền** của từng thiết bị. Thiết bị trong giờ yên tĩnh bị bỏ qua khi gửi, không tự gửi lại sau đó; tin vẫn có thể xuất hiện trong danh sách. **X/Y** là số gửi thành công trên số thiết bị đủ điều kiện, không phải trên tổng số nông dân.
 
 ---
 
@@ -121,8 +121,8 @@ Việc admin/trainer nên làm **trước** buổi tập huấn tại xã:
 - [ ] Mỗi nông dân: 1 điện thoại có mạng (4G/wifi), có số điện thoại riêng.
 - [ ] Chuẩn bị sẵn vài câu hỏi mẫu để demo (vd: *"Lúa bị vàng lá là bệnh gì?"*).
 - [ ] **Tạo sẵn tài khoản cho các kỹ sư** (email + mật khẩu) trước buổi học.
-- [ ] Hướng dẫn cách mở app + **"Thêm vào màn hình chính"**.
-- [ ] Nhắc bà con khi mở lần đầu: app hỏi **cho phép Thông báo** và **micro** → bấm **Cho phép**.
+- [ ] Hướng dẫn cách mở app + cài ra màn hình chính (Chrome: **"Cài đặt và tạo lối tắt"**).
+- [ ] Hướng dẫn bật thông báo trong **Cài đặt thông báo** và cấp quyền trình duyệt; cấp quyền micro khi sử dụng giọng nói.
 - [ ] Với bà con lớn tuổi: chỉ cách chỉnh **Cỡ chữ hiển thị → Lớn / Rất lớn**.
 
 ---
@@ -131,7 +131,7 @@ Việc admin/trainer nên làm **trước** buổi tập huấn tại xã:
 
 | Tình huống | Cách xử lý |
 |---|---|
-| Kỹ sư mới chưa đăng nhập được | **Quản lý user** → tab Kỹ sư (có số chờ) → **Phê duyệt kỹ sư** |
+| Kỹ sư chưa có tài khoản hoặc chưa đăng nhập được | Tạo tài khoản trong **Quản lý user**; nếu tài khoản có trạng thái chờ, **Phê duyệt kỹ sư** |
 | Nông dân quên PIN | **Quản lý user** → **Đặt lại PIN** → copy PIN mới đọc cho họ |
 | AI tự trả lời (%) thấp | Bổ sung tài liệu vào **Kho tri thức**; biến câu hay thành QA ở **Soát chất lượng AI** |
 | Nhiều câu chờ quá hạn 24h | Nhắc kỹ sư; admin tự nhận & trả lời từ **Dashboard** |
@@ -139,7 +139,7 @@ Việc admin/trainer nên làm **trước** buổi tập huấn tại xã:
 | Gửi tin "X/Y thiết bị" nhỏ | Bình thường — chỉ tính máy đã bật thông báo, ngoài giờ "không làm phiền" |
 | Lỡ lên lịch nhầm | Mục **Đã lên lịch** → **Hủy** trước giờ gửi |
 | Không tự khóa được mình | Đúng thiết kế — nhờ admin khác thao tác nếu cần |
-| AI hay báo 429/quá tải | Quota Gemini miễn phí cạn — xem **Báo lỗi AI**; cần bật billing để hết |
+| AI hay báo 429/quá tải | Chờ và thử lại; kiểm tra giới hạn và cấu hình dịch vụ AI với người vận hành |
 
 ---
 

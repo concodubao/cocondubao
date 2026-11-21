@@ -266,8 +266,7 @@ erDiagram
 
 ### 4.1 `users`
 
-Every account: farmers (phone + PIN), engineers/admins (email + password). RLS policy
-`users_self` (`auth.uid() = id`).
+Every account: farmers (phone + PIN), engineers/admins (email + password). The backend enforces access; client-side policies were removed by the security migration.
 
 | Column | Type | Null | Default | Constraints | Description |
 |--------|------|------|---------|-------------|-------------|
@@ -280,12 +279,13 @@ Every account: farmers (phone + PIN), engineers/admins (email + password). RLS p
 | `village` | text | nullable | — | — | Hamlet/commune |
 | `crops` | text[] | nullable | `'{}'` | — | Subset of `{rice,veggie,fruit,other}` |
 | `is_active` | boolean | nullable | `true` | — | `false` ⇒ locked / self-deleted (denylist) |
+| `tokens_valid_after` | timestamptz | nullable | — | — | Reject tokens issued before this timestamp |
 | `created_at` | timestamptz | nullable | `now()` | — | |
 | `updated_at` | timestamptz | nullable | `now()` | — | Maintained by `trg_users_updated_at` |
 
 ### 4.2 `chat_sessions`
 
-One advisory conversation. RLS policy `sessions_owner` (`user_id = auth.uid()`).
+One advisory conversation. Ownership is enforced by the backend.
 
 | Column | Type | Null | Default | Constraints | Description |
 |--------|------|------|---------|-------------|-------------|
@@ -297,8 +297,7 @@ One advisory conversation. RLS policy `sessions_owner` (`user_id = auth.uid()`).
 
 ### 4.3 `messages`
 
-Every turn in a conversation (farmer, AI, engineer, or system). RLS policy
-`messages_owner` (session belongs to `auth.uid()`).
+Every turn in a conversation (farmer, AI, engineer, or system). The backend enforces session ownership.
 
 | Column | Type | Null | Default | Constraints | Description |
 |--------|------|------|---------|-------------|-------------|
@@ -308,12 +307,10 @@ Every turn in a conversation (farmer, AI, engineer, or system). RLS policy
 | `content` | text | NN | — | — | Message text |
 | `image_url` | text | nullable | — | — | Pest photo public URL (nulled when image purged) |
 | `confidence` | double precision | nullable | — | — | RAG similarity (assistant messages) |
-| `source` | text | nullable | — | CHECK in `{rag, llm, engineer}` | Origin of an answer |
+| `source` | text | nullable | — | No source CHECK after 2026-11-13 | Origin of an answer |
 | `created_at` | timestamptz | nullable | `now()` | — | |
 
-> Note: the application also uses logical `source` values like `faq`, `qa_direct`,
-> `vision`, `rag_low_conf` in API responses; the DB CHECK only constrains stored values
-> to `{rag, llm, engineer}`, so persisted `source` is normalized accordingly.
+> The 2026-11-13 migration drops the old `messages_source_check`; sources such as `faq`, `qa_direct`, `vision`, `rag_low_conf` and cache suffixes can be stored. Before migration, the backend retries a CHECK violation with `source=null` to preserve the answer.
 
 ### 4.4 `engineer_queue`
 
@@ -323,6 +320,7 @@ Questions escalated to human agronomists. RLS enabled, no policy (service-role o
 |--------|------|------|---------|-------------|-------------|
 | `id` | uuid | NN | `gen_random_uuid()` | **PK** | |
 | `message_id` | uuid | nullable | — | **FK** → `messages(id)` ON DELETE CASCADE | The farmer's question |
+| `answer_message_id` | uuid | nullable | — | UNIQUE, **FK** → `messages(id)` ON DELETE SET NULL | The engineer's reply, used for edits |
 | `assigned_to` | uuid | nullable | — | **FK** → `users(id)` | Engineer who took it |
 | `status` | text | nullable | `'pending'` | CHECK in `{pending, in_progress, resolved}` | |
 | `answer` | text | nullable | — | — | Engineer's answer text |
@@ -332,8 +330,7 @@ Questions escalated to human agronomists. RLS enabled, no policy (service-role o
 
 ### 4.5 `knowledge_docs`
 
-Source documents/QA for the RAG knowledge base. RLS policy `knowledge_farmer_read`
-(approved docs are world-readable; staff see all).
+Source documents/QA for the RAG knowledge base. Direct client access is denied; backend staff routes enforce role checks.
 
 | Column | Type | Null | Default | Constraints | Description |
 |--------|------|------|---------|-------------|-------------|
@@ -382,8 +379,7 @@ Durable L2 answer cache (survives redeploys) to cut Gemini calls. Soft-degraded.
 
 ### 4.8 `ai_error_reports`
 
-Farmer "this answer is wrong" reports (👎). RLS: insert own (`user_id = auth.uid()`);
-engineers/admins read.
+Farmer "this answer is wrong" reports (👎). The backend checks ownership and restricts review routes by role.
 
 | Column | Type | Null | Default | Constraints | Description |
 |--------|------|------|---------|-------------|-------------|
@@ -422,8 +418,7 @@ Farmer-saved answers. RLS enabled, no policy. Soft-degraded.
 
 ### 4.11 `notifications`
 
-Broadcast notifications and weather-alert drafts. RLS policy `notif_read` (crop-matched
-or general).
+Broadcast notifications and weather-alert drafts. The backend filters notifications by recipient and crop.
 
 | Column | Type | Null | Default | Constraints | Description |
 |--------|------|------|---------|-------------|-------------|
@@ -604,24 +599,7 @@ Trigger function: `NEW.updated_at = now(); RETURN NEW;`.
 
 ## 8. Row-Level Security (RLS)
 
-**Every table has RLS enabled.** The backend uses the service-role key (which bypasses
-RLS), so application code is the primary authorization layer; RLS is a defense-in-depth
-backstop that blocks anon/`authenticated` clients from reading data directly. Policies
-that *do* exist (for any future direct-client access):
-
-| Table | Policy | Effect |
-|-------|--------|--------|
-| `users` | `users_self` | A user can only access their own row (`auth.uid() = id`) |
-| `chat_sessions` | `sessions_owner` | Owner only (`user_id = auth.uid()`) |
-| `messages` | `messages_owner` (SELECT) | Only messages in the user's own sessions |
-| `knowledge_docs` | `knowledge_farmer_read` (SELECT) | Approved docs world-readable; staff see all |
-| `notifications` | `notif_read` (SELECT) | General (`crop_tags={}`) or crop-matched to user |
-| `ai_error_reports` | `ai_error_insert` / `ai_error_read_eng` | Insert own; engineers/admins read |
-
-Tables with **RLS on but no policy** (deny-all to clients; service-role only):
-`engineer_queue`, `knowledge_chunks`, `post_likes`, `posts`, `comments`,
-`push_subscriptions`, `notification_reads`, `answer_feedback`, `message_bookmarks`,
-`content_reports`, `answer_cache`, `admin_audit_log`.
+**Every table has RLS enabled.** The backend uses the service-role key (which bypasses RLS) and enforces authorization and ownership in application code. The 2026-10-25 security migration removes the old client policies, revokes public client table writes, and restricts the vector-search RPC to the service role. With RLS enabled and no client policies, anon/authenticated clients cannot access application rows directly.
 
 > **Consequence:** Supabase Realtime cannot subscribe to `engineer_queue` from an anon
 > client (RLS blocks it), which is why the engineer queue uses **polling** rather than
@@ -675,6 +653,9 @@ then committed. Files in `supabase/migrations/`:
 | 20260621000001 | `content_reports.sql` | `content_reports` table (moderation) |
 | 20260628000000 | `answer_cache.sql` | `answer_cache` table (L2 cache) |
 | 20260629000000 | `message_bookmarks.sql` | `message_bookmarks` table |
+| 20261025000000 | `security_hardening.sql` | Token revocation timestamp, removal of client policies, write and RPC privilege restrictions |
+| 20261113000000 | `messages_source_check.sql` | Remove obsolete `messages.source` constraint |
+| 20261121000000 | `engineer_answer_message.sql` | Link engineer replies to queue items and save both in one transaction |
 
 > When adding a migration: create the file in `supabase/migrations/`, apply by hand with
 > `psql`, then commit. Vector columns are `vector(1536)`. Write API code to degrade

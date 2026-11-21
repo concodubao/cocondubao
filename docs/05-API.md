@@ -177,27 +177,26 @@ Exceeding a limit returns `429` with a friendly Vietnamese message.
 ## 6. Auth API (`/api/v1/auth`)
 
 ### POST `/auth/request-otp` · public · OTP-limited
-Send an SMS OTP (Twilio via Supabase Auth). Does **not** reveal whether the number is
-registered (prevents account enumeration).
+OTP is disabled by default and the current UI uses phone + PIN. Set `OTP_ENABLED=true` only when an SMS provider is configured. Send an SMS OTP (via Supabase Auth); the response does **not** reveal whether the number is registered.
 - **Body:** `{ "phone": "0901234567" }`
 - **200:** `{ "success": true, "phone": "+84901234567" }`
-- **Errors:** `400` invalid phone · `429` provider rate limit
+- **Errors:** `400` invalid phone · `404` OTP disabled · `429` provider rate limit
 
 ### POST `/auth/verify-otp` · public · OTP-limited
-Verify the OTP; creates a farmer account on first verification.
+Verify the OTP; creates a farmer account on first verification. Requires `OTP_ENABLED=true`; otherwise returns `404`.
 - **Body:** `{ "phone": "...", "otp": "123456" }`
 - **200:** `{ "success": true, "token": "<jwt>", "user": { id, phone, role, name, village, crops, hasPassword }, "isNewUser": true }`
 - **Errors:** `400` wrong/expired OTP · `403` account locked
 
 ### POST `/auth/register-phone` · public
 Farmer signup with phone + 6-digit PIN. Token valid **30 days**.
-- **Body:** `{ "phone": "...", "password": "123456" }` (PIN = exactly 6 digits)
+- **Body:** `{ "phone": "...", "password": "482739" }` (PIN = exactly 6 digits)
 - **200:** `{ "success": true, "token": "<jwt>", "user": {...}, "isNewUser": bool }`
 - **Errors:** `400` invalid phone / PIN not 6 digits / already registered
 
 ### POST `/auth/login-phone` · public · PIN lockout
 Farmer login. 5 wrong PINs → 10-minute lock for that phone.
-- **Body:** `{ "phone": "...", "password": "123456" }`
+- **Body:** `{ "phone": "...", "password": "482739" }`
 - **200:** `{ "success": true, "token": "<jwt>", "user": {...}, "isNewUser": bool }`
 - **Errors:** `401` not registered / wrong PIN / no PIN set · `403` locked · `429` too many failures
 
@@ -208,8 +207,7 @@ Staff (engineer/admin) login with email + password. Token valid **7 days**.
 - **Errors:** `401` wrong credentials · `403` pending approval / locked
 
 ### POST `/auth/register-email` · admin
-Create an engineer/admin account (admin-only path). New engineers start inactive
-(`pending`) until approved; new admins are active.
+Legacy admin-only path: new engineers start inactive (`pending`) until approved; new admins are active. The admin UI uses `/admin/engineers` instead, which creates active engineer and admin accounts.
 - **Body:** `{ "email": "...", "password": "...(≥8)", "role": "engineer"|"admin" }`
 - **200:** `{ "success": true, "pending": bool }`
 - **Errors:** `400` missing fields / weak password / email taken / bad role

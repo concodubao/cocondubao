@@ -8,6 +8,8 @@
 | **Frameworks** | Vitest + Supertest (backend), Vitest + Testing Library (frontend), Playwright (e2e), custom RAG eval |
 | **Related** | [02-SRS](02-SRS.md) (requirement IDs) · [05-API](05-API.md) · [07-RISK-REGISTER](07-RISK-REGISTER.md) |
 
+> **Current verification:** The results below are a historical baseline, not evidence for the current source. Run the relevant suites and record the date, commit, environment and any skips before claiming a current pass. Human UAT and sign-off remain pending until actually completed.
+
 ---
 
 ## Table of contents

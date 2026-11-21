@@ -65,7 +65,10 @@ function overlayInit() {
         box-sizing:border-box;z-index:2147483647;pointer-events:none;padding:10px 14px;border-radius:14px;
         background:rgba(46,21,5,.88);color:#fff;font-family:'Noto Sans',system-ui,sans-serif;
         box-shadow:0 6px 20px rgba(0,0,0,.25);transition:opacity .35s;opacity:0;text-align:center}
-      #__demo_cap[data-pos=bottom]{bottom:18px} #__demo_cap[data-pos=top]{top:10px}
+      #__demo_cap[data-pos=bottom]{bottom:18px}
+      /* top = gọn trong thanh tiêu đề (~60px) để không che bong bóng chat */
+      #__demo_cap[data-pos=top]{top:5px;padding:6px 12px;border-radius:12px;width:calc(100% - 12px)}
+      #__demo_cap[data-pos=top] .vi{font-size:13.5px} #__demo_cap[data-pos=top] .en{font-size:11px;margin-top:1px}
       #__demo_cap .vi{font-size:15px;font-weight:700;line-height:1.35}
       #__demo_cap .en{font-size:12.5px;opacity:.85;margin-top:3px;line-height:1.3;font-style:italic}
       .__demo_tap{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;
@@ -217,7 +220,7 @@ async function farmerAsks(page) {
   await tap(page.getByRole('button', { name: 'Hỏi Cò Con' }))
   await page.waitForURL(/\/chat$/)
   await settle(page, 800)
-  await cap(page, 'Bà con gõ hoặc nói câu hỏi về cây trồng', 'Type or speak a question about your crops', 'top')
+  await cap(page, 'Gõ hoặc nói câu hỏi về cây trồng', 'Type or speak a crop question', 'top')
   await pause(1500)
   const input = page.getByLabel('Nhập câu hỏi')
   await typeSlow(input, QUESTION)
@@ -236,7 +239,7 @@ async function farmerAsks(page) {
     r => r.url().includes('/chat/ask') && r.request().method() === 'POST', { timeout: 90_000 })
   askResp.catch(() => {}) // tránh unhandled rejection che mất lỗi thật nếu bước sau hỏng
   await tap(page.getByRole('button', { name: 'Gửi câu hỏi' }))
-  await cap(page, 'Cò Con tìm trong kho tài liệu nông nghiệp rồi trả lời', 'Cò Con searches its farming knowledge base, then answers', 'top')
+  await cap(page, 'Cò Con tra tài liệu nông nghiệp…', 'Searching the farming knowledge base…', 'top')
   const data = await (await askResp).json().catch(() => ({}))
 
   if (data.needEngineer) {
@@ -246,13 +249,13 @@ async function farmerAsks(page) {
     await pause(5000)
   } else {
     await pause(1200)
-    await cap(page, 'Câu trả lời dễ hiểu, có nút nghe đọc to', 'A plain-language answer, with read-aloud', 'top')
+    await cap(page, 'Trả lời dễ hiểu, có nút nghe đọc', 'Plain answer, with read-aloud', 'top')
     await smoothScroll(page, 900, 110, 380)
     await pause(2500)
     // Chuyển kỹ sư xem lại (1 chạm)
     page.once('dialog', d => d.accept())
     const esc = page.getByRole('button', { name: 'Hỏi lại kỹ sư' }).last()
-    await cap(page, 'Chưa chắc? Một chạm để hỏi lại kỹ sư', 'Not sure? One tap asks a human engineer', 'top')
+    await cap(page, 'Chưa chắc? Một chạm hỏi kỹ sư', 'Not sure? One tap asks an engineer', 'top')
     await pause(1500)
     await tap(esc)
     await pause(3500)
@@ -262,7 +265,7 @@ async function farmerAsks(page) {
   if (PHOTO && fs.existsSync(PHOTO)) {
     await page.goto(`${BASE}/chat/image`)
     await settle(page, 800)
-    await cap(page, 'Hoặc chụp ảnh lá bệnh để Cò Con xem', 'Or snap a photo of the sick leaf', 'top')
+    await cap(page, 'Hoặc chụp ảnh lá bệnh', 'Or snap a photo of the sick leaf', 'top')
     await page.locator('input[type=file]').setInputFiles(PHOTO)
     await pause(1500)
     await typeSlow(page.getByLabel('Mô tả thêm'), 'Lá lúa có vết đốm hình thoi, xuất hiện 3 ngày nay')
@@ -284,7 +287,7 @@ async function farmerAsks(page) {
 
   // Cộng đồng
   await page.goto(`${BASE}/community`)
-  await settle(page)
+  await settle(page, 2500)
   await cap(page, 'Cộng đồng: bà con chia sẻ kinh nghiệm, hình ảnh mùa vụ', 'Community: farmers share tips and harvest photos')
   await pause(2500)
   await smoothScroll(page, 1200, 120, 330)
@@ -293,6 +296,8 @@ async function farmerAsks(page) {
   // Thông báo
   await page.goto(`${BASE}/notifications`)
   await settle(page)
+  await page.locator('[role=feed][aria-busy=false]').waitFor({ timeout: 20_000 }).catch(() => {})
+  await pause(800)
   await cap(page, 'Thông báo: lịch phun thuốc, cảnh báo thời tiết, tin của xã', 'Alerts: spraying reminders, weather warnings, commune news')
   await pause(4000)
 
@@ -373,16 +378,16 @@ async function engineerAnswers(page) {
 async function farmerGetsReply(page) {
   await page.goto(`${BASE}/chat/history`)
   await settle(page)
-  await cap(page, 'Nông dân mở lại cuộc hỏi đáp…', 'Back on the farmer’s phone…', 'top')
+  await cap(page, 'Mở lại cuộc hỏi đáp…', 'Back on the farmer’s phone…', 'top')
   await pause(2000)
   await tap(page.getByText(QUESTION).first())
   await page.waitForURL(/\/chat$/)
   await settle(page, 1500)
   await smoothScroll(page, 3000, 200, 300)
   await page.getByText('Kỹ sư xác nhận').last().waitFor({ timeout: 20_000 }).catch(() => {})
-  await cap(page, 'Câu trả lời của kỹ sư, có dấu "Kỹ sư xác nhận"', 'The engineer’s reply, marked “Engineer verified”', 'top')
+  await cap(page, 'Kỹ sư đã trả lời — có dấu xác nhận', 'The engineer replied — marked verified', 'top')
   await pause(5000)
-  await cap(page, 'Cò Con — hỏi là có người trả lời', 'Cò Con — every question gets an answer', 'top')
+  await cap(page, 'Cò Con — hỏi là có người trả lời', 'Every question gets an answer', 'top')
   await pause(3500)
 }
 

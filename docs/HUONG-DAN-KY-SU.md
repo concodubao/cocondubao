@@ -21,12 +21,12 @@
 
 1. Mở app → chọn vai trò **"Kỹ sư / Admin"**.
 2. Đăng nhập bằng **email + mật khẩu** do admin cấp.
-   - *Chưa có tài khoản? → Liên hệ admin để được tạo (hoặc tự đăng ký rồi chờ admin phê duyệt).*
+   - *Chưa có tài khoản? → Liên hệ admin để được tạo. Màn hình đăng nhập không hỗ trợ tự đăng ký tài khoản nhân sự.*
 3. Sau khi đăng nhập, vào thẳng màn hình **Hàng đợi câu hỏi**.
 
 > Thanh menu kỹ sư gồm: **Hàng đợi · Kho tri thức · Test AI · Thời tiết · Soát chất lượng AI**.
 
-`[Ảnh: màn hình đăng nhập kỹ sư]`
+![Màn hình đăng nhập kỹ sư / admin](images/huong-dan/ks-dang-nhap.png)
 
 ---
 
@@ -56,15 +56,17 @@ Có thể **tìm** theo tên nông dân/nội dung và **lọc theo cây trồng
 3. **Tùy chọn quan trọng — "Đánh dấu Tin cậy — thêm vào kho tri thức RAG":**
    - **Tích** nếu câu trả lời chính xác và dùng lại được nhiều lần → embed vào pgvector, AI tự trả câu tương tự sau này.
    - **Không tích** nếu chỉ đúng cho trường hợp riêng lẻ.
-4. Bấm **"Gửi câu trả lời cho nông dân"**. Nông dân nhận **thông báo** ngay.
+4. Bấm **"Gửi câu trả lời cho nông dân"**. Nông dân có thể xem câu trả lời trong cuộc hội thoại; thông báo đẩy phụ thuộc vào thiết bị và kết nối.
 
 ### 2.3. Mẹo & lưu ý
 - **Lưu mẫu riêng:** gõ xong (≥20 ký tự) → **"Lưu làm mẫu"** → đặt tên (vd "Đạo ôn"). Mẫu của bạn hiện cạnh mẫu mặc định, xóa được.
-- **Lỡ thoát/F5:** vào lại đúng câu đó vẫn được (mở từ Hàng đợi hoặc Lịch sử), không mất câu đang soạn dở khi quay lại.
+- **Lỡ thoát/F5:** có thể mở lại câu hỏi từ Hàng đợi hoặc Lịch sử, nhưng nội dung **chưa gửi không được tự động lưu**. Hãy lưu riêng nội dung dài trước khi rời trang.
 - **Sửa câu đã gửi:** vào **Lịch sử** → mở câu (trạng thái đã trả lời) → màn đổi tên **"Chỉnh sửa câu trả lời"**.
 - **Xóa câu khỏi hàng đợi** (nút thùng rác): chỉ khi câu không hợp lệ/trùng — **nông dân sẽ KHÔNG nhận được trả lời**, nên cân nhắc; có hỏi xác nhận.
 
-`[Ảnh: màn hình Hàng đợi và màn Trả lời & Kiểm duyệt]`
+![Hàng đợi câu hỏi](images/huong-dan/ks-hang-doi.png)
+
+![Màn hình soạn và gửi câu trả lời](images/huong-dan/ks-tra-loi.png)
 
 ---
 
@@ -75,10 +77,10 @@ Vào **Kho tri thức RAG**. Đầu trang có **bộ đếm**: số tài liệu 
 ### 3.1. Hai cách thêm kiến thức
 
 **Cách A — Upload tài liệu (file dài):**
-- Bấm **"Upload tài liệu mới"** → chọn file **PDF / DOCX / TXT** → đặt **Tên tài liệu** → chọn **cây trồng áp dụng** (không bắt buộc) → **Upload**.
+- Bấm **"Upload tài liệu mới"** → chọn file **PDF / DOCX / TXT** (tối đa **20 MB**) → đặt **Tên tài liệu** → chọn ít nhất **một cây trồng áp dụng** → **Upload**. Có thể điền nguồn tài liệu.
 
 **Cách B — Soạn cặp Hỏi–Đáp chuẩn (nhanh, cho 1 câu cụ thể):**
-- Bấm **"Soạn cặp Hỏi–Đáp chuẩn"** → nhập **Câu hỏi** + **Câu trả lời đúng** → **Lưu**. Dùng khi bạn muốn AI trả thẳng một câu hay gặp.
+- Bấm **"Soạn cặp Hỏi–Đáp chuẩn"** → nhập **Câu hỏi** + **Câu trả lời đúng** → **Lưu**; hệ thống bắt đầu embed. Dùng khi bạn muốn AI trả thẳng một câu hay gặp.
 
 ### 3.2. Vòng đời tài liệu (trạng thái)
 
@@ -93,7 +95,7 @@ Vào **Kho tri thức RAG**. Đầu trang có **bộ đếm**: số tài liệu 
 
 > Tài liệu càng tốt, AI trả lời càng chuẩn. Đây là cách chính để làm AI thông minh hơn.
 
-`[Ảnh: màn hình Kho tri thức]`
+![Kho tri thức](images/huong-dan/ks-kho-tri-thuc.png)
 
 ---
 
@@ -116,7 +118,7 @@ Vào **Soát chất lượng AI** để rà soát các câu AI **đã trả lờ
 **Hai việc chính:**
 
 1. **Câu sai / yếu** → bấm **"Sai? Soạn câu trả lời đúng"** → cửa sổ hiện ra, nhập **Câu hỏi chuẩn** + **Câu trả lời đúng** → **"Lưu & embed"**. AI học lại để lần sau trả đúng.
-2. **Câu được nông dân 👍** (tab "Được khen") → bấm **"Duyệt thành QA"** → câu trả lời AI được điền sẵn, bạn chỉnh cho chuẩn → **Lưu**. Từ đó AI **trả thẳng** câu này khi có người hỏi tương tự — **không tốn quota AI**.
+2. **Câu được nông dân 👍** (tab "Được khen") → bấm **"Duyệt thành QA"** → câu trả lời AI được điền sẵn, bạn chỉnh cho chuẩn → **Lưu**. Từ đó AI **trả thẳng** câu này khi có người hỏi tương tự — có thể được trả trực tiếp.
 
 > Ưu tiên dọn tab **Tin cậy thấp (<50%)** (dễ sai) và tận dụng tab **👍 Được khen** (biến câu hay thành QA chuẩn).
 
@@ -126,7 +128,7 @@ Vào **Soát chất lượng AI** để rà soát các câu AI **đã trả lờ
 
 - Cố gắng trả lời câu hỏi **trong vòng 24 giờ** (câu quá hạn sẽ bị đánh dấu).
 - Câu chờ lâu (badge đỏ) nên ưu tiên xử lý trước.
-- Có thể giúp nông dân **đặt lại mã PIN** khi họ quên (qua admin, hoặc nếu bạn có quyền).
+- Khi nông dân quên PIN, đề nghị **admin** đặt lại; kỹ sư không có chức năng đặt lại PIN.
 - Tích "Tin cậy" có trách nhiệm: câu trả lời được đưa vào RAG sẽ ảnh hưởng các câu trả lời sau.
 
 ---
@@ -135,13 +137,13 @@ Vào **Soát chất lượng AI** để rà soát các câu AI **đã trả lờ
 
 | Tình huống | Cách xử lý |
 |---|---|
-| Mới đăng ký chưa đăng nhập được | Tài khoản chờ admin **Phê duyệt kỹ sư** trong Quản lý user |
+| Chưa có tài khoản | Liên hệ admin tạo tài khoản kỹ sư |
 | Nông dân quên PIN | Đề nghị admin **Đặt lại PIN** → đọc PIN mới cho họ |
 | AI báo "đang quá tải" khi Test | Giới hạn lượt gọi AI miễn phí — chờ chút rồi thử lại |
 | Tài liệu upload xong AI chưa dùng | Phải bấm **Duyệt & Embed**; chờ trạng thái chuyển sang **Đang dùng** |
 | Nhận câu báo "Không thể nhận" | Kỹ sư khác vừa nhận trước — chọn câu khác |
 | Gửi câu trả lời báo lỗi | Câu phải **≥ 20 ký tự**; kiểm tra mạng rồi gửi lại |
-| Lỡ thoát giữa chừng | Mở lại đúng câu từ Hàng đợi/Lịch sử — câu vẫn còn |
+| Lỡ thoát giữa chừng | Mở lại câu từ Hàng đợi/Lịch sử; phần soạn chưa gửi phải nhập lại |
 | Cần sửa câu đã gửi | Vào **Lịch sử** → mở câu → **Chỉnh sửa câu trả lời** |
 
 ---

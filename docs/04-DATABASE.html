@@ -303,8 +303,7 @@ the log survives without joins — no enforced FKs.</p>
 <hr>
 <h2>4. Data dictionary</h2>
 <h3>4.1 <code>users</code></h3>
-<p>Every account: farmers (phone + PIN), engineers/admins (email + password). RLS policy
-<code>users_self</code> (<code>auth.uid() = id</code>).</p>
+<p>Every account: farmers (phone + PIN), engineers/admins (email + password). The backend enforces access; client-side policies were removed by the security migration.</p>
 <table>
 <thead>
 <tr>
@@ -388,6 +387,7 @@ the log survives without joins — no enforced FKs.</p>
 <td>—</td>
 <td><code>false</code> ⇒ locked / self-deleted (denylist)</td>
 </tr>
+<tr><td><code>tokens_valid_after</code></td><td>timestamptz</td><td>nullable</td><td>—</td><td>—</td><td>Reject tokens issued before this timestamp</td></tr>
 <tr>
 <td><code>created_at</code></td>
 <td>timestamptz</td>
@@ -406,7 +406,7 @@ the log survives without joins — no enforced FKs.</p>
 </tr>
 </tbody></table>
 <h3>4.2 <code>chat_sessions</code></h3>
-<p>One advisory conversation. RLS policy <code>sessions_owner</code> (<code>user_id = auth.uid()</code>).</p>
+<p>One advisory conversation. Ownership is enforced by the backend.</p>
 <table>
 <thead>
 <tr>
@@ -460,8 +460,7 @@ the log survives without joins — no enforced FKs.</p>
 </tr>
 </tbody></table>
 <h3>4.3 <code>messages</code></h3>
-<p>Every turn in a conversation (farmer, AI, engineer, or system). RLS policy
-<code>messages_owner</code> (session belongs to <code>auth.uid()</code>).</p>
+<p>Every turn in a conversation (farmer, AI, engineer, or system). The backend enforces session ownership.</p>
 <table>
 <thead>
 <tr>
@@ -526,7 +525,7 @@ the log survives without joins — no enforced FKs.</p>
 <td>text</td>
 <td>nullable</td>
 <td>—</td>
-<td>CHECK in <code>{rag, llm, engineer}</code></td>
+<td>No source CHECK after 2026-11-13</td>
 <td>Origin of an answer</td>
 </tr>
 <tr>
@@ -539,9 +538,7 @@ the log survives without joins — no enforced FKs.</p>
 </tr>
 </tbody></table>
 <blockquote>
-<p>Note: the application also uses logical <code>source</code> values like <code>faq</code>, <code>qa_direct</code>,
-<code>vision</code>, <code>rag_low_conf</code> in API responses; the DB CHECK only constrains stored values
-to <code>{rag, llm, engineer}</code>, so persisted <code>source</code> is normalized accordingly.</p>
+<p>The 2026-11-13 migration drops the old <code>messages_source_check</code>; sources such as <code>faq</code>, <code>qa_direct</code>, <code>vision</code>, <code>rag_low_conf</code> and cache suffixes can be stored. Before migration, the backend retries a CHECK violation with <code>source=null</code> to preserve the answer.</p>
 </blockquote>
 <h3>4.4 <code>engineer_queue</code></h3>
 <p>Questions escalated to human agronomists. RLS enabled, no policy (service-role only).</p>
@@ -571,6 +568,14 @@ to <code>{rag, llm, engineer}</code>, so persisted <code>source</code> is normal
 <td>—</td>
 <td><strong>FK</strong> → <code>messages(id)</code> ON DELETE CASCADE</td>
 <td>The farmer&#39;s question</td>
+</tr>
+<tr>
+<td><code>answer_message_id</code></td>
+<td>uuid</td>
+<td>nullable</td>
+<td>—</td>
+<td>UNIQUE, <strong>FK</strong> → <code>messages(id)</code> ON DELETE SET NULL</td>
+<td>The engineer&#39;s reply, used for edits</td>
 </tr>
 <tr>
 <td><code>assigned_to</code></td>
@@ -622,8 +627,7 @@ to <code>{rag, llm, engineer}</code>, so persisted <code>source</code> is normal
 </tr>
 </tbody></table>
 <h3>4.5 <code>knowledge_docs</code></h3>
-<p>Source documents/QA for the RAG knowledge base. RLS policy <code>knowledge_farmer_read</code>
-(approved docs are world-readable; staff see all).</p>
+<p>Source documents/QA for the RAG knowledge base. Direct client access is denied; backend staff routes enforce role checks.</p>
 <table>
 <thead>
 <tr>
@@ -869,8 +873,7 @@ to <code>{rag, llm, engineer}</code>, so persisted <code>source</code> is normal
 </tr>
 </tbody></table>
 <h3>4.8 <code>ai_error_reports</code></h3>
-<p>Farmer &quot;this answer is wrong&quot; reports (👎). RLS: insert own (<code>user_id = auth.uid()</code>);
-engineers/admins read.</p>
+<p>Farmer &quot;this answer is wrong&quot; reports (👎). The backend checks ownership and restricts review routes by role.</p>
 <table>
 <thead>
 <tr>
@@ -1056,8 +1059,7 @@ engineers/admins read.</p>
 </tr>
 </tbody></table>
 <h3>4.11 <code>notifications</code></h3>
-<p>Broadcast notifications and weather-alert drafts. RLS policy <code>notif_read</code> (crop-matched
-or general).</p>
+<p>Broadcast notifications and weather-alert drafts. The backend filters notifications by recipient and crop.</p>
 <table>
 <thead>
 <tr>
@@ -1795,53 +1797,7 @@ LIMIT match_count;
 </tbody></table>
 <hr>
 <h2>8. Row-Level Security (RLS)</h2>
-<p><strong>Every table has RLS enabled.</strong> The backend uses the service-role key (which bypasses
-RLS), so application code is the primary authorization layer; RLS is a defense-in-depth
-backstop that blocks anon/<code>authenticated</code> clients from reading data directly. Policies
-that <em>do</em> exist (for any future direct-client access):</p>
-<table>
-<thead>
-<tr>
-<th>Table</th>
-<th>Policy</th>
-<th>Effect</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>users</code></td>
-<td><code>users_self</code></td>
-<td>A user can only access their own row (<code>auth.uid() = id</code>)</td>
-</tr>
-<tr>
-<td><code>chat_sessions</code></td>
-<td><code>sessions_owner</code></td>
-<td>Owner only (<code>user_id = auth.uid()</code>)</td>
-</tr>
-<tr>
-<td><code>messages</code></td>
-<td><code>messages_owner</code> (SELECT)</td>
-<td>Only messages in the user&#39;s own sessions</td>
-</tr>
-<tr>
-<td><code>knowledge_docs</code></td>
-<td><code>knowledge_farmer_read</code> (SELECT)</td>
-<td>Approved docs world-readable; staff see all</td>
-</tr>
-<tr>
-<td><code>notifications</code></td>
-<td><code>notif_read</code> (SELECT)</td>
-<td>General (<code>crop_tags={}</code>) or crop-matched to user</td>
-</tr>
-<tr>
-<td><code>ai_error_reports</code></td>
-<td><code>ai_error_insert</code> / <code>ai_error_read_eng</code></td>
-<td>Insert own; engineers/admins read</td>
-</tr>
-</tbody></table>
-<p>Tables with <strong>RLS on but no policy</strong> (deny-all to clients; service-role only):
-<code>engineer_queue</code>, <code>knowledge_chunks</code>, <code>post_likes</code>, <code>posts</code>, <code>comments</code>,
-<code>push_subscriptions</code>, <code>notification_reads</code>, <code>answer_feedback</code>, <code>message_bookmarks</code>,
-<code>content_reports</code>, <code>answer_cache</code>, <code>admin_audit_log</code>.</p>
+<p><strong>Every table has RLS enabled.</strong> The backend uses the service-role key (which bypasses RLS) and enforces authorization and ownership in application code. The 2026-10-25 security migration removes the old client policies, revokes public client table writes, and restricts the vector-search RPC to the service role. With RLS enabled and no client policies, anon/authenticated clients cannot access application rows directly.</p>
 <blockquote>
 <p><strong>Consequence:</strong> Supabase Realtime cannot subscribe to <code>engineer_queue</code> from an anon
 client (RLS blocks it), which is why the engineer queue uses <strong>polling</strong> rather than
@@ -1952,6 +1908,9 @@ then committed. Files in <code>supabase/migrations/</code>:</p>
 <td><code>message_bookmarks.sql</code></td>
 <td><code>message_bookmarks</code> table</td>
 </tr>
+<tr><td>20261025000000</td><td><code>security_hardening.sql</code></td><td>Token revocation timestamp, removal of client policies, write and RPC privilege restrictions</td></tr>
+<tr><td>20261113000000</td><td><code>messages_source_check.sql</code></td><td>Remove obsolete <code>messages.source</code> constraint</td></tr>
+<tr><td>20261121000000</td><td><code>engineer_answer_message.sql</code></td><td>Link engineer replies to queue items and save both in one transaction</td></tr>
 </tbody></table>
 <blockquote>
 <p>When adding a migration: create the file in <code>supabase/migrations/</code>, apply by hand with

@@ -14,6 +14,8 @@
 > The **human UAT scenarios** (§4) and the **sign-off** (§7) are filled in during the live
 > acceptance session with the cooperative; fields marked `[ ... ]` are completed then.
 
+> **Current verification:** The results below are a historical baseline, not evidence for the current source. Run the relevant suites and record the date, commit, environment and any skips before claiming a current pass. Human UAT and sign-off remain pending until actually completed.
+
 ---
 
 ## Table of contents
@@ -92,7 +94,7 @@ Executed by representative users on real devices. Result legend: **Pass** / **Fa
 | UAT-07 | **Community feed** | Create a post (optional image), comment, like | Post/comment/like work; report + admin moderation work | `[ ]` | `[ ]` |
 | UAT-08 | **Admin: user management** | Lock/unlock a user; reset a farmer PIN | Lock takes effect promptly; new PIN issued | `[ ]` | `[ ]` |
 | UAT-09 | **Weather** | Open weather screen; review an alert draft | Forecast shown; weather alerts require admin approval before sending | `[ ]` | `[ ]` |
-| UAT-10 | **Report a wrong answer** | Tap "báo lỗi" on an answer, choose a reason | Report recorded; visible to engineer/admin for review | `[ ]` | `[ ]` |
+| UAT-10 | **Report a wrong answer** | Tap "báo lỗi" on an answer, choose a reason | Report recorded; visible to admin for review | `[ ]` | `[ ]` |
 
 ---
 

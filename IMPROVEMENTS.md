@@ -194,6 +194,7 @@ Còn lại (thấp, có chủ ý chưa làm): race login đọc hash cũ trùng 
 - **N24 (phần reload)** — `main.jsx`: `controllerchange` chỉ reload khi trước đó ĐÃ có SW điều khiển (cập nhật thật); lần đầu mở app không reload nữa (trước đây xoá chữ/câu hỏi người mới đang gõ).
 - Công cụ quay demo: `frontend/demo/record-demo.mjs` (Playwright + Chrome cài sẵn; người dùng tự đăng nhập, script không đụng mật khẩu; output `frontend/demo/out/`, đã gitignore).
 - Backend 188 pass.
+- **Tài liệu hướng dẫn** (2026-11-13, Claude): chèn 10 ảnh chụp app thật vào `docs/HUONG-DAN-{NONG-DAN,KY-SU,ADMIN}.md/.html` (`docs/images/huong-dan/`, đã che email/SĐT/tên thật) + xuất PDF (`docs/pdf/`) và Word (`docs/word/`). Sửa hướng dẫn cài app: Chrome Android giờ là **"Cài đặt và tạo lối tắt"** (không còn "Thêm vào màn hình chính"); iPhone: chia sẻ → "Thêm vào MH chính" (cả bản TAP-HUAN). Sửa .md thì nhớ sửa .html tương ứng rồi xuất lại.
 
 **Đã sửa (2026-11-13, Claude — đợt "sửa hết"; backend 198 pass, frontend lint 0 / 12 test / build OK):**
 - **N4** — `ragRate` = câu có căn cứ (similarity ≥ 0.7) / mọi câu kỹ thuật, kể cả câu phải chuyển kỹ sư, bỏ FAQ; "lỗ hổng tri thức" + tab "Tin cậy thấp" lấy cả `role='system'` (trước luôn rỗng); Dashboard gắn nhãn "Chuyển kỹ sư".

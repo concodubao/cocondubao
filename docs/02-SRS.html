@@ -255,7 +255,7 @@ otherwise it escalates to an engineer and tells the farmer.</li>
 <tr>
 <td>FR-AUTH-02</td>
 <td>S</td>
-<td>Farmers can request and verify an SMS OTP (phone verification).</td>
+<td>When explicitly enabled with <code>OTP_ENABLED=true</code>, the API supports SMS OTP; it is disabled by default and the current UI uses phone + PIN.</td>
 </tr>
 <tr>
 <td>FR-AUTH-03</td>
@@ -265,7 +265,7 @@ otherwise it escalates to an engineer and tells the farmer.</li>
 <tr>
 <td>FR-AUTH-04</td>
 <td>M</td>
-<td>Only admins can create engineer/admin accounts; new engineers start pending approval.</td>
+<td>Only admins can create engineer/admin accounts. The admin UI creates active staff accounts; the legacy email registration endpoint creates engineers pending approval.</td>
 </tr>
 <tr>
 <td>FR-AUTH-05</td>
@@ -300,7 +300,7 @@ otherwise it escalates to an engineer and tells the farmer.</li>
 <tr>
 <td>FR-AUTH-11</td>
 <td>S</td>
-<td>OTP/login responses must not reveal whether a number is already registered.</td>
+<td>OTP request responses do not reveal whether a number is registered; phone login and registration currently return account-specific errors.</td>
 </tr>
 </tbody></table>
 <h3>4.2 AI question answering (FR-CHAT)</h3>

@@ -143,7 +143,7 @@ architecture must keep request volume low and tolerate provider 429/503.</li>
     gemini[[Google Gemini&lt;br/&gt;embeddings + generation + vision]]
     supabase[[Supabase&lt;br/&gt;Postgres + pgvector + Storage]]
     openmeteo[[Open-Meteo&lt;br/&gt;weather forecast]]
-    twilio[[Twilio via Supabase Auth&lt;br/&gt;SMS OTP]]
+    twilio[[Twilio via Supabase Auth&lt;br/&gt;SMS OTP optional, disabled by default]]
     webpushsvc[[Browser Push Services&lt;br/&gt;FCM / APNs / Mozilla]]
 
     farmer --&gt;|asks questions, reads answers| pwa
@@ -154,7 +154,7 @@ architecture must keep request volume low and tolerate provider 429/503.</li>
     api --&gt;|embed / generate / vision| gemini
     api --&gt;|SQL + RPC + Storage| supabase
     api --&gt;|daily forecast| openmeteo
-    api --&gt;|send OTP| twilio
+    api -.-&gt;|send OTP when enabled| twilio
     api --&gt;|Web Push| webpushsvc
     webpushsvc -.-&gt;|notification| farmer
 </code></pre>
@@ -175,8 +175,7 @@ notifications, approves weather-alert drafts, moderates the community, views ana
 <li><strong>Supabase</strong> — Postgres 17 (system of record) with <code>pgvector</code>, plus an <code>images</code>
 Storage bucket.</li>
 <li><strong>Open-Meteo</strong> — free daily forecast for the weather widget and weather-alert drafts.</li>
-<li><strong>Twilio</strong> (via Supabase Auth) — SMS OTP for farmer phone verification (kept but
-flagged for replacement; Twilio deliverability is poor in Vietnam).</li>
+<li><strong>Twilio</strong> (via Supabase Auth) — optional SMS OTP. The current UI uses phone + PIN; OTP endpoints are disabled unless <code>OTP_ENABLED=true</code>.</li>
 <li><strong>Browser push services</strong> — deliver Web Push notifications.</li>
 </ul>
 <hr>
@@ -800,7 +799,7 @@ insert window of a few ms) so a mid-way 429 never wipes a live document. Only do
     API-&gt;&gt;Q: insert {message_id, status: pending}
     API-&gt;&gt;P: notifyEngineer(...)
     P--&gt;&gt;E: 🔔 &quot;New farmer question&quot;
-    API--&gt;&gt;F: &quot;Forwarded to an engineer (≤ 24h)&quot;
+    API--&gt;&gt;F: &quot;Forwarded to an engineer (24h estimate)&quot;
 
     E-&gt;&gt;Q: PATCH /queue/:id/take (atomic pending→in_progress)
     E-&gt;&gt;API: PATCH /queue/:id/answer {answer, addToKnowledge}
@@ -816,10 +815,10 @@ insert window of a few ms) so a mid-way 429 never wipes a live document. Only do
 <p><em>(Placeholder: [Chèn ảnh sơ đồ từ mermaid.live vào đây])</em></p>
 <p><strong>Notes</strong></p>
 <ul>
-<li><code>take</code> is <strong>atomic</strong> (<code>UPDATE ... WHERE status=&#39;pending&#39;</code>) to avoid two engineers
+<li>The 24-hour time shown is an estimate, not a guaranteed deadline; push delivery depends on the recipient device. <code>take</code> is <strong>atomic</strong> (<code>UPDATE ... WHERE status=&#39;pending&#39;</code>) to avoid two engineers
 grabbing the same item; 0 rows updated → 409 Conflict.</li>
-<li>Editing a resolved answer <strong>overwrites</strong> the prior engineer message (matched by
-content) instead of appending a duplicate.</li>
+<li><code>save_engineer_answer</code> saves the reply and resolves the queue item in one transaction.
+Edits use the stored answer message ID. An ambiguous match for a legacy reply returns 409.</li>
 <li>A farmer can also <strong>self-escalate</strong> (<code>POST /chat/escalate</code>) after an AI answer, or
 <strong>report an error</strong> (👎) / mark <strong>helpful</strong> (👍). High-👍 answers become candidate
 curated QA. Deleting an unanswered queue item notifies the farmer so they don&#39;t wait

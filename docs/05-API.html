@@ -658,15 +658,14 @@ even if the token is still valid — via the in-memory denylist).</li>
 <hr>
 <h2>6. Auth API (<code>/api/v1/auth</code>)</h2>
 <h3>POST <code>/auth/request-otp</code> · public · OTP-limited</h3>
-<p>Send an SMS OTP (Twilio via Supabase Auth). Does <strong>not</strong> reveal whether the number is
-registered (prevents account enumeration).</p>
+<p>OTP is disabled by default and the current UI uses phone + PIN. Set <code>OTP_ENABLED=true</code> only when an SMS provider is configured. Send an SMS OTP (via Supabase Auth); the response does <strong>not</strong> reveal whether the number is registered.</p>
 <ul>
 <li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;0901234567&quot; }</code></li>
 <li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;phone&quot;: &quot;+84901234567&quot; }</code></li>
-<li><strong>Errors:</strong> <code>400</code> invalid phone · <code>429</code> provider rate limit</li>
+<li><strong>Errors:</strong> <code>400</code> invalid phone · <code>404</code> OTP disabled · <code>429</code> provider rate limit</li>
 </ul>
 <h3>POST <code>/auth/verify-otp</code> · public · OTP-limited</h3>
-<p>Verify the OTP; creates a farmer account on first verification.</p>
+<p>Verify the OTP; creates a farmer account on first verification. Requires <code>OTP_ENABLED=true</code>; otherwise returns <code>404</code>.</p>
 <ul>
 <li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;otp&quot;: &quot;123456&quot; }</code></li>
 <li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;token&quot;: &quot;&lt;jwt&gt;&quot;, &quot;user&quot;: { id, phone, role, name, village, crops, hasPassword }, &quot;isNewUser&quot;: true }</code></li>
@@ -675,14 +674,14 @@ registered (prevents account enumeration).</p>
 <h3>POST <code>/auth/register-phone</code> · public</h3>
 <p>Farmer signup with phone + 6-digit PIN. Token valid <strong>30 days</strong>.</p>
 <ul>
-<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;password&quot;: &quot;123456&quot; }</code> (PIN = exactly 6 digits)</li>
+<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;password&quot;: &quot;482739&quot; }</code> (PIN = exactly 6 digits)</li>
 <li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;token&quot;: &quot;&lt;jwt&gt;&quot;, &quot;user&quot;: {...}, &quot;isNewUser&quot;: bool }</code></li>
 <li><strong>Errors:</strong> <code>400</code> invalid phone / PIN not 6 digits / already registered</li>
 </ul>
 <h3>POST <code>/auth/login-phone</code> · public · PIN lockout</h3>
 <p>Farmer login. 5 wrong PINs → 10-minute lock for that phone.</p>
 <ul>
-<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;password&quot;: &quot;123456&quot; }</code></li>
+<li><strong>Body:</strong> <code>{ &quot;phone&quot;: &quot;...&quot;, &quot;password&quot;: &quot;482739&quot; }</code></li>
 <li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;token&quot;: &quot;&lt;jwt&gt;&quot;, &quot;user&quot;: {...}, &quot;isNewUser&quot;: bool }</code></li>
 <li><strong>Errors:</strong> <code>401</code> not registered / wrong PIN / no PIN set · <code>403</code> locked · <code>429</code> too many failures</li>
 </ul>
@@ -694,8 +693,7 @@ registered (prevents account enumeration).</p>
 <li><strong>Errors:</strong> <code>401</code> wrong credentials · <code>403</code> pending approval / locked</li>
 </ul>
 <h3>POST <code>/auth/register-email</code> · admin</h3>
-<p>Create an engineer/admin account (admin-only path). New engineers start inactive
-(<code>pending</code>) until approved; new admins are active.</p>
+<p>Legacy admin-only path: new engineers start inactive (<code>pending</code>) until approved; new admins are active. The admin UI uses <code>/admin/engineers</code> instead, which creates active engineer and admin accounts.</p>
 <ul>
 <li><strong>Body:</strong> <code>{ &quot;email&quot;: &quot;...&quot;, &quot;password&quot;: &quot;...(≥8)&quot;, &quot;role&quot;: &quot;engineer&quot;|&quot;admin&quot; }</code></li>
 <li><strong>200:</strong> <code>{ &quot;success&quot;: true, &quot;pending&quot;: bool }</code></li>

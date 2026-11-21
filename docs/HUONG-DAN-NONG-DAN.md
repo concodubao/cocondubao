@@ -2,7 +2,7 @@
 
 > App giúp bà con **hỏi về cây trồng** và được trả lời ngay. Câu khó sẽ có **kỹ sư** trả lời giúp.
 > Địa chỉ app: **cocondubao.vercel.app** (mở bằng trình duyệt điện thoại).
-> Có thể **"Thêm vào màn hình chính"** để dùng như một ứng dụng.
+> Có thể **cài app ra màn hình chính** (xem mục 1) để dùng như một ứng dụng.
 
 ---
 
@@ -24,13 +24,15 @@
 ## 1. Cài app vào điện thoại
 
 1. Mở trình duyệt (Chrome / Safari) → gõ địa chỉ **cocondubao.vercel.app**.
-2. Bấm menu trình duyệt (dấu **⋮** hoặc nút chia sẻ) → chọn **"Thêm vào màn hình chính"**.
+2. Bấm menu trình duyệt rồi chọn mục cài app:
+   - **Chrome (Android):** bấm dấu **⋮** góc trên bên phải → chọn **"Cài đặt và tạo lối tắt"** (máy để tiếng Anh: *"Install and create shortcut"*; Chrome đời cũ ghi *"Thêm vào màn hình chính"*) → bấm **Cài đặt** để xác nhận.
+   - **Safari (iPhone):** bấm nút **chia sẻ** (ô vuông có mũi tên lên) → chọn **"Thêm vào MH chính"**.
 3. Từ nay mở app bằng biểu tượng **con cò** ngoài màn hình, không cần gõ địa chỉ nữa.
-4. Lần đầu mở, app xin **cho phép Thông báo** và **micro** → bấm **Cho phép** cả hai.
+4. Khi dùng giọng nói, cho phép **micro** nếu trình duyệt yêu cầu. Để nhận thông báo trên thiết bị, vào **Thông báo → Cài đặt thông báo → Bật** và cho phép quyền thông báo.
 
 > **Mẹo cho bà con lớn tuổi:** vào **Hồ sơ → Cỡ chữ hiển thị → Lớn / Rất lớn** để chữ to, dễ đọc.
 
-`[Ảnh: màn hình "Thêm vào màn hình chính"]`
+![Chrome trên Android: bấm ⋮ rồi chọn “Cài đặt và tạo lối tắt”](images/huong-dan/nd-cai-app.png)
 
 ---
 
@@ -41,12 +43,12 @@ Dùng **số điện thoại + mã PIN 6 số**.
 1. Mở app → màn hình chọn vai trò → bấm **"Nông dân"**.
 2. **Lần đầu** — chọn tab **Đăng ký**:
    - Nhập **số điện thoại**.
-   - Tạo **mã PIN gồm 6 chữ số** (ví dụ `123456`). **Nhớ kỹ mã PIN** để đăng nhập lần sau.
-   - Bấm **Đăng ký** → app đưa thẳng vào màn khai báo hồ sơ (mục 3).
+   - Tạo **mã PIN gồm 6 chữ số** (ví dụ `482739`). **Nhớ kỹ mã PIN** để đăng nhập lần sau. Tránh dãy liên tiếp, số lặp hoặc mẫu dễ đoán.
+   - Nhập lại PIN, đánh dấu đồng ý với **Điều khoản & Chính sách bảo mật**, rồi bấm **Đăng ký** → khai báo hồ sơ (mục 3).
 3. **Lần sau** — chọn tab **Đăng nhập** → nhập số điện thoại + mã PIN → bấm **Đăng nhập**.
-4. **Quên PIN?** → Nhờ **kỹ sư hoặc admin** ở xã đặt lại giúp (họ đọc cho bạn mã PIN mới).
+4. **Quên PIN?** → Nhờ **admin** ở xã đặt lại giúp (họ đọc cho bạn mã PIN mới).
 
-> Ai có **tài khoản cũ dùng mật khẩu chữ**: bấm dòng *"Tài khoản cũ dùng mật khẩu chữ?"* để chuyển sang ô nhập mật khẩu chữ.
+> Nếu tài khoản cũ không dùng được PIN, liên hệ admin để được hỗ trợ đặt lại PIN.
 
 **Các trường hợp app báo lỗi (và cách xử lý):**
 
@@ -59,7 +61,7 @@ Dùng **số điện thoại + mã PIN 6 số**.
 
 > **Lưu ý:** PIN bị che (hiện dấu •) cho an toàn. Có thể **dán** (paste) PIN nếu lưu sẵn.
 
-`[Ảnh: màn hình đăng ký nông dân]`
+![Màn hình đăng ký nông dân](images/huong-dan/nd-dang-ky.png)
 
 ---
 
@@ -81,7 +83,7 @@ Sau khi đăng ký, app hỏi vài thông tin để hỗ trợ tốt hơn:
 - **Thời tiết hôm nay** → xem nắng/mưa, nhiệt độ.
 - **Mẹo hôm nay** → gợi ý canh tác theo cây trồng của bạn.
 
-`[Ảnh: màn hình chính nông dân]`
+![Màn hình chính của nông dân](images/huong-dan/nd-trang-chu.png)
 
 ---
 
@@ -101,11 +103,11 @@ Sau khi đăng ký, app hỏi vài thông tin để hỗ trợ tốt hơn:
 
 > **Lưu ý ảnh:** chỉ nhận **file ảnh**, dung lượng **tối đa 10MB**. Chụp rõ vùng bị bệnh, đủ sáng. Nếu phân tích ảnh trục trặc, AI sẽ tự chuyển sang trả lời theo mô tả chữ.
 
-> Nếu bạn trồng **2 loại cây trở lên**, nút **chọn cây** hiện ở đầu màn hình chat — bấm để hỏi đúng theo cây (trồng 1 loại thì không có nút này).
+> Nếu hồ sơ có cây trồng, nút **chọn cây** hiện ở đầu màn hình chat — bấm để chọn cây liên quan đến câu hỏi.
 
 > **Gửi quá nhanh/nhiều:** hệ thống giới hạn ~**15 câu hỏi/phút**. Nếu hỏi dồn dập, app sẽ nhắc chờ chút rồi gửi lại.
 
-`[Ảnh: ô nhập câu hỏi với nút micro và máy ảnh]`
+![Câu trả lời của kỹ sư và ô nhập câu hỏi (máy ảnh · ô gõ · micro · gửi)](images/huong-dan/nd-hoi-dap.png)
 
 ---
 
@@ -120,11 +122,11 @@ Sau khi đăng ký, app hỏi vài thông tin để hỗ trợ tốt hơn:
 
 ## 7. Khi AI chưa chắc — hỏi kỹ sư
 
-- Câu khó, app tự chuyển sang màn **chờ kỹ sư** → bạn chờ, kỹ sư sẽ trả lời (trong vòng **24 giờ**).
+- Câu khó, app tự chuyển sang màn **chờ kỹ sư** → bạn chờ kỹ sư trả lời. App thông báo thời gian dự kiến là **24 giờ**; thời gian thực tế tùy tình hình xử lý.
 - Khi đã có câu trả lời AI, bạn vẫn có thể bấm **"Hỏi lại kỹ sư"** → app hỏi xác nhận *"Gửi câu hỏi này cho kỹ sư nông nghiệp xem lại?"* → đồng ý.
   - Gửi xong nút đổi thành **"Đã gửi kỹ sư"** (mỗi câu chỉ gửi **1 lần**).
 - Câu đã có nhãn **"Kỹ sư xác nhận"** thì **không cần** hỏi lại — đó là câu kỹ sư đã duyệt.
-- Kỹ sư trả lời xong, bạn nhận được **thông báo** ngay.
+- Khi kỹ sư trả lời, kiểm tra lại cuộc hội thoại; thông báo đẩy phụ thuộc vào việc thiết bị đã bật thông báo và kết nối mạng.
 
 ---
 
@@ -144,6 +146,7 @@ Thấy AI trả lời sai/khó hiểu → bấm **"Báo lỗi"** (cờ) dưới 
 ### 9.1. Lịch sử chat
 - Bấm nút **đồng hồ** để xem lại các câu đã hỏi.
 - Có ô **tìm trong lịch sử** (vd gõ "lúa", "vàng lá") để tìm nhanh câu cũ.
+- Trên màn hình kết quả có thể bấm **Lưu** để lưu câu trả lời, hoặc **Hữu ích** để đánh giá. Vào tab **Đã lưu** trong Lịch sử chat để xem lại hoặc bỏ lưu.
 
 ### 9.2. Cộng đồng nhà nông
 Nơi bà con chia sẻ kinh nghiệm với nhau:
@@ -151,13 +154,13 @@ Nơi bà con chia sẻ kinh nghiệm với nhau:
 - **Chúc mừng** (giống "thích"): bấm nút **Chúc mừng** dưới bài để động viên người đăng.
 - **Bình luận**: bấm **Bình luận** để trao đổi thêm dưới bài.
 - **Xóa bài của mình**: bài do bạn đăng có nút xóa.
-- **Báo cáo bài xấu**: thấy bài không phù hợp → bấm nút **báo cáo** (cờ) → xác nhận. Admin sẽ xem xét.
+- **Báo cáo bài hoặc bình luận** không phù hợp: bấm nút **báo cáo** → xác nhận. Admin sẽ xem xét; bạn cũng có thể xóa bình luận của mình.
 
 ### 9.3. Cài đặt thông báo
 Trong mục Thông báo → **Cài đặt thông báo**:
 - Bật/Tắt nhận thông báo.
 - Chọn loại tin muốn nhận: **Cảnh báo dịch bệnh / Khuyến mãi vật tư / Thời tiết**.
-- **Khung giờ không làm phiền** (mặc định 22:00–06:00): ban đêm điện thoại không rung/chuông.
+- **Khung giờ không làm phiền** (mặc định 22:00–06:00): thông báo đẩy bị bỏ qua trong khoảng này; vẫn có thể xem tin trong danh sách. Bấm **Lưu cài đặt** sau khi thay đổi.
 
 ### 9.4. Hồ sơ
 Nút **người** ở góc: sửa tên/cây trồng, **đổi cỡ chữ** (Vừa / Lớn / Rất lớn), đặt/đổi mật khẩu, đăng xuất.
@@ -168,7 +171,7 @@ Nút **người** ở góc: sửa tên/cây trồng, **đổi cỡ chữ** (Vừ
 
 | Tình huống | Cách xử lý |
 |---|---|
-| Quên mã PIN | Nhờ admin/kỹ sư **Đặt lại PIN** → nhận PIN mới → tự đổi lại trong Hồ sơ |
+| Quên mã PIN | Nhờ admin **Đặt lại PIN** → nhận PIN mới → tự đổi lại trong Hồ sơ |
 | Tài khoản bị khóa | Liên hệ admin ở xã để mở khóa |
 | Không nhận được thông báo | Vào **Cài đặt thông báo** → bấm **Bật**; kiểm tra quyền thông báo của trình duyệt |
 | Micro không hoạt động / "Đang nhận dạng" mãi | Cho phép quyền micro; nói nơi yên tĩnh, rõ ràng; mạng yếu thử lại |
@@ -177,7 +180,7 @@ Nút **người** ở góc: sửa tên/cây trồng, **đổi cỡ chữ** (Vừ
 | Gửi ảnh báo lỗi | Ảnh phải là **file ảnh ≤ 10MB**; kiểm tra mạng, thử **Chụp lại** |
 | Hỏi dồn bị chặn | Giới hạn ~15 câu/phút — chờ một lát |
 | Câu trả lời sai | Bấm **Báo lỗi** dưới câu trả lời, chọn lý do |
-| Câu hỏi khó, AI không chắc | App tự chuyển kỹ sư, hoặc bấm **Hỏi lại kỹ sư** → chờ trong 24h |
+| Câu hỏi khó, AI không chắc | App tự chuyển kỹ sư, hoặc bấm **Hỏi lại kỹ sư** → theo dõi cuộc hội thoại; app dự kiến 24 giờ |
 | Cập nhật mới không thấy | Đóng hẳn app và mở lại (tải bản mới) |
 
 ---

@@ -100,7 +100,7 @@ graph TB
     gemini[[Google Gemini<br/>embeddings + generation + vision]]
     supabase[[Supabase<br/>Postgres + pgvector + Storage]]
     openmeteo[[Open-Meteo<br/>weather forecast]]
-    twilio[[Twilio via Supabase Auth<br/>SMS OTP]]
+    twilio[[Twilio via Supabase Auth<br/>SMS OTP optional, disabled by default]]
     webpushsvc[[Browser Push Services<br/>FCM / APNs / Mozilla]]
 
     farmer -->|asks questions, reads answers| pwa
@@ -111,7 +111,7 @@ graph TB
     api -->|embed / generate / vision| gemini
     api -->|SQL + RPC + Storage| supabase
     api -->|daily forecast| openmeteo
-    api -->|send OTP| twilio
+    api -.->|send OTP when enabled| twilio
     api -->|Web Push| webpushsvc
     webpushsvc -.->|notification| farmer
 ```
@@ -135,8 +135,7 @@ graph TB
 - **Supabase** — Postgres 17 (system of record) with `pgvector`, plus an `images`
   Storage bucket.
 - **Open-Meteo** — free daily forecast for the weather widget and weather-alert drafts.
-- **Twilio** (via Supabase Auth) — SMS OTP for farmer phone verification (kept but
-  flagged for replacement; Twilio deliverability is poor in Vietnam).
+- **Twilio** (via Supabase Auth) — optional SMS OTP. The current UI uses phone + PIN; OTP endpoints are disabled unless `OTP_ENABLED=true`.
 - **Browser push services** — deliver Web Push notifications.
 
 ---
@@ -496,7 +495,7 @@ sequenceDiagram
     API->>Q: insert {message_id, status: pending}
     API->>P: notifyEngineer(...)
     P-->>E: 🔔 "New farmer question"
-    API-->>F: "Forwarded to an engineer (≤ 24h)"
+    API-->>F: "Forwarded to an engineer (24h estimate)"
 
     E->>Q: PATCH /queue/:id/take (atomic pending→in_progress)
     E->>API: PATCH /queue/:id/answer {answer, addToKnowledge}
@@ -515,10 +514,10 @@ sequenceDiagram
 
 **Notes**
 
-- `take` is **atomic** (`UPDATE ... WHERE status='pending'`) to avoid two engineers
+- The 24-hour time shown is an estimate, not a guaranteed deadline; push delivery depends on the recipient device. `take` is **atomic** (`UPDATE ... WHERE status='pending'`) to avoid two engineers
   grabbing the same item; 0 rows updated → 409 Conflict.
-- Editing a resolved answer **overwrites** the prior engineer message (matched by
-  content) instead of appending a duplicate.
+- `save_engineer_answer` saves the reply and resolves the queue item in one transaction.
+  Edits use the stored answer message ID. An ambiguous match for a legacy reply returns 409.
 - A farmer can also **self-escalate** (`POST /chat/escalate`) after an AI answer, or
   **report an error** (👎) / mark **helpful** (👍). High-👍 answers become candidate
   curated QA. Deleting an unanswered queue item notifies the farmer so they don't wait

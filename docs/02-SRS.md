@@ -185,16 +185,16 @@ Priority: **M** = Must, **S** = Should, **C** = Could.
 | ID | Pri | Requirement |
 |----|-----|-------------|
 | FR-AUTH-01 | M | Farmers can register/login with a Vietnamese mobile number and a 6-digit PIN. |
-| FR-AUTH-02 | S | Farmers can request and verify an SMS OTP (phone verification). |
+| FR-AUTH-02 | S | When explicitly enabled with `OTP_ENABLED=true`, the API supports SMS OTP; it is disabled by default and the current UI uses phone + PIN. |
 | FR-AUTH-03 | M | Engineers/admins log in with email + password (≥ 8 chars). |
-| FR-AUTH-04 | M | Only admins can create engineer/admin accounts; new engineers start pending approval. |
+| FR-AUTH-04 | M | Only admins can create engineer/admin accounts. The admin UI creates active staff accounts; the legacy email registration endpoint creates engineers pending approval. |
 | FR-AUTH-05 | M | The system issues a JWT (7 days email / 30 days phone) carrying user id, role, name. |
 | FR-AUTH-06 | M | A locked account (`is_active=false`) is rejected within ≤ 60 s even with a valid token. |
 | FR-AUTH-07 | M | Users can set/change their password/PIN, enforcing role-appropriate strength. |
 | FR-AUTH-08 | M | After 5 wrong PINs, that phone is locked for 10 minutes. |
 | FR-AUTH-09 | M | Users can view/update their profile (name, village, crops); crops limited to a whitelist. |
 | FR-AUTH-10 | M | Users can self-delete: account disabled, PII nulled, images removed, history kept. |
-| FR-AUTH-11 | S | OTP/login responses must not reveal whether a number is already registered. |
+| FR-AUTH-11 | S | OTP request responses do not reveal whether a number is registered; phone login and registration currently return account-specific errors. |
 
 ### 4.2 AI question answering (FR-CHAT)
 

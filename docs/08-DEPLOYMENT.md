@@ -75,7 +75,7 @@ inside each package (see §6).
    (frontend), and the private key for `VAPID_PRIVATE_KEY` (backend only).
 5. **SMS OTP (optional)** — configure a phone provider (e.g. Twilio) **inside the Supabase
    Auth dashboard**. No `TWILIO_*` variables are needed in the app; phone+PIN is the
-   primary auth path and OTP is optional.
+   primary auth path. OTP is disabled by default (`OTP_ENABLED=false`) and is not exposed by the current UI; enabling it requires `OTP_ENABLED=true` and a configured provider.
 6. **Sentry (optional)** — create two projects (Node + React) for `SENTRY_DSN` /
    `VITE_SENTRY_DSN`.
 
@@ -95,7 +95,7 @@ migration **in timestamp order** with `psql` 17 over the Session pooler:
 # Repeat -f for each migration file, in ascending timestamp order.
 ```
 
-Migration order (as of this baseline) is listed in [04-DATABASE](04-DATABASE.md) §11. The
+Migration order, including the 2026-10-25 security hardening and 2026-11-13 source constraint removal, is listed in [04-DATABASE](04-DATABASE.md) §11. The
 base migration creates the tables, the `match_knowledge_chunks` RPC, the `update_updated_at`
 trigger, indexes, and RLS. Vector columns are `vector(1536)` (Gemini embedding dimension).
 
@@ -106,7 +106,7 @@ the question relationship explicitly and uses the new database function to save 
 
 > **Soft-degrade:** the API is written to return an "unavailable" flag instead of `500`
 > when a not-yet-applied table is queried, so a deploy that precedes a manual migration
-> does not crash. Still, apply migrations promptly.
+> does not crash. This applies only to specific optional features, not every schema change. Apply all pending migrations; the security and source-constraint migrations are required for the documented behavior.
 
 ---
 
@@ -157,7 +157,7 @@ Verify the backend is up: `curl http://localhost:3000/health` should return
    [04-DATABASE](04-DATABASE.md) §11 "Seed Data". Engineers/admins can then be created
    in-app by an admin.
 2. **Knowledge base** — log in as engineer/admin and upload documents or author curated
-   Q&A, then approve them (they are chunked and embedded). The RAG pipeline only searches
+   Q&A. Uploaded documents must be approved; authored Q&A starts embedding immediately. The RAG pipeline only searches
    `status = 'approved'` documents, so the assistant is only useful once the KB is seeded.
 
 ---
