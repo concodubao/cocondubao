@@ -184,7 +184,7 @@ router.get('/queue', verifyJWT, requireRole('engineer', 'admin'), async (req, re
       answer,
       add_to_knowledge,
       assignee:users!engineer_queue_assigned_to_fkey ( id, name, email ),
-      messages (
+      messages!engineer_queue_message_id_fkey (
         id,
         content,
         image_url,
@@ -217,7 +217,7 @@ router.get('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (req
     .select(`
       id, status, created_at, resolved_at, assigned_to, answer, add_to_knowledge,
       assignee:users!engineer_queue_assigned_to_fkey ( id, name, email ),
-      messages (
+      messages!engineer_queue_message_id_fkey (
         id, content, image_url, confidence, created_at,
         chat_sessions ( crop_type, users ( name, village, phone ) )
       )
@@ -268,89 +268,26 @@ router.patch('/queue/:id/answer', verifyJWT, requireRole('engineer', 'admin'), a
   if (!answer?.trim()) return res.status(400).json({ error: 'Câu trả lời không được để trống.' })
 
   try {
-    const { data: queueItem } = await supabase
-      .from('engineer_queue')
-      .select(`
-        message_id,
-        assigned_to,
-        status,
-        answer,
-        messages (
-          session_id,
-          content,
-          chat_sessions ( user_id )
-        )
-      `)
-      .eq('id', id)
-      .single()
-
-    if (!queueItem) return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' })
-
-    // Engineer chỉ trả lời được câu hỏi do mình nhận, admin có thể override
-    if (req.user.role !== 'admin' && queueItem.assigned_to && queueItem.assigned_to !== req.user.userId) {
-      return res.status(403).json({ error: 'Câu hỏi này đang được kỹ sư khác xử lý.' })
-    }
-
-    const sessionId  = queueItem.messages?.session_id
-    const farmerId   = queueItem.messages?.chat_sessions?.user_id
-    const question   = queueItem.messages?.content
-    const isEditing  = queueItem.status === 'resolved'
-    const newAnswer  = answer.trim()
-
-    // Khi sửa câu đã trả lời (status=resolved): GHI ĐÈ message engineer cũ thay vì
-    // chèn câu mới — nếu không nông dân sẽ thấy 2 câu trả lời. Khớp theo nội dung
-    // câu cũ để đúng message kể cả khi 1 phiên có nhiều lần escalate.
-    let overwritten = false
-    if (isEditing && queueItem.answer) {
-      // So nội dung ở JS: trước đây .eq('content', <câu cũ>) nhét cả câu trả lời (có thể
-      // vài nghìn ký tự tiếng Việt) vào URL → quá giới hạn URL là truy vấn lỗi, code tưởng
-      // "không có câu cũ" rồi chèn thêm câu thứ hai.
-      const { data: engMsgs } = await supabase
-        .from('messages')
-        .select('id, content')
-        .eq('session_id', sessionId)
-        .eq('role', 'engineer')
-        .order('created_at', { ascending: false })
-        .limit(50)
-      const prev = (engMsgs || []).find(m => m.content === queueItem.answer)
-      if (prev) {
-        const { error: upErr } = await supabase.from('messages').update({ content: newAnswer }).eq('id', prev.id)
-        if (upErr) throw upErr
-        overwritten = true
-      }
-    }
-
-    // Câu trả lời mới (lần đầu) hoặc không tìm thấy message cũ → chèn mới.
-    // PHẢI kiểm lỗi: nếu chèn hỏng mà vẫn đánh dấu resolved thì câu hỏi biến khỏi
-    // hàng đợi còn nông dân không bao giờ thấy câu trả lời.
-    if (!overwritten) {
-      const { error: msgErr } = await supabase.from('messages').insert({
-        session_id: sessionId,
-        role:       'engineer',
-        content:    newAnswer,
-        source:     'engineer',
-      })
-      if (msgErr) throw msgErr
-    }
-
-    // Cập nhật trạng thái queue → resolved. Trả lời thẳng câu chưa ai nhận (pending)
-    // thì gán luôn người trả lời — nếu không câu đó không hiện trong lịch sử/thống kê
-    // của kỹ sư (cả hai lọc theo assigned_to).
-    const { error: qErr } = await supabase.from('engineer_queue').update({
-      status:           'resolved',
-      answer:           newAnswer,
-      add_to_knowledge: addToKnowledge,
-      resolved_at:      new Date().toISOString(),
-      ...(queueItem.assigned_to ? {} : { assigned_to: req.user.userId }),
-    }).eq('id', id)
-    if (qErr) throw qErr
+    const newAnswer = answer.trim()
+    const { data, error } = await supabase.rpc('save_engineer_answer', {
+      p_queue_id: id,
+      p_engineer_id: req.user.userId,
+      p_is_admin: req.user.role === 'admin',
+      p_answer: newAnswer,
+      p_add_to_knowledge: addToKnowledge,
+    }).single()
+    if (error?.code === 'P0002') return res.status(404).json({ error: 'Không tìm thấy câu hỏi.' })
+    if (error?.code === '42501') return res.status(403).json({ error: 'Câu hỏi này đang được kỹ sư khác xử lý.' })
+    if (error?.code === 'PT409') return res.status(409).json({ error: 'Có nhiều câu trả lời cũ giống nhau. Cần xác định đúng tin nhắn trước khi sửa.' })
+    if (error) throw error
+    const { question, farmer_id: farmerId, previous_answer: previousAnswer, overwritten } = data
 
     // Sửa câu trả lời đã từng "thêm vào tri thức": tài liệu QA cũ (câu trả lời SAI vừa bị
     // sửa) trước đây vẫn nằm đó ở trạng thái approved và tiếp tục được trả thẳng cho nông
     // dân (qa_direct). Lưu trữ nó + xoá cache; tick lại "Tin cậy" sẽ tạo QA mới bên dưới.
-    if (isEditing && question && queueItem.answer && queueItem.answer !== newAnswer) {
+    if (question && previousAnswer && previousAnswer !== newAnswer) {
       try {
-        const oldContent = buildQaContent(question, queueItem.answer)
+        const oldContent = buildQaContent(question, previousAnswer)
         const { data: oldDocs } = await supabase
           .from('knowledge_docs')
           .select('id, content')
@@ -415,7 +352,7 @@ router.delete('/queue/:id', verifyJWT, requireRole('engineer', 'admin'), async (
   // Lấy kèm phiên + nông dân để báo lại cho họ sau khi xóa (tránh chờ vô vọng 24h).
   const { data: item } = await supabase
     .from('engineer_queue')
-    .select('id, status, assigned_to, messages ( session_id, chat_sessions ( user_id ) )')
+    .select('id, status, assigned_to, messages!engineer_queue_message_id_fkey ( session_id, chat_sessions ( user_id ) )')
     .eq('id', id)
     .single()
 
@@ -464,7 +401,7 @@ router.get('/history', verifyJWT, requireRole('engineer', 'admin'), async (req, 
 
   // Khi lọc theo cây trồng → dùng inner join để lọc NGAY Ở DB. Trước đây lọc
   // client-side sau .range() nên phân trang sai và total chỉ là số của 1 trang.
-  const messagesJoin = filterCrop ? 'messages!inner' : 'messages'
+  const messagesJoin = filterCrop ? 'messages!engineer_queue_message_id_fkey!inner' : 'messages!engineer_queue_message_id_fkey'
   const sessionsJoin = filterCrop ? 'chat_sessions!inner' : 'chat_sessions'
 
   let query = supabase

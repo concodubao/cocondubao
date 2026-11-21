@@ -24,6 +24,7 @@ const sb = vi.hoisted(() => {
 vi.mock('../src/services/supabase.js', () => ({ supabase: sb.supabase }))
 vi.mock('../src/services/notifications.js', () => ({
   sendPush: vi.fn().mockResolvedValue({ ok: true }),
+  loadNotificationRecipients: vi.fn().mockResolvedValue([]),
   dispatchNotification: vi.fn().mockResolvedValue({ sent: 0, failed: 0, total: 0 }),
 }))
 // sharp là native module — mock để test không phụ thuộc binary theo nền tảng

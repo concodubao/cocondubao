@@ -1,29 +1,36 @@
 import { test, expect } from '@playwright/test'
 
-// E2E luồng đăng nhập — viết theo ĐÚNG code thật (Login.jsx + App.jsx routes + api.js).
-// Tất cả API đều được mock (page.route) nên test KHÔNG cần backend chạy thật.
-//
-// Lưu ý khớp với UI thật:
-//  - Vai trò: nút "Nông dân" / "Kỹ sư / Admin".
-//  - Nông dân: ô SĐT placeholder "Nhập số điện thoại"; PIN = 6 ô input[type=password] (DigitBoxes mask).
-//  - PHẢI tick checkbox đồng ý (#consent) thì nút "Đăng nhập" mới bật (disabled || !agreed).
-//  - Đăng nhập thành công điều hướng bằng window.location.href: nông dân → /home, kỹ sư → /engineer/queue.
-//  - Endpoint thật: POST /auth/login-phone, POST /auth/login-email, GET /engineer/queue.
+const submitBtn = page => page.getByRole('button', { name: /Đăng nhập/ }).last()
 
-// Nút submit và tab cùng chữ "Đăng nhập" → submit luôn là phần tử cuối (.last()).
-const submitBtn = (page) => page.getByRole('button', { name: /Đăng nhập/ }).last()
+async function fillPins(page, digits) {
+  const boxes = page.locator('input[type="password"]')
+  await expect(boxes).toHaveCount(digits.length)
+  for (let i = 0; i < digits.length; i++) await boxes.nth(i).fill(digits[i])
+}
 
 test.describe('Luồng đăng nhập (critical path)', () => {
-  test('Checkbox đồng ý chặn nút đăng nhập tới khi tick (nông dân)', async ({ page }) => {
+  test('Nông dân cần đồng ý điều khoản khi đăng ký', async ({ page }) => {
+    let registrations = 0
+    await page.route('**/api/v1/auth/register-phone', route => {
+      registrations++
+      return route.fulfill({ json: {
+        token: 'fake-jwt-farmer', user: { id: 'u1', role: 'farmer' }, isNewUser: true,
+      } })
+    })
     await page.goto('/login')
     await page.getByText('Nông dân').click()
+    await page.getByRole('button', { name: 'Đăng ký', exact: true }).first().click()
+    await page.getByRole('textbox', { name: 'Số điện thoại', exact: true }).fill('0987654321')
+    await fillPins(page, '123456123456')
+    const register = page.getByRole('button', { name: /Đăng ký/ }).last()
+    await register.click()
+    await expect(page.getByText(/Bạn cần đánh dấu đồng ý/)).toBeVisible()
+    expect(registrations).toBe(0)
 
-    // Chưa tick consent → nút Đăng nhập bị khoá
-    await expect(submitBtn(page)).toBeDisabled()
-
-    // Tick consent → nút mở
-    await page.locator('#consent').check()
-    await expect(submitBtn(page)).toBeEnabled()
+    await page.getByRole('checkbox').check()
+    await register.click()
+    await expect(page).toHaveURL(/\/profile\?onboard=true$/)
+    expect(registrations).toBe(1)
   })
 
   test('Nông dân đăng nhập bằng SĐT + PIN → vào /home', async ({ page }) => {
@@ -38,11 +45,9 @@ test.describe('Luồng đăng nhập (critical path)', () => {
     await page.goto('/login')
     await page.getByText('Nông dân').click()
 
-    await page.getByPlaceholder('Nhập số điện thoại').fill('0987654321')
-    const pinBoxes = page.locator('input[type="password"]')
-    for (let i = 0; i < 6; i++) await pinBoxes.nth(i).fill('1')
+    await page.getByRole('textbox', { name: 'Số điện thoại', exact: true }).fill('0987654321')
+    await fillPins(page, '111111')
 
-    await page.locator('#consent').check()
     await submitBtn(page).click()
 
     // Điều hướng sang trang chủ nông dân
@@ -65,10 +70,9 @@ test.describe('Luồng đăng nhập (critical path)', () => {
     await page.goto('/login')
     await page.getByText('Kỹ sư / Admin').click()
 
-    await page.getByPlaceholder('email@example.com').fill('engineer@test.com')
-    await page.getByPlaceholder('••••••••').fill('password123')
+    await page.getByLabel('Email', { exact: true }).fill('engineer@test.com')
+    await page.getByLabel('Mật khẩu', { exact: true }).fill('password123')
 
-    await page.locator('#consent').check()
     await submitBtn(page).click()
 
     await expect(page).toHaveURL(/\/engineer\/queue$/)

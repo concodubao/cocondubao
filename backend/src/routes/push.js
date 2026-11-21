@@ -11,7 +11,7 @@ import multer    from 'multer'
 import sharp     from 'sharp'
 import { verifyJWT, requireRole } from '../middleware/auth.js'
 import { supabase } from '../services/supabase.js'
-import { sendPush, dispatchNotification } from '../services/notifications.js'
+import { sendPush, dispatchNotification, loadNotificationRecipients } from '../services/notifications.js'
 import { DRAFT_PREFIX, dismissedRegion } from '../services/weatherAlerts.js'
 import { fail500 } from '../services/dbUtil.js'
 
@@ -225,6 +225,8 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
   }
 
   try {
+    const crop_tags = cropTags.filter(c => VALID_CROPS.includes(c))
+    const recipients = scheduledAt ? null : await loadNotificationRecipients({ type, crop_tags })
     const { data: notif, error: notifError } = await supabase
       .from('notifications')
       .insert({
@@ -232,7 +234,7 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
         body:         body.trim(),
         type,
         image_url:    imageUrl || null,
-        crop_tags:    cropTags.filter(c => VALID_CROPS.includes(c)),
+        crop_tags,
         created_by:   req.user.userId,
         scheduled_at: scheduledAt,
         sent_at:      scheduledAt ? null : new Date().toISOString(),
@@ -254,7 +256,7 @@ router.post('/send', verifyJWT, requireRole('admin'), async (req, res) => {
     }
 
     // Gửi ngay — dùng chung logic với scheduler
-    const stats = await dispatchNotification(notif)
+    const stats = await dispatchNotification(notif, recipients)
 
     if (stats.total === 0) {
       return res.json({ success: true, sent: 0, message: 'Không có thiết bị nào phù hợp để gửi.' })
@@ -341,6 +343,7 @@ router.post('/drafts/:id/approve', verifyJWT, requireRole('admin'), async (req, 
     if (!notif) return res.status(404).json({ error: 'Không tìm thấy bản nháp.' })
     if (notif.sent_at) return res.status(400).json({ error: 'Bản nháp này đã được gửi.' })
 
+    const recipients = await loadNotificationRecipients(notif)
     // Đánh dấu đã duyệt + đã gửi TRƯỚC khi dispatch, có điều kiện sent_at IS NULL: bấm đúp
     // hoặc 2 admin cùng duyệt thì chỉ 1 request trúng dòng → không gửi trùng.
     const { data: claimed, error: claimErr } = await supabase
@@ -352,7 +355,7 @@ router.post('/drafts/:id/approve', verifyJWT, requireRole('admin'), async (req, 
     if (claimErr) throw claimErr
     if (!claimed?.length) return res.status(400).json({ error: 'Bản nháp này đã được gửi.' })
 
-    const stats = await dispatchNotification(notif)
+    const stats = await dispatchNotification(notif, recipients)
     res.json({ success: true, sent: stats.sent, total: stats.total })
   } catch (err) {
     fail500(res, err, 'PUSH')

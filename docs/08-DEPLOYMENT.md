@@ -99,6 +99,11 @@ Migration order (as of this baseline) is listed in [04-DATABASE](04-DATABASE.md)
 base migration creates the tables, the `match_knowledge_chunks` RPC, the `update_updated_at`
 trigger, indexes, and RLS. Vector columns are `vector(1536)` (Gemini embedding dimension).
 
+Deploy `20261121000000_engineer_answer_message.sql` and the matching backend together.
+Apply the migration immediately before switching traffic to the updated API. It adds
+a second relationship between queue items and chat messages. The updated API selects
+the question relationship explicitly and uses the new database function to save replies.
+
 > **Soft-degrade:** the API is written to return an "unavailable" flag instead of `500`
 > when a not-yet-applied table is queried, so a deploy that precedes a manual migration
 > does not crash. Still, apply migrations promptly.

@@ -131,6 +131,26 @@ async function enqueueForEngineer(messageId, pushTitle, question) {
   return true
 }
 
+async function saveChatAnswer(result, sessionId, userMessageId, question, hasImage = false) {
+  let content = result.answer
+  let engineerQueued = false
+  if (result.needEngineer) {
+    const title = hasImage ? 'Nông dân gửi ảnh sâu bệnh cần tư vấn' : 'Có câu hỏi mới từ nông dân'
+    engineerQueued = await enqueueForEngineer(userMessageId, title, question)
+    content = engineerQueued
+      ? 'Câu hỏi của bạn đã được chuyển cho kỹ sư nông nghiệp. Kỹ sư sẽ trả lời trong vòng 24 giờ.'
+      : 'Chưa gửi được câu hỏi cho kỹ sư. Bạn vui lòng thử gửi lại.'
+  }
+  const answerMsg = await insertAnswerMessage({
+    session_id: sessionId,
+    role: result.needEngineer ? 'system' : 'assistant',
+    content,
+    confidence: result.confidence,
+    source: result.source,
+  })
+  return { answerMsg, engineerQueued }
+}
+
 // ─── POST /chat/ask — hỏi bằng text ─────────────────────────────────────────
 router.post('/ask', verifyJWT, async (req, res) => {
   const { text, sessionId, testMode } = req.body
@@ -186,22 +206,7 @@ router.post('/ask', verifyJWT, async (req, res) => {
     }).select('id').single()
     if (userMsgErr || !userMsg) throw userMsgErr || new Error('Không lưu được câu hỏi.')
 
-    const answerContent = result.needEngineer
-      ? 'Câu hỏi của bạn đã được chuyển cho kỹ sư nông nghiệp. Kỹ sư sẽ trả lời trong vòng 24 giờ.'
-      : result.answer
-
-    const answerMsg = await insertAnswerMessage({
-      session_id: sid,
-      role:       result.needEngineer ? 'system' : 'assistant',
-      content:    answerContent,
-      confidence: result.confidence,
-      source:     result.source,
-    })
-
-    let engineerQueued = false
-    if (result.needEngineer && userMsg) {
-      engineerQueued = await enqueueForEngineer(userMsg.id, 'Có câu hỏi mới từ nông dân', text.trim())
-    }
+    const { answerMsg, engineerQueued } = await saveChatAnswer(result, sid, userMsg.id, text.trim())
 
     res.json({
       answer:        result.answer,
@@ -355,22 +360,7 @@ router.post('/ask-with-image', verifyJWT, upload.single('image'), async (req, re
     }).select('id').single()
     if (userMsgErr || !userMsg) throw userMsgErr || new Error('Không lưu được câu hỏi.')
 
-    const answerContent = result.needEngineer
-      ? 'Ảnh và câu hỏi của bạn đã được gửi cho kỹ sư. Kỹ sư sẽ xem ảnh và trả lời trong 24 giờ.'
-      : result.answer
-
-    const answerMsg = await insertAnswerMessage({
-      session_id: sid,
-      role:       result.needEngineer ? 'system' : 'assistant',
-      content:    answerContent,
-      confidence: result.confidence,
-      source:     result.source,
-    })
-
-    let engineerQueued = false
-    if (result.needEngineer && userMsg) {
-      engineerQueued = await enqueueForEngineer(userMsg.id, 'Nông dân gửi ảnh sâu bệnh cần tư vấn', question)
-    }
+    const { answerMsg, engineerQueued } = await saveChatAnswer(result, sid, userMsg.id, question, !!imageUrl)
 
     res.json({
       answer:         result.answer,

@@ -15,7 +15,7 @@ const sb = vi.hoisted(() => {
     return b
   }
   return {
-    supabase: { from: () => makeBuilder() },
+    supabase: { from: vi.fn(makeBuilder) },
     enqueue:  (...results) => queue.push(...results),
     reset:    () => { queue.length = 0 },
   }
@@ -26,11 +26,16 @@ const sendNotification = vi.hoisted(() => vi.fn())
 vi.mock('../src/services/supabase.js', () => ({ supabase: sb.supabase }))
 vi.mock('web-push', () => ({ default: { sendNotification } }))
 
-const { isQuietHour, dispatchNotification, processScheduledNotifications } =
+const { isQuietHour, loadNotificationRecipients, dispatchNotification, processScheduledNotifications } =
   await import('../src/services/notifications.js')
+
+async function sendBroadcast(notif) {
+  return dispatchNotification(notif, await loadNotificationRecipients(notif))
+}
 
 beforeEach(() => {
   sb.reset()
+  sb.supabase.from.mockClear()
   sendNotification.mockReset().mockResolvedValue({})
 })
 
@@ -80,7 +85,7 @@ describe('dispatchNotification', () => {
       error: null,
     })
 
-    const stats = await dispatchNotification({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: [] })
+    const stats = await sendBroadcast({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: [] })
 
     expect(stats.total).toBe(2)
     expect(stats.sent).toBe(2)
@@ -96,7 +101,7 @@ describe('dispatchNotification', () => {
       error: null,
     })
 
-    const stats = await dispatchNotification({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: [] })
+    const stats = await sendBroadcast({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: [] })
 
     expect(stats.total).toBe(1)
     expect(sendNotification).toHaveBeenCalledTimes(1)
@@ -117,7 +122,7 @@ describe('dispatchNotification', () => {
       },
     )
 
-    const stats = await dispatchNotification({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: ['rice'] })
+    const stats = await sendBroadcast({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: ['rice'] })
 
     expect(stats.total).toBe(1)
     expect(sendNotification).toHaveBeenCalledTimes(1)
@@ -125,7 +130,7 @@ describe('dispatchNotification', () => {
 
   it('không có subscriber → sent 0, không gọi web-push', async () => {
     sb.enqueue({ data: [], error: null })
-    const stats = await dispatchNotification({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: [] })
+    const stats = await sendBroadcast({ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: [] })
     expect(stats).toEqual({ sent: 0, failed: 0, total: 0 })
     expect(sendNotification).not.toHaveBeenCalled()
   })
@@ -136,8 +141,8 @@ describe('processScheduledNotifications', () => {
   it('gửi notif tới hạn rồi đánh dấu sent_at', async () => {
     sb.enqueue(
       { data: [{ id: 'n1', title: 'T', body: 'B', type: 'alert', image_url: null, crop_tags: [] }], error: null }, // due
-      { data: [{ id: 'n1' }], error: null }, // claim: update sent_at WHERE sent_at IS NULL
       { data: [{ endpoint: 'e1', keys: {}, user_id: 'u1', notif_types: ['alert'], quiet_start: null, quiet_end: null }], error: null }, // subs
+      { data: [{ id: 'n1' }], error: null }, // claim: update sent_at WHERE sent_at IS NULL
     )
 
     await processScheduledNotifications()
@@ -148,6 +153,7 @@ describe('processScheduledNotifications', () => {
   it('notif đã bị nơi khác nhận (claim trúng 0 dòng) → KHÔNG gửi trùng', async () => {
     sb.enqueue(
       { data: [{ id: 'n1', title: 'T', body: 'B', type: 'alert', image_url: null, crop_tags: [] }], error: null }, // due
+      { data: [{ endpoint: 'e1', keys: {} }] }, // recipients
       { data: [], error: null }, // claim trúng 0 dòng
     )
     await processScheduledNotifications()
@@ -156,10 +162,24 @@ describe('processScheduledNotifications', () => {
 
   it('cắt gọn nội dung dài trong payload push (giới hạn ~4KB của Web Push)', async () => {
     sb.enqueue({ data: [{ endpoint: 'e1', keys: {}, user_id: 'u1', notif_types: ['alert'], quiet_start: null, quiet_end: null }], error: null })
-    await dispatchNotification({ id: 'n1', title: 'T', body: 'ạ'.repeat(5000), type: 'alert', crop_tags: [] })
+    await sendBroadcast({ id: 'n1', title: 'T', body: 'ạ'.repeat(5000), type: 'alert', crop_tags: [] })
     const payload = sendNotification.mock.calls.at(-1)[1]
     expect(Buffer.byteLength(payload)).toBeLessThan(3000)
     expect(JSON.parse(payload).body.endsWith('…')).toBe(true)
+  })
+
+  it.each(['subscriptions', 'profiles'])('retries after a failed %s lookup', async failure => {
+    const due = { data: [{ id: 'n1', title: 'T', body: 'B', type: 'alert', crop_tags: ['rice'] }] }
+    const subs = { data: [{ endpoint: 'e1', keys: {}, user_id: 'u1' }] }
+    const unavailable = { data: null, error: { message: 'database unavailable' } }
+    sb.enqueue(due, ...(failure === 'profiles' ? [subs] : []), unavailable)
+    await processScheduledNotifications()
+    expect(sb.supabase.from.mock.calls.filter(([table]) => table === 'notifications')).toHaveLength(1)
+    expect(sendNotification).not.toHaveBeenCalled()
+
+    sb.enqueue(due, subs, { data: [{ id: 'u1', crops: ['rice'] }] }, { data: [{ id: 'n1' }] })
+    await processScheduledNotifications()
+    expect(sendNotification).toHaveBeenCalledOnce()
   })
 
   it('không có notif tới hạn → không gửi gì', async () => {

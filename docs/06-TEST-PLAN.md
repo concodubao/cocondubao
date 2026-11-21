@@ -236,7 +236,7 @@ knowledge base and valid Gemini key.
 | TC-FE-02 | Answer markdown + disclaimer | renders + disclaimer for technical | Auto | `frontend` Vitest |
 | TC-FE-03 | Wait-engineer state | correct UI/polling | Auto | `frontend` Vitest |
 | TC-E2E-01 | Login by phone & email | reaches role home | Auto | Playwright `critical-path.spec.js` |
-| TC-E2E-02 | Consent required to proceed | button enabled only after consent (`#consent`) | Auto | Playwright |
+| TC-E2E-02 | Farmer registration requires consent | Submitting without consent shows an error. Checking the box and submitting opens onboarding. | Auto | Playwright |
 | TC-E2E-03 | Role-based routing | farmer→`/home`, engineer→`/engineer/queue` | Auto | Playwright |
 
 ### 6.10 Manual / UAT (→ NFR-USE)

@@ -21,6 +21,7 @@ export default defineConfig({
   // động backend (tránh phụ thuộc .env/DB/Gemini thật và làm test giòn).
   webServer: {
     command: 'npm run dev',
+    env: { VITE_API_URL: '/api/v1' },
     url: 'http://localhost:5173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

@@ -22,7 +22,7 @@ const sb = vi.hoisted(() => {
     return b
   }
   return {
-    supabase: { from: () => makeBuilder() },
+    supabase: { from: () => makeBuilder(), rpc: vi.fn(makeBuilder) },
     enqueue:  (...results) => queue.push(...results),
     reset:    () => { queue.length = 0 },
   }
@@ -53,7 +53,7 @@ const farmerToken = () => jwt.sign({ userId: 'farmer1', role: 'farmer' }, SECRET
 const auth        = (t) => ({ Authorization: `Bearer ${t}` })
 
 beforeAll(() => { process.env.JWT_SECRET = SECRET })
-beforeEach(() => { sb.reset() })
+beforeEach(() => { sb.reset(); sb.supabase.rpc.mockClear() })
 
 // ══════════════════════════════════════════════════════════════════════════════
 describe('GET /engineer/queue', () => {
@@ -129,17 +129,7 @@ describe('PATCH /engineer/queue/:id/answer', () => {
   })
 
   it('lưu câu trả lời thành công khi kỹ sư xử lý câu của mình (200)', async () => {
-    sb.enqueue(
-      { // queueItem
-        data: {
-          message_id: 'm1', assigned_to: 'eng1', status: 'in_progress',
-          messages: { session_id: 's1', content: 'Lúa bị gì?', chat_sessions: { user_id: 'farmer1' } },
-        },
-        error: null,
-      },
-      { data: null, error: null }, // insert messages
-      { data: null, error: null }, // update engineer_queue
-    )
+    sb.enqueue({ data: { question: 'Lúa bị gì?', farmer_id: 'farmer1', previous_answer: null, overwritten: false } })
 
     const res = await request(app)
       .patch('/api/v1/engineer/queue/q1/answer')
@@ -147,18 +137,15 @@ describe('PATCH /engineer/queue/:id/answer', () => {
       .send({ answer: 'Bón thêm urê 5kg/công nhé bà con.', addToKnowledge: false })
 
     expect(res.status).toBe(200)
+    expect(sb.supabase.rpc).toHaveBeenCalledWith('save_engineer_answer', {
+      p_queue_id: 'q1', p_engineer_id: 'eng1', p_is_admin: false,
+      p_answer: 'Bón thêm urê 5kg/công nhé bà con.', p_add_to_knowledge: false,
+    })
     expect(res.body.success).toBe(true)
   })
 
   it('trả 403 khi câu hỏi đang do kỹ sư khác xử lý', async () => {
-    sb.enqueue({
-      data: {
-        message_id: 'm1', assigned_to: 'eng2', status: 'in_progress',
-        messages: { session_id: 's1', content: 'Lúa bị gì?', chat_sessions: { user_id: 'farmer1' } },
-      },
-      error: null,
-    })
-
+    sb.enqueue({ data: null, error: { code: '42501' } })
     const res = await request(app)
       .patch('/api/v1/engineer/queue/q1/answer')
       .set(auth(engToken()))
@@ -277,19 +264,7 @@ describe('GET /docs/:id — xem nội dung tài liệu trước khi duyệt', ()
 // ══════════════════════════════════════════════════════════════════════════════
 describe('PATCH /engineer/queue/:id/answer — sửa câu đã trả lời = ghi đè', () => {
   it('ghi đè message engineer cũ thay vì tạo trùng (updated=true)', async () => {
-    sb.enqueue(
-      { // queueItem đã resolved, có answer cũ
-        data: {
-          message_id: 'm1', assigned_to: 'eng1', status: 'resolved', answer: 'Câu trả lời cũ',
-          messages: { session_id: 's1', content: 'Lúa bị gì?', chat_sessions: { user_id: 'farmer1' } },
-        },
-        error: null,
-      },
-      { data: [{ id: 'other', content: 'Câu khác' }, { id: 'pm1', content: 'Câu trả lời cũ' }], error: null }, // message engineer của phiên → so nội dung ở JS
-      { data: null, error: null },            // update message (ghi đè)
-      { data: null, error: null },            // update engineer_queue
-    )
-
+    sb.enqueue({ data: { question: 'Lúa?', previous_answer: 'Câu trả lời cũ', overwritten: true } })
     const res = await request(app)
       .patch('/api/v1/engineer/queue/q1/answer')
       .set(auth(engToken()))
@@ -299,20 +274,15 @@ describe('PATCH /engineer/queue/:id/answer — sửa câu đã trả lời = ghi
     expect(res.body.updated).toBe(true)
   })
 
-  it('không tìm thấy message cũ → chèn mới (updated=false)', async () => {
-    sb.enqueue(
-      {
-        data: {
-          message_id: 'm1', assigned_to: 'eng1', status: 'resolved', answer: 'Câu cũ',
-          messages: { session_id: 's1', content: 'Lúa?', chat_sessions: { user_id: 'farmer1' } },
-        },
-        error: null,
-      },
-      { data: [], error: null },   // không tìm thấy message cũ
-      { data: null, error: null }, // insert message mới
-      { data: null, error: null }, // update engineer_queue
-    )
+  it('trả 409 khi không xác định được tin nhắn cũ', async () => {
+    sb.enqueue({ data: null, error: { code: 'PT409' } })
+    const res = await request(app).patch('/api/v1/engineer/queue/q1/answer')
+      .set(auth(engToken())).send({ answer: 'Câu mới' })
+    expect(res.status).toBe(409)
+  })
 
+  it('không tìm thấy message cũ → chèn mới (updated=false)', async () => {
+    sb.enqueue({ data: { question: 'Lúa?', previous_answer: 'Câu cũ', overwritten: false } })
     const res = await request(app)
       .patch('/api/v1/engineer/queue/q1/answer')
       .set(auth(engToken()))

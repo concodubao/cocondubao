@@ -8,18 +8,21 @@ const SECRET = 'test-secret-key'
 // ─── Mock Supabase chainable (giống engineer.queue.test.js) ───
 const sb = vi.hoisted(() => {
   const queue = []
+  const inserts = []
   const CHAIN = ['select','insert','update','delete','eq','in','order','range',
                  'contains','is','not','single','maybeSingle','limit','or','gte','lt','lte','gt','ilike']
-  const makeBuilder = () => {
+  const makeBuilder = table => {
     const b = {}
     for (const m of CHAIN) b[m] = () => b
+    b.insert = row => { inserts.push({ table, row }); return b }
     b.then = (resolve, reject) => {
       const r = queue.length ? queue.shift() : { data: null, error: null }
       return Promise.resolve(r).then(resolve, reject)
     }
     return b
   }
-  return { supabase: { from: () => makeBuilder() }, enqueue: (...r) => queue.push(...r), reset: () => { queue.length = 0 } }
+  return { supabase: { from: makeBuilder }, inserts, enqueue: (...r) => queue.push(...r),
+    reset: () => { queue.length = 0; inserts.length = 0 } }
 })
 
 vi.mock('../src/services/supabase.js', () => ({ supabase: sb.supabase }))
@@ -116,6 +119,21 @@ describe('POST /chat/ask — testMode (Test AI của kỹ sư) không lưu dữ 
 })
 
 // ══════════════════════════════════════════════════════════════════════════════
+describe.each(['/ask', '/ask-with-image'])('Engineer handoff through %s', path => {
+  it.each([true, false])('records the queue outcome (queued=%s)', async queued => {
+    const { askRAG } = await import('../src/services/rag.js')
+    askRAG.mockResolvedValueOnce({ answer: null, confidence: 0.1, source: 'rag', needEngineer: true })
+    sb.enqueue({ data: { id: 's1' } }, { data: { id: 'question' } },
+      { error: queued ? null : { message: 'unavailable' } }, { data: { id: 'reply' } })
+    const res = await request(app).post('/api/v1/chat' + path)
+      .set(auth(tok('farmer1', 'farmer'))).send({ text: 'Lúa bị vàng lá?' })
+    expect(res.status).toBe(200)
+    expect(res.body).toMatchObject({ engineerQueued: queued, needEngineer: true, messageId: 'reply' })
+    expect(sb.inserts.map(i => i.table)).toEqual(['chat_sessions', 'messages', 'engineer_queue', 'messages'])
+    expect(sb.inserts.at(-1).row.content).toContain(queued ? 'đã được chuyển' : 'Chưa gửi được')
+  })
+})
+
 describe('POST /chat/escalate — nông dân xin kỹ sư xem lại', () => {
   const farmer = () => auth(tok('farmer1', 'farmer'))
   const ansMsg = (userId) => ({ id: 'm1', session_id: 's1', created_at: new Date().toISOString(), chat_sessions: { user_id: userId } })

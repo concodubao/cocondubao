@@ -55,18 +55,16 @@ export function isQuietHour(quietStart, quietEnd) {
   return hhmm >= start && hhmm < end
 }
 
-// ─── Gửi 1 notification (đã lưu DB) tới các subscriber phù hợp ───────────────
-// notif: { id, title, body, type, image_url, crop_tags }
-// Trả về { sent, failed, total } để route/scheduler báo cáo.
-export async function dispatchNotification(notif) {
+// Tải đủ người nhận trước khi ghi sent_at để có thể thử lại nếu truy vấn lỗi.
+export async function loadNotificationRecipients(notif) {
   // Phân trang: quá 1000 thiết bị thì 1 truy vấn bị cắt âm thầm → phần còn lại không nhận push
-  const { data: subscriptions } = await fetchAllRows(() => supabase
+  const { data: subscriptions, error } = await fetchAllRows(() => supabase
     .from('push_subscriptions')
     .select('endpoint, keys, user_id, notif_types, quiet_start, quiet_end, crops_filter')
     .eq('active', true)
     .order('endpoint', { ascending: true }))
 
-  if (!subscriptions?.length) return { sent: 0, failed: 0, total: 0 }
+  if (error) throw error
 
   // Lọc theo loại thông báo user muốn nhận + khung giờ yên tĩnh
   const filtered = subscriptions.filter(sub => {
@@ -79,26 +77,28 @@ export async function dispatchNotification(notif) {
   // Ưu tiên BỘ LỌC CÁ NHÂN của thiết bị (crops_filter); rỗng thì dùng cây trong
   // hồ sơ (users.crops). Trước đây crops_filter được lưu nhưng không bao giờ
   // được dùng khi gửi → cài đặt "lọc theo cây" của nông dân vô tác dụng.
-  let targetSubs = filtered
   const cropTags = notif.crop_tags || []
-  if (cropTags.length > 0) {
-    const userIds = [...new Set(filtered.map(s => s.user_id))]
-    const { data: users } = await supabase
+  if (!cropTags.length) return filtered
+
+  const needsProfile = filtered.filter(sub => sub.user_id && !sub.crops_filter?.length)
+  const userIds = [...new Set(needsProfile.map(sub => sub.user_id))]
+  const cropsByUser = new Map()
+  // Keep the UUID list within PostgREST URL and row limits.
+  for (let i = 0; i < userIds.length; i += 100) {
+    const { data: users, error: profileError } = await supabase
       .from('users')
       .select('id, crops')
-      .in('id', userIds)
-
-    const userMap = Object.fromEntries((users || []).map(u => [u.id, u.crops || []]))
-    targetSubs = filtered.filter(sub => {
-      const effectiveCrops = (sub.crops_filter?.length ? sub.crops_filter : userMap[sub.user_id]) || []
-      // Chưa chọn cây nào = nhận tất cả — khớp với danh sách thông báo trong app (G19).
-      // Trước đây danh sách hiện cảnh báo gắn cây cho người chưa chọn cây nhưng push
-      // thì không gửi → bà con bỏ lỡ cảnh báo sâu bệnh.
-      if (!effectiveCrops.length) return true
-      return cropTags.some(tag => effectiveCrops.includes(tag))
-    })
+      .in('id', userIds.slice(i, i + 100))
+    if (profileError) throw profileError
+    for (const user of users) cropsByUser.set(user.id, user.crops)
   }
+  return filtered.filter(sub => {
+    const crops = sub.crops_filter?.length ? sub.crops_filter : cropsByUser.get(sub.user_id)
+    return !crops?.length || cropTags.some(tag => crops.includes(tag))
+  })
+}
 
+export async function dispatchNotification(notif, targetSubs) {
   const payload = {
     title:   clip(notif.title, PUSH_TITLE_MAX),
     body:    clip(notif.body, PUSH_BODY_MAX),
@@ -138,6 +138,8 @@ export async function processScheduledNotifications() {
 
     for (const notif of due) {
       try {
+        // A lookup failure leaves sent_at NULL so the next scheduler tick can retry.
+        const recipients = await loadNotificationRecipients(notif)
         // NHẬN VIỆC trước khi gửi (nguyên tử: chỉ 1 nơi cập nhật được dòng còn sent_at NULL).
         // Trước đây gửi xong mới ghi sent_at: ghi lỗi / process sập giữa chừng / 2 máy cùng
         // chạy scheduler → thông báo bị gửi lại mỗi 60 giây.
@@ -150,7 +152,7 @@ export async function processScheduledNotifications() {
         if (claimErr) { console.warn(`[CRON] nhận notif ${notif.id} lỗi:`, claimErr.message); continue }
         if (!claimed?.length) continue // nơi khác đã gửi
 
-        const stats = await dispatchNotification(notif)
+        const stats = await dispatchNotification(notif, recipients)
         console.log(`[CRON] đã gửi notif đặt lịch ${notif.id} → ${stats.sent}/${stats.total} thiết bị`)
       } catch (e) {
         console.warn(`[CRON] gửi notif ${notif.id} lỗi:`, e.message)
